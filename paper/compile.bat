@@ -3,11 +3,11 @@ REM Windows batch file for compiling LaTeX document
 
 echo Compiling LaTeX document...
 
-REM Compile with XeLaTeX (recommended)
-xelatex main.tex
-biber main
-xelatex main.tex
-xelatex main.tex
+REM Compile with pdflatex (compatible with bibtex)
+pdflatex -interaction=nonstopmode main.tex
+bibtex main
+pdflatex -interaction=nonstopmode main.tex
+pdflatex -interaction=nonstopmode main.tex
 
 echo.
 echo Compilation complete!
