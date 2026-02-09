@@ -1,0 +1,68 @@
+\section{Task Definition}
+\label{sec:task}
+
+We formally define the graph classification problem and establish notation for our cross-residual framework that integrates multiple graph operators. Unlike traditional approaches that focus on a single operator (e.g., GCN or GAT), our framework treats graph convolution operators as modular components that can be systematically combined through cross-branch residual connections.
+
+\subsection{Graph Representation and Notation}
+
+Let $\mathcal{G} = (\mathcal{V}, \mathcal{E})$ denote an undirected or directed graph, where $\mathcal{V} = \{v_1, v_2, \ldots, v_n\}$ is the set of $n$ nodes and $\mathcal{E} \subseteq \mathcal{V} \times \mathcal{V}$ is the set of edges. Each node $v_i \in \mathcal{V}$ is associated with a feature vector $\mathbf{x}_i \in \mathbb{R}^{d_{\text{in}}}$, where $d_{\text{in}}$ is the input feature dimension. The node features for the entire graph are collected in a matrix $\mathbf{X} \in \mathbb{R}^{n \times d_{\text{in}}}$, where the $i$-th row corresponds to $\mathbf{x}_i$.
+
+The graph structure is represented using an adjacency matrix $\mathbf{A} \in \{0,1\}^{n \times n}$, where $A_{ij} = 1$ if there exists an edge $(v_i, v_j) \in \mathcal{E}$, and $A_{ij} = 0$ otherwise. For undirected graphs, the adjacency matrix is symmetric ($\mathbf{A} = \mathbf{A}^\top$). Optionally, edge features can be represented as $\mathbf{e}_{uv} \in \mathbb{R}^{d_e}$ for each edge $(u,v) \in \mathcal{E}$, or collected in a tensor $\mathbf{E} \in \mathbb{R}^{n \times n \times d_e}$.
+
+\subsection{Graph Classification Problem}
+
+Given a training dataset $\mathcal{D} = \{(\mathcal{G}_i, y_i)\}_{i=1}^{N}$ consisting of $N$ graphs, where each graph $\mathcal{G}_i$ is associated with a label $y_i \in \mathcal{Y}$, our objective is to learn a mapping function $f_\theta: \mathcal{G} \rightarrow \hat{y}$ that predicts the label $\hat{y} \in \mathcal{Y}$ for an unseen graph. The label space $\mathcal{Y}$ depends on the task type:
+\begin{itemize}
+    \item \textbf{Binary classification}: $\mathcal{Y} = \{0, 1\}$ (e.g., molecular toxicity prediction)
+    \item \textbf{Multi-class classification}: $\mathcal{Y} = \{1, 2, \ldots, C\}$ (e.g., graph categorization into $C$ classes)
+    \item \textbf{Multi-label classification}: $\mathcal{Y} \subseteq \{1, 2, \ldots, C\}$ (e.g., a graph may belong to multiple categories simultaneously)
+\end{itemize}
+
+The function $f_\theta$ is parameterized by neural network weights $\theta$ and operates by first learning node-level representations through message passing, then aggregating these into a graph-level representation, and finally mapping this representation to the output label space.
+
+\subsection{Message Passing with Multiple Operators}
+
+Our framework supports multiple message passing operators $\{\Phi_1, \Phi_2, \ldots, \Phi_K\}$, where each operator $\Phi_k$ imposes a distinct inductive bias on neighborhood aggregation. Common operators include:
+\begin{itemize}
+    \item \textbf{GCN} \cite{kipf2016semi}: Normalized adjacency-based aggregation with low-pass filtering
+    \item \textbf{GAT} \cite{velivckovic2017graph}: Attention-weighted aggregation with learnable importance coefficients
+    \item \textbf{GraphSAGE} \cite{hamilton2017inductive}: Sampling-based aggregation with mean/LSTM/pooling operators
+    \item \textbf{GIN} \cite{xu2018powerful}: Injective aggregation for maximum discriminative power
+    \item \textbf{Transformer} \cite{dwivedi2020generalization}: Self-attention over nodes for long-range dependencies
+\end{itemize}
+
+For a single operator $\Phi_k$, node representations are updated over $L$ layers. At layer $\ell$, the representation $\mathbf{h}_i^{(\ell, k)}$ of node $v_i$ in branch $k$ is computed as:
+
+\begin{equation}
+\mathbf{h}_i^{(\ell+1, k)} = \sigma\left(\mathbf{W}^{(\ell, k)} \cdot \text{AGGREGATE}_k\left(\left\{\mathbf{h}_j^{(\ell, k)} : j \in \mathcal{N}(i)\right\}, \mathbf{h}_i^{(\ell, k)}\right) + \mathbf{b}^{(\ell, k)}\right)
+\end{equation}
+
+where $\text{AGGREGATE}_k$ is the aggregation function specific to operator $\Phi_k$ (e.g., mean pooling for GCN, attention weights for GAT), $\mathbf{W}^{(\ell, k)}$ are learnable weights, $\mathbf{b}^{(\ell, k)}$ is a bias term, and $\sigma$ is a non-linear activation function (e.g., ReLU). Our cross-residual framework enhances this standard formulation by introducing cross-branch connections that enable information exchange between different operators $\Phi_k$ and $\Phi_{k'}$ at each layer, as detailed in Section~\ref{sec:model}.
+
+\subsection{Graph-Level Representation Learning}
+
+After $L$ layers of message passing across $K$ branches, we obtain node representations $\{\mathbf{h}_i^{(L, k)} : i = 1, \ldots, n\}$ for each branch $k$. A readout function $R_k$ aggregates node-level representations into a branch-specific graph-level embedding $\mathbf{h}_{\mathcal{G}}^{(k)} \in \mathbb{R}^{d_{\text{out}}}$:
+
+\begin{equation}
+\mathbf{h}_{\mathcal{G}}^{(k)} = R_k\left(\left\{\mathbf{h}_i^{(L, k)} : i = 1, \ldots, n\right\}\right)
+\end{equation}
+
+Common readout functions include global mean pooling ($\frac{1}{n}\sum_{i=1}^n \mathbf{h}_i^{(L, k)}$), max pooling ($\max_{i=1,\ldots,n} \mathbf{h}_i^{(L, k)}$), and sum pooling ($\sum_{i=1}^n \mathbf{h}_i^{(L, k)}$). In our framework, the final graph-level representation $\mathbf{h}_{\mathcal{G}}$ combines embeddings from all $K$ branches through cross-residual connections, enabling the model to leverage complementary inductive biases from different operators.
+
+\subsection{Learning Objective}
+
+The graph-level representation is passed through a classifier (typically a linear layer followed by softmax) to produce the predicted label distribution:
+
+\begin{equation}
+\hat{\mathbf{y}} = \text{softmax}\left(\mathbf{W}_{\text{clf}} \mathbf{h}_{\mathcal{G}} + \mathbf{b}_{\text{clf}}\right)
+\end{equation}
+
+where $\hat{\mathbf{y}} \in \mathbb{R}^{C}$ (for multi-class classification) is the predicted probability distribution over $C$ classes, and $\mathbf{W}_{\text{clf}} \in \mathbb{R}^{C \times d_{\text{out}}}$, $\mathbf{b}_{\text{clf}} \in \mathbb{R}^{C}$ are classifier parameters.
+
+The model is trained end-to-end by minimizing the cross-entropy loss function:
+
+\begin{equation}
+\mathcal{L}(\theta) = -\frac{1}{N} \sum_{i=1}^{N} \sum_{c=1}^{C} y_{i,c} \log(\hat{y}_{i,c})
+\end{equation}
+
+where $y_{i,c} \in \{0, 1\}$ is the ground-truth label indicator (one-hot encoding) for graph $\mathcal{G}_i$ and class $c$, and $\hat{y}_{i,c}$ is the predicted probability for class $c$. For binary classification, this reduces to the binary cross-entropy loss. The parameters $\theta$ include all weights in the message passing layers, readout functions, cross-residual connections, and the classifier, which are optimized using gradient-based methods (e.g., Adam) with backpropagation.

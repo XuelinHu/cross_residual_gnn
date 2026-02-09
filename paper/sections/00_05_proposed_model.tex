@@ -1,0 +1,151 @@
+\section{Proposed Model}
+\label{sec:model}
+
+We present Enhanced Cross Residual Graph Neural Networks (ECR-GNN), a unified framework that integrates multiple graph operators through structured cross-branch residual connections. Unlike traditional approaches that treat different convolution operators (e.g., GCN, GAT, Transformer) as alternative choices, our framework designs them as modular components that can be systematically combined through two complementary cross-residual mechanisms: (1) node-level cross-residual connections that exchange intermediate representations between parallel branches at each layer, and (2) graph-level cross-residual propagation that passes graph-level embeddings across branches to enable hierarchical information fusion. This design enables operators with complementary inductive biases to collaborate synergistically—for example, GCN's low-pass smoothing can stabilize GAT's attention weights, while GAT's selectivity can refine GCN's aggregated features.
+
+\subsection{Overview of Cross-Residual Architecture}
+
+The overall architecture constructs multiple parallel branches, where each branch $k$ employs a base graph convolution operator $\Phi_k$ chosen from a set of supported operators $\{\text{GCN}, \text{GAT}, \text{Transformer}\}$. Let $\mathbf{X} \in \mathbb{R}^{n \times d_{\text{in}}}$ denote the input node features and $\mathbf{A} \in \{0,1\}^{n \times n}$ denote the adjacency matrix for a graph with $n$ nodes. Each branch processes the graph through $L$ layers of message passing, producing node-level representations $\{\mathbf{H}^{(L, k)} \in \mathbb{R}^{n \times d_{\text{out}}} : k = 1, \ldots, K\}$, where $\mathbf{H}^{(L, k)}$ collects node representations $\{\mathbf{h}_i^{(L, k)} : i = 1, \ldots, n\}$ for branch $k$ at the final layer $L$.
+
+The key innovation lies in how information flows across branches. At each layer $\ell$, our framework maintains cross-branch dependencies through two mechanisms:
+
+\textbf{Node-Level Cross-Residual:} Intermediate node representations from one branch are injected as auxiliary input to downstream layers of another branch. For two branches with operators $\Phi_1$ and $\Phi_2$, the update at layer $\ell$ is:
+\begin{align}
+\mathbf{H}^{(\ell+1, 1)} &= \sigma\left(\Phi_1\left(\mathbf{H}^{(\ell, 1)}, \mathbf{A}\right) + \mathbf{H}^{(\ell-1, 2)}\right) \label{eq:node_cross_1} \\
+\mathbf{H}^{(\ell+1, 2)} &= \sigma\left(\Phi_2\left(\mathbf{H}^{(\ell, 2)}, \mathbf{A}\right) + \mathbf{H}^{(\ell-1, 1)}\right) \label{eq:node_cross_2}
+\end{align}
+where $\mathbf{H}^{(\ell-1, k)}$ denotes the node representations from branch $k$ at layer $\ell-1$, and $\sigma$ is a non-linear activation function (e.g., ReLU). This cross-branch addition enables each operator to leverage historical information from the complementary branch, preserving multi-scale features and mitigating over-smoothing.
+
+\textbf{Graph-Level Cross-Residual:} After each pair of branches completes their forward pass, graph-level representations are exchanged and used as auxiliary input for subsequent branch pairs. Let $\mathbf{h}_{\mathcal{G}}^{(k)} \in \mathbb{R}^{d_{\text{out}}}$ denote the graph-level embedding from branch $k$, obtained by applying a readout function $R_k$ (e.g., global mean pooling) to node representations: $\mathbf{h}_{\mathcal{G}}^{(k)} = R_k(\mathbf{H}^{(L, k)})$. For two branch pairs $(k_1, k_2)$ and $(k_3, k_4)$, we have:
+\begin{align}
+\mathbf{h}_{\mathcal{G}}^{(k_1, t)} &= \mathbf{h}_{\mathcal{G}}^{(k_1, t-1)} + \mathbf{h}_{\mathcal{G}}^{(k_2, t-1)} \label{eq:graph_cross_1} \\
+\mathbf{h}_{\mathcal{G}}^{(k_2, t)} &= \mathbf{h}_{\mathcal{G}}^{(k_2, t-1)} + \mathbf{h}_{\mathcal{G}}^{(k_1, t-1)} \label{eq:graph_cross_2}
+\end{align}
+where $t$ denotes the stage in the sequential branch-pair processing. This residual propagation of graph-level embeddings enables hierarchical feature aggregation across branches, allowing later branches to build upon the graph-level knowledge acquired by earlier branches.
+
+The final graph-level representation $\mathbf{h}_{\mathcal{G}}$ combines outputs from all branches through summation:
+\begin{equation}
+\mathbf{h}_{\mathcal{G}} = \sum_{k=1}^{K} \mathbf{h}_{\mathcal{G}}^{(k)}
+\end{equation}
+which is then passed to a classifier for label prediction. This summation allows the model to leverage diverse inductive biases from all operators, producing a richer representation than any single branch could achieve alone.
+
+\subsection{Node-Level Cross-Residual Block}
+
+We formalize the node-level cross-residual mechanism, which operates at the granularity of individual node representations. Consider two parallel branches indexed by $k \in \{1, 2\}$, each employing $L$ layers of the same base operator $\Phi$ (e.g., GCN or GAT). Let $\mathbf{h}_i^{(\ell, k)}$ denote the representation of node $v_i$ at layer $\ell$ in branch $k$.
+
+At layer $\ell=0$, each branch applies an initial projection to map input features to the hidden space:
+\begin{equation}
+\mathbf{H}^{(0, k)} = \sigma\left(\mathbf{W}_{\text{init}}^{(k)} \mathbf{X}\right), \quad k \in \{1, 2\}
+\end{equation}
+where $\mathbf{W}_{\text{init}}^{(k)} \in \mathbb{R}^{d_{\text{out}} \times d_{\text{in}}}$ are learnable projection weights specific to branch $k$.
+
+For layers $\ell = 1, \ldots, L$, the node representations are updated through cross-residual connections. Let $\mathbf{H}_{\text{pre}}^{(\ell-1, k)}$ denote the cached representations from branch $k$ at layer $\ell-1$. The update rules are:
+\begin{align}
+\mathbf{H}_{\text{temp}}^{(\ell, 1)} &= \mathbf{H}^{(\ell, 1)} \label{eq:cache_1} \\
+\mathbf{H}_{\text{temp}}^{(\ell, 2)} &= \mathbf{H}^{(\ell, 2)} \label{eq:cache_2} \\
+\mathbf{H}^{(\ell+1, 1)} &= \sigma\left(\Phi\left(\mathbf{H}^{(\ell, 1)} + \mathbf{H}_{\text{pre}}^{(\ell-1, 2)}, \mathbf{A}\right) \odot \mathbf{M}^{(\ell, 1)}\right) \label{eq:update_cross_1} \\
+\mathbf{H}^{(\ell+1, 2)} &= \sigma\left(\Phi\left(\mathbf{H}^{(\ell, 2)} + \mathbf{H}_{\text{pre}}^{(\ell-1, 1)}, \mathbf{A}\right) \odot \mathbf{M}^{(\ell, 2)}\right) \label{eq:update_cross_2} \\
+\mathbf{H}_{\text{pre}}^{(\ell, 1)} &= \mathbf{H}_{\text{temp}}^{(\ell, 1)} \label{eq:update_pre_1} \\
+\mathbf{H}_{\text{pre}}^{(\ell, 2)} &= \mathbf{H}_{\text{temp}}^{(\ell, 2)} \label{eq:update_pre_2}
+\end{align}
+where $\mathbf{M}^{(\ell, k)}$ is a dropout mask applied for regularization, and $\odot$ denotes element-wise multiplication. The critical terms are $\mathbf{H}_{\text{pre}}^{(\ell-1, 2)}$ in Equation~\ref{eq:update_cross_1} and $\mathbf{H}_{\text{pre}}^{(\ell-1, 1)}$ in Equation~\ref{eq:update_cross_2}, which inject the cached representations from the \textit{opposite branch} into the current layer.
+
+After processing all $L$ layers, the two branches are merged through summation:
+\begin{equation}
+\mathbf{H}^{(L)} = \mathbf{H}^{(L, 1)} + \mathbf{H}^{(L, 2)}
+\end{equation}
+
+This cross-residual mechanism differs fundamentally from standard residual connections \cite{he2016deep}, which add a layer's input to its output within the same branch ($\mathbf{H}^{(\ell+1)} = \Phi(\mathbf{H}^{(\ell)}) + \mathbf{H}^{(\ell)}$). In contrast, our cross-branch approach adds representations from a \textit{different branch}, enabling information exchange across operators. This design preserves multi-scale features: even at deep layers ($\ell \to L$), each branch has access to historical information from the complementary branch, mitigating over-smoothing by maintaining diverse receptive fields across the two operator-specific pathways.
+
+\subsection{Graph-Level Cross-Residual Block}
+
+The graph-level cross-residual mechanism operates at the coarser granularity of entire graph embeddings. This mechanism is particularly useful when the architecture contains multiple branch pairs that are processed sequentially, where later pairs can benefit from the graph-level knowledge acquired by earlier pairs.
+
+Consider $P$ pairs of branches, where each pair $p \in \{1, \ldots, P\}$ consists of two branches $(k_{2p-1}, k_{2p})$. Let $\mathbf{h}_{\mathcal{G}}^{(k, t)}$ denote the graph-level embedding produced by branch $k$ at processing stage $t$, obtained via a readout function $R_k$:
+\begin{equation}
+\mathbf{h}_{\mathcal{G}}^{(k, t)} = R_k\left(\mathbf{H}^{(L, k, t)}\right) = \frac{1}{n}\sum_{i=1}^{n} \mathbf{h}_i^{(L, k, t)}
+\end{equation}
+where $\mathbf{H}^{(L, k, t)}$ are the node representations from branch $k$ at stage $t$, and we use global mean pooling as the readout.
+
+The graph-level cross-residual propagation is defined as:
+\begin{align}
+\mathbf{h}_{\mathcal{G}}^{(k_{2p-1}, t+1)} &= \mathbf{h}_{\mathcal{G}}^{(k_{2p-1}, t)} + \mathbf{h}_{\mathcal{G}}^{(k_{2p}, t)} \label{eq:graph_level_1} \\
+\mathbf{h}_{\mathcal{G}}^{(k_{2p}, t+1)} &= \mathbf{h}_{\mathcal{G}}^{(k_{2p}, t)} + \mathbf{h}_{\mathcal{G}}^{(k_{2p-1}, t)} \label{eq:graph_level_2}
+\end{align}
+Crucially, during the forward pass of branch $k$ at stage $t+1$, the graph embedding $\mathbf{h}_{\mathcal{G}}^{(k, t+1)}$ is not only used as the branch's output but also added as auxiliary input to the node-level representations within that branch. Specifically, for each node $v_i$ in a graph belonging to batch index $b$, we inject the graph-level embedding:
+\begin{equation}
+\mathbf{h}_i^{(\ell, k, t+1)} \leftarrow \mathbf{h}_i^{(\ell, k, t+1)} + \mathbf{h}_{\mathcal{G}}^{(k, t)}
+\end{equation}
+This injection ensures that node-level processing at stage $t+1$ is informed by the graph-level summary from stage $t$, creating a feedback loop that tightens the coupling between local node features and global graph structure.
+
+After processing all $P$ pairs, the final graph representation combines the outputs from the last pair:
+\begin{equation}
+\mathbf{h}_{\mathcal{G}} = \mathbf{h}_{\mathcal{G}}^{(k_{2P-1}, P)} + \mathbf{h}_{\mathcal{G}}^{(k_{2P}, P)}
+\end{equation}
+
+The graph-level cross-residual mechanism addresses the limitation of purely sequential architectures (e.g., stacking branches without cross-branch connections) by enabling explicit information exchange between branch pairs. This design allows the framework to leverage complementary graph-level perspectives—for instance, if one branch pair using GCN captures smooth global patterns, the subsequent pair using GAT can refine these patterns through attention-based selectivity, while still having access to the GCN-derived embeddings via the residual connection.
+
+\subsection{Operator Instantiation Framework}
+
+A key principle of ECR-GNN is that graph convolution operators are treated as modular, pluggable components rather than monolithic architectural choices. Our framework provides a unified interface for instantiating different operators, enabling systematic evaluation of operator combinations within the cross-residual architecture.
+
+Let $\mathcal{O} = \{\text{GCN}, \text{GAT}, \text{Transformer}\}$ denote the set of supported operators in the current implementation. Each operator $\Phi_k \in \mathcal{O}$ for branch $k$ is instantiated through a factory function:
+\begin{equation}
+\Phi_k = \text{InstantiateOperator}(\text{model_name}, d_{\text{in}}, d_{\text{out}})
+\end{equation}
+where $\text{model_name} \in \{\texttt{``GCNConv"}, \texttt{``GATConv"}, \texttt{``TransformerConv"}\}$ specifies the operator type, and $d_{\text{in}}, d_{\text{out}}$ are the input and output dimensions. The factory function returns a PyTorch module that implements the specific aggregation scheme:
+
+\begin{itemize}
+    \item \textbf{GCNConv} \cite{kipf2016semi}: Performs normalized adjacency-based aggregation:
+    \begin{equation}
+    \mathbf{H}' = \sigma\left(\tilde{\mathbf{D}}^{-\frac{1}{2}}\tilde{\mathbf{A}}\tilde{\mathbf{D}}^{-\frac{1}{2}}\mathbf{H}\mathbf{W}\right)
+    \end{equation}
+    where $\tilde{\mathbf{A}} = \mathbf{A} + \mathbf{I}$ is the adjacency matrix with self-loops, $\tilde{\mathbf{D}}$ is the degree matrix, and $\mathbf{W}$ are learnable weights. GCN imposes a low-pass filtering bias, smoothing features across neighbors.
+
+    \item \textbf{GATConv} \cite{velivckovic2017graph}: Computes attention coefficients for each edge:
+    \begin{align}
+    \alpha_{ij} &= \frac{\exp\left(\text{LeakyReLU}\left(\mathbf{a}^{\top}[\mathbf{W}\mathbf{h}_i \| \mathbf{W}\mathbf{h}_j]\right)\right)}{\sum_{k \in \mathcal{N}(i) \cup \{i\}} \exp\left(\text{LeakyReLU}\left(\mathbf{a}^{\top}[\mathbf{W}\mathbf{h}_i \| \mathbf{W}\mathbf{h}_k]\right)\right)} \\
+    \mathbf{h}_i' &= \sigma\left(\sum_{j \in \mathcal{N}(i) \cup \{i\}} \alpha_{ij} \mathbf{W}\mathbf{h}_j\right)
+    \end{align}
+    where $\mathbf{a}$ is a learnable attention vector and $\|$ denotes concatenation. GAT enables adaptive, importance-weighted aggregation.
+
+    \item \textbf{TransformerConv} \cite{dwivedi2020generalization}: Applies multi-head self-attention over nodes:
+    \begin{equation}
+    \text{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \text{softmax}\left(\frac{\mathbf{Q}\mathbf{K}^{\top}}{\sqrt{d_k}}\right)\mathbf{V}
+    \end{equation}
+    where $\mathbf{Q}, \mathbf{K}, \mathbf{V}$ are query, key, value matrices derived from node features. TransformerConv captures long-range dependencies beyond local neighborhoods.
+\end{itemize}
+
+The modularity of this design has two important implications. First, it allows new operators to be easily integrated by adding a corresponding instantiation case in the factory function (e.g., GraphSAGE \cite{hamilton2017inductive}, GIN \cite{xu2018powerful}) without modifying the core cross-residual logic. Second, it enables controlled experiments where the operator type is varied while keeping the cross-residual architecture fixed, facilitating ablation studies to isolate the contribution of operator-specific inductive biases versus cross-branch information flow.
+
+In our implementation, all branches within a single model instance (e.g., CrossBlockGnn) typically use the same operator type to study the effect of cross-residual connections in a controlled setting. However, the framework architecture naturally supports heterogeneous operator combinations—for example, using GCN in branch 1 and GAT in branch 2—by simply passing different $\text{model_name}$ values when instantiating the branches.
+
+\subsection{Readout and Classification}
+
+After $L$ layers of cross-residual message passing across $K$ branches, the framework must aggregate node-level representations into a fixed-size graph-level embedding for classification. We employ global mean pooling as the readout function due to its simplicity and effectiveness:
+
+\begin{equation}
+\mathbf{h}_{\mathcal{G}}^{(k)} = R_k\left(\mathbf{H}^{(L, k)}\right) = \frac{1}{n}\sum_{i=1}^{n} \mathbf{h}_i^{(L, k)}
+\end{equation}
+
+For node-level cross-residual architectures (e.g., CrossBlockGnn), the final graph representation combines outputs from all branches:
+\begin{equation}
+\mathbf{h}_{\mathcal{G}} = \sum_{k=1}^{K} \mathbf{h}_{\mathcal{G}}^{(k)}
+\end{equation}
+
+For graph-level cross-residual architectures (e.g., CrossGraphBlockGnn) with $P$ sequential branch pairs, the final representation combines the outputs from the last pair:
+\begin{equation}
+\mathbf{h}_{\mathcal{G}} = \mathbf{h}_{\mathcal{G}}^{(2P-1, P)} + \mathbf{h}_{\mathcal{G}}^{(2P, P)}
+\end{equation}
+
+The graph-level embedding is then passed through a linear classifier followed by softmax to produce the predicted label distribution:
+\begin{equation}
+\hat{\mathbf{y}} = \text{softmax}\left(\mathbf{W}_{\text{clf}} \mathbf{h}_{\mathcal{G}} + \mathbf{b}_{\text{clf}}\right)
+\end{equation}
+where $\mathbf{W}_{\text{clf}} \in \mathbb{R}^{C \times d_{\text{out}}}$ and $\mathbf{b}_{\text{clf}} \in \mathbb{R}^{C}$ are classifier parameters, and $C$ is the number of classes.
+
+The model is trained end-to-end by minimizing the cross-entropy loss:
+\begin{equation}
+\mathcal{L}(\theta) = -\frac{1}{N}\sum_{i=1}^{N} \sum_{c=1}^{C} y_{i,c} \log(\hat{y}_{i,c})
+\end{equation}
+where $y_{i,c}$ is the ground-truth label indicator for graph $i$ and class $c$, and $\theta$ includes all parameters in the message passing layers, cross-residual connections, and classifier. Dropout regularization is applied both after each message passing layer and before the final classifier to prevent overfitting. The parameters are optimized using the Adam optimizer \cite{kingma2014adam} with backpropagation.

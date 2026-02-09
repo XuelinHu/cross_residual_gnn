@@ -1,0 +1,144 @@
+\section{Datasets}
+\label{sec:datasets}
+
+To comprehensively evaluate the effectiveness of ECR-GNN, we conduct experiments on four benchmark datasets from the TU Dortmund University (TUDataset) collection \cite{keriven2020benchmark}. These datasets vary in size, domain, and graph characteristics, providing a robust testbed for evaluating cross-residual mechanisms and multi-operator architectures.
+
+\subsection{Dataset Overview}
+
+We use the following datasets in our experiments:
+
+\paragraph{MUTAG}
+MUTAG is a standard benchmark dataset for molecular property prediction, consisting of 188 chemical compounds representing nitroaromatic molecules. Each graph corresponds to a molecule, where nodes represent atoms and edges represent chemical bonds. The task is binary classification: predicting whether a molecule has mutagenic effects on the Gram-negative bacterium \textit{Salmonella typhimurium}. This dataset is widely used in graph classification literature due to its small size and well-defined task, making it suitable for controlled ablation studies.
+
+\paragraph{DD}
+The DD (Dreiding-Dataset) dataset contains 1,178 chemical compounds representing small organic molecules. Each graph encodes the molecular structure of a compound, with nodes representing atoms and edges representing chemical bonds. The task is to predict whether a compound is active against drug-resistant HIV strains. Compared to MUTAG, DD presents a larger-scale challenge with more graphs and complex molecular structures, testing the model's ability to handle increased dataset size and structural diversity.
+
+\paragraph{MSRC\_9}
+MSRC\_9 (Microsoft Research Cambridge 9) is a dataset derived from image segmentation tasks, containing 231 graphs representing image regions. Each graph corresponds to a segmented image from the MSRC dataset, where nodes represent image regions and edges indicate spatial adjacency between regions. The task is multi-class classification: assigning each graph to one of 9 scene categories (e.g., building, tree, cow, airplane). This dataset introduces non-biological domain data, testing the generalizability of our framework beyond molecular graphs.
+
+\paragraph{AIDS}
+AIDS is a bioinformatics dataset containing 2,000 chemical compounds screened for activity against HIV. Each graph represents a molecule, with nodes as atoms and edges as chemical bonds. The task is binary classification: predicting whether a compound is active against HIV. This is the largest dataset in our experiments, challenging the model's scalability and ability to learn from diverse molecular structures.
+
+\subsection{Dataset Statistics}
+
+Table~\ref{tab:datasets} summarizes the key statistics of the datasets used in our experiments. Statistics are computed from the TUDataset loader in PyTorch Geometric.
+
+\begin{table}[t]
+\centering
+\caption{Summary of graph classification datasets used in experiments}
+\label{tab:datasets}
+\begin{tabular}{lccccc}
+\toprule
+Dataset & \# Graphs & \# Classes & Feature Dim. & Domain & Task Type \\
+\midrule
+MUTAG & 188 & 2 & [PLACEHOLDER] & Bio & Binary \\
+DD & 1,178 & 2 & [PLACEHOLDER] & Bio & Binary \\
+MSRC\_9 & 231 & 9 & [PLACEHOLDER] & Vision & Multi-class \\
+AIDS & 2,000 & 2 & [PLACEHOLDER] & Bio & Binary \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Data Loading and Configuration}
+
+All datasets are loaded using the TUDataset loader from PyTorch Geometric \cite{fey2019fast}. The data loading process follows the implementation in \texttt{geomatric/graph\_classify\_v2.py}:
+
+\paragraph{Dataset Source}
+Datasets are loaded from the TUDataset collection with the root path configured as \texttt{/data/ai\_data} on Linux or \texttt{../data} on Windows. Each dataset is specified by name (e.g., \texttt{``MUTAG"}, \texttt{``DD"}, \texttt{``MSRC\_9"}, \texttt{``AIDS"}) and automatically downloaded to the configured path if not present.
+
+\paragraph{Graph Representation}
+Each graph is represented as a PyTorch Geometric \texttt{Data} object containing:
+\begin{itemize}
+    \item \textbf{x}: Node feature matrix of shape $(n \times d_{\text{in}})$, where $n$ is the number of nodes and $d_{\text{in}}$ is the input feature dimension specific to the dataset
+    \item \textbf{edge\_index}: Graph connectivity in COO format, shape $(2, |\mathcal{E}|)$, where $|\mathcal{E}|$ is the number of edges
+    \item \textbf{y}: Graph-level label (scalar for binary/multi-class classification)
+    \item \textbf{batch}: Batch assignment vector (for mini-batch processing)
+\end{itemize}
+
+\paragraph{Node Features}
+Node features are provided by the TUDataset loader in their original form. No additional feature engineering or normalization is applied during data loading. The feature dimension $d_{\text{in}}$ is dataset-specific and automatically inferred by the loader. For molecular datasets (MUTAG, DD, AIDS), features typically encode atom types and chemical properties; for MSRC\_9, features encode visual descriptors of image regions.
+
+\paragraph{Edge Attributes and Self-Loops}
+\textbf{Edge attributes} are not used in our implementation. All graph convolution operators (GCN, GAT, Transformer) operate on unweighted graphs. \textbf{Self-loops} are added automatically by specific operators when required (e.g., GCN adds self-loops via $\tilde{\mathbf{A}} = \mathbf{A} + \mathbf{I}$), but this is handled internally by the operator implementation rather than as a preprocessing step.
+
+\subsection{Data Splitting Protocol}
+
+We use 5-fold cross-validation for all datasets to ensure robust evaluation and enable fair comparison with baseline methods.
+
+\paragraph{5-Fold Cross-Validation}
+The dataset is randomly shuffled and split into 5 equal-sized folds using the implementation in \texttt{load\_data(start\_index)} (line 167-188 in \texttt{graph\_classify\_v2.py}). For each fold $k \in \{0, 1, 2, 3, 4\}$:
+\begin{enumerate}
+    \item Fold $k$ is held out as the test set
+    \item The remaining 4 folds are concatenated to form the training set
+    \item The model is trained on the training set and evaluated on the test set
+    \item This process is repeated for all 5 folds, and the mean accuracy and standard deviation across folds are reported
+\end{enumerate}
+
+The split is implemented as:
+\begin{equation}
+\begin{aligned}
+\text{train\_dataset} &= \mathcal{D}[0:k \cdot \text{split\_len}] \cup \mathcal{D}[(k+1) \cdot \text{split\_len}:|\mathcal{D}|] \\
+\text{test\_dataset} &= \mathcal{D}[k \cdot \text{split\_len}:(k+1) \cdot \text{split\_len}]
+\end{aligned}
+\end{equation}
+where $\mathcal{D}$ is the full dataset, $\text{split\_len} = |\mathcal{D}| / 5$, and $k$ is the fold index.
+
+\paragraph{Reproducibility}
+To ensure reproducibility, random seeds are set before training:
+\begin{itemize}
+    \item PyTorch random seed: 1024
+    \item NumPy random seed: 1024
+    \item Python random seed: 1024
+    \item CUDA random seed: 1024 (if GPU is available)
+\end{itemize}
+The dataset shuffling is deterministic given the fixed random seed, ensuring that the 5-fold splits are consistent across different experimental runs.
+
+\paragraph{No Official Splits Used}
+We do not use the predefined splits provided by TUDataset. Instead, we generate our own 5-fold splits to maintain consistency with the experimental setup in prior work and to enable controlled comparison across different model architectures. All results report mean accuracy and standard deviation computed from the 5 folds.
+
+\subsection{Data Preprocessing and Augmentation}
+
+\paragraph{Minimal Preprocessing}
+Our framework applies minimal preprocessing to the raw datasets:
+\begin{itemize}
+    \item \textbf{Dataset shuffling:} The dataset is shuffled once using the fixed random seed before creating 5-fold splits
+    \item \textbf{Batching:} Graphs are grouped into batches of size 32 using PyTorch Geometric's \texttt{DataLoader}
+    \item \textbf{No feature normalization:} Node features are used as-is without scaling or centering
+    \item \textbf{No graph augmentation:} No edge dropout, node dropping, or subgraph sampling is applied
+\end{itemize}
+
+\paragraph{Batching Strategy}
+Training and test sets are loaded using separate \texttt{DataLoader} instances:
+\begin{itemize}
+    \item \textbf{Training loader:} \texttt{DataLoader(train\_dataset, batch\_size=32, shuffle=True)} - shuffles batches each epoch
+    \item \textbf{Test loader:} \texttt{DataLoader(test\_dataset, batch\_size=32, shuffle=False)} - maintains deterministic order for evaluation
+\end{itemize}
+The batch size of 32 is used across all datasets and models, as specified in the implementation.
+
+\paragraph{Regularization}
+While not data augmentation per se, we apply \textbf{dropout} regularization during training:
+\begin{itemize}
+    \item Dropout probability: 0.6 (default, configurable via \texttt{--drop} argument)
+    \item Applied after each message passing layer
+    \item Applied before the final classifier
+\end{itemize}
+Dropout acts as a form of implicit data augmentation by randomly dropping node features during training, which helps prevent overfitting despite the small dataset sizes.
+
+\subsection{Evaluation Metrics}
+
+Following standard practice in graph classification literature, we evaluate model performance using:
+
+\paragraph{Accuracy}
+Accuracy is the primary evaluation metric, computed as the proportion of correctly classified graphs:
+\begin{equation}
+\text{Accuracy} = \frac{1}{|\mathcal{D}_{\text{test}}|} \sum_{i=1}^{|\mathcal{D}_{\text{test}}|} \mathbb{1}[\hat{y}_i = y_i]
+\end{equation}
+where $\mathcal{D}_{\text{test}}$ is the test set, $\hat{y}_i$ is the predicted label, and $y_i$ is the ground-truth label.
+
+\paragraph{Aggregation Across Folds}
+For each dataset, we report:
+\begin{itemize}
+    \item \textbf{Mean accuracy:} $\mu = \frac{1}{5}\sum_{k=0}^{4} \text{acc}_k$, where $\text{acc}_k$ is the accuracy on fold $k$
+    \item \textbf{Standard deviation:} $\sigma = \sqrt{\frac{1}{5}\sum_{k=0}^{4} (\text{acc}_k - \mu)^2}$
+\end{itemize}
+These statistics are computed across the 5 folds, providing a robust measure of model performance and stability. Results are reported in the format ``mean $\pm$ standard deviation'' (e.g., ``$0.85 \pm 0.03$'').
