@@ -1,17 +1,15 @@
 % Table 1: Main Results
-
-% Table 1: Main Results on All Datasets
 \begin{table}[t]
 \centering
-\caption{Graph classification accuracy (mean $\pm$ std over 5-fold CV) on TUDataset benchmarks. Best results in bold.}
+\caption{Best 5-fold graph classification accuracy (mean $\pm$ std) for each architecture on each dataset after replacing the older MUTAG+GCNConv slice with the v4 rerun.}
 \label{tab:main_results}
 \begin{tabular}{lcccc}
 \toprule
 Model & MUTAG & DD & MSRC\_9 & AIDS \\
 \midrule
-BlockGNN & 0.822 $\pm$ 0.0404 & \textbf{0.618 $\pm$ 0.0211} & \textbf{0.982 $\pm$ 0.0170} & 0.810 $\pm$ 0.0213 \\
+BlockGNN & 0.822 $\pm$ 0.0404 & 0.618 $\pm$ 0.0211 & \textbf{0.982 $\pm$ 0.0170} & 0.810 $\pm$ 0.0213 \\
 ResBlockGnn & \textbf{0.832 $\pm$ 0.0315} & 0.611 $\pm$ 0.0316 & \textbf{0.982 $\pm$ 0.0265} & 0.812 $\pm$ 0.0068 \\
-CrossBlockGnn & 0.800 $\pm$ 0.0404 & 0.617 $\pm$ 0.0222 & 0.977 $\pm$ 0.0144 & 0.812 $\pm$ 0.0218 \\
+CrossBlockGnn & 0.811 $\pm$ 0.0705 & 0.617 $\pm$ 0.0222 & 0.977 $\pm$ 0.0144 & 0.812 $\pm$ 0.0218 \\
 GraphBlockGnn & 0.827 $\pm$ 0.0653 & 0.609 $\pm$ 0.0277 & 0.977 $\pm$ 0.0144 & 0.812 $\pm$ 0.0173 \\
 ResGraphBlockGnn & 0.816 $\pm$ 0.0465 & \textbf{0.619 $\pm$ 0.0384} & 0.973 $\pm$ 0.0223 & 0.812 $\pm$ 0.0083 \\
 CrossGraphBlockGnn & 0.778 $\pm$ 0.0315 & 0.614 $\pm$ 0.0275 & \textbf{0.982 $\pm$ 0.0170} & \textbf{0.815 $\pm$ 0.0172} \\
@@ -19,46 +17,40 @@ CrossGraphBlockGnn & 0.778 $\pm$ 0.0315 & 0.614 $\pm$ 0.0275 & \textbf{0.982 $\p
 \end{tabular}
 \end{table}
 
-
-% Table 2: Ablation Study
-
-% Table 2: Ablation Study on Residual Mechanisms (MUTAG, GCN, dim=64)
+% Table 2: Updated MUTAG GCN rerun summary
 \begin{table}[t]
 \centering
-\caption{Ablation study on different residual mechanisms. Results on MUTAG with GCN operator and dim=64.}
+\caption{Best configuration of each architecture on the updated MUTAG + GCNConv rerun slice (derived from v4 records).}
 \label{tab:ablation}
 \begin{tabular}{lccccc}
 \toprule
-Residual Type & h=1 & h=2 & h=3 & h=4 & h=5 \\
+Model & Dim & Depth & Acc. & Std. & Time (s) \\
 \midrule
-None & 0.741 & 0.746 & 0.724 & 0.638 & 0.643 \\
-Intra-branch & 0.730 & 0.822 & 0.768 & 0.795 & 0.757 \\
-Node-level cross & 0.746 & 0.768 & 0.762 & 0.676 & 0.670 \\
-Sequential graph & 0.773 & 0.811 & 0.703 & 0.589 & 0.665 \\
-Sequential graph residual & 0.768 & 0.784 & 0.703 & 0.665 & 0.697 \\
-Graph-level cross & 0.703 & 0.719 & 0.708 & 0.676 & 0.627 \\
+BlockGNN & 32 & 1 & 0.800 & 0.0930 & 577.4 \\
+ResBlockGnn & 32 & 4 & 0.811 & 0.0419 & 1018.8 \\
+CrossBlockGnn & 64 & 2 & 0.811 & 0.0705 & 1842.4 \\
+GraphBlockGnn & 32 & 2 & 0.827 & 0.0653 & 1228.7 \\
+ResGraphBlockGnn & 32 & 2 & 0.805 & 0.0733 & 1229.5 \\
+CrossGraphBlockGnn & 32 & 1 & 0.778 & 0.0315 & 1634.5 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-
-% Table 3: Efficiency Comparison
-
-% Table 3: Efficiency Comparison (MUTAG, GCN, dim=32, h=2)
+% Table 3: Efficiency comparison
 \begin{table}[t]
 \centering
-\caption{Computational efficiency comparison. Execution time in seconds for 5-fold CV.}
+\caption{Efficiency comparison on MUTAG with GCNConv, dim=32, and depth=2. Relative overhead is measured against BlockGNN.}
 \label{tab:efficiency}
-\begin{tabular}{lcc}
+\begin{tabular}{lccc}
 \toprule
-Model & Time (s) & Relative Overhead \\
+Model & Time (s) & Relative Overhead & Accuracy \\
 \midrule
-BlockGNN & 1019.8 & +0.0\% \\
-ResBlockGnn & 1051.8 & +3.1\% \\
-CrossBlockGnn & 1587.9 & +55.7\% \\
-CrossGraphBlockGnn & 2822.6 & +176.8\% \\
+BlockGNN & 709.8 & +0.0\% & 0.708 \\
+ResBlockGnn & 738.9 & +4.1\% & 0.795 \\
+CrossBlockGnn & 1158.0 & +63.1\% & 0.724 \\
+GraphBlockGnn & 1228.7 & +73.1\% & 0.827 \\
+ResGraphBlockGnn & 1229.5 & +73.2\% & 0.805 \\
+CrossGraphBlockGnn & 2187.2 & +208.1\% & 0.622 \\
 \bottomrule
 \end{tabular}
 \end{table}
-
-

@@ -1,0 +1,10 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+This paper revisited ECR-GNN from an implementation-grounded perspective and evaluated it with a verified experiment archive rather than a hand-curated summary. By checking the raw record exports and merging the newer v4 rerun into the earlier v3 benchmark, we obtained a consistent 720-configuration result set for comparing six residual and cross-residual graph classification architectures.
+
+The empirical picture is clear. ResBlockGnn is the strongest all-around design: it achieves the best global mean accuracy (0.775), the lowest average fold variance, and only a small execution-time increase over BlockGNN. CrossBlockGnn can reach similarly strong peak scores on selected slices, but it is less stable. Graph-level interaction is still useful, especially for AIDS and for shallow MUTAG + GCNConv settings, yet it is not universally superior and becomes expensive when implemented through multiple sequential block models. In particular, CrossGraphBlockGnn delivers the best AIDS score (0.815) but also incurs the largest average runtime.
+
+The updated MUTAG + GCNConv rerun adds an important nuance: the locally best architecture within one operator-dataset slice is not always the globally best architecture across the full benchmark. GraphBlockGnn is strongest on the shallow dim=32 rerun slice, whereas ResBlockGnn remains the most depth-tolerant and stable model overall. This reinforces the main practical takeaway of the paper: residual design should be judged jointly by accuracy, robustness, and cost, not by a single best-case number.
+
+Future work can move in three directions. First, the graph-level variants should be redesigned to reduce their substantial runtime overhead. Second, heterogeneous operator combinations deserve a direct study, since the current experiments still keep the operator type homogeneous within each model instance. Third, larger datasets and stronger statistical testing are needed to determine when cross-branch interaction offers a meaningful advantage beyond the simpler residual baseline.

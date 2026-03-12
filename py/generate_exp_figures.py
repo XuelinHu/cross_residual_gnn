@@ -1,342 +1,390 @@
 """
-Generate figures and tables for experiments chapter
-Run this script to create:
-1. Figures (PDF/PNG) in figures/exp_/
-2. LaTeX table code in md/exp_tables.tex
+Generate figures and LaTeX tables for the paper's experiments section.
+
+This script merges the full v3 summary with the newer v4 rerun that
+replaces the MUTAG + GCNConv slice, validates the raw record exports,
+and writes figures/tables used by the paper manuscript.
 """
 
-import pandas as pd
-import numpy as np
+from __future__ import annotations
+
+from pathlib import Path
+
 import matplotlib.pyplot as plt
-import os
+import numpy as np
+import pandas as pd
 from matplotlib import rcParams
 
-# Set style for publication-quality figures
-rcParams['font.family'] = 'serif'
-rcParams['font.serif'] = 'Times New Roman'
-rcParams['font.size'] = 10
-rcParams['figure.dpi'] = 300
-rcParams['savefig.dpi'] = 300
-rcParams['savefig.format'] = 'pdf'
-rcParams['savefig.bbox'] = 'tight'
 
-# Create output directories
-os.makedirs('figures/exp', exist_ok=True)
-os.makedirs('md', exist_ok=True)
+ROOT = Path(__file__).resolve().parents[1]
+RECORDS_DIR = ROOT / "records"
 
-# Load data
-df = pd.read_excel('../records/v3result.xlsx')
-
-# ============================================================================
-# FIGURE 1: Bar chart of mean accuracy by model (all datasets)
-# ============================================================================
-fig1, ax = plt.subplots(figsize=(8, 5))
-
-model_order = ['BlockGNN', 'ResBlockGnn', 'CrossBlockGnn',
-               'GraphBlockGnn', 'ResGraphBlockGnn', 'CrossGraphBlockGnn']
-
-# Calculate mean accuracy across all datasets for each model
-mean_acc = df.groupby('gm')['acc'].mean().reindex(model_order)
-std_acc = df.groupby('gm')['acc'].std().reindex(model_order)
-
-# Plot bar chart with error bars
-bars = ax.bar(range(len(model_order)), mean_acc, yerr=std_acc,
-              capsize=5, alpha=0.8, edgecolor='black', linewidth=1.2,
-              color=['#e74c3c', '#3498db', '#3498db', '#2ecc71', '#2ecc71', '#9b59b6'])
-
-ax.set_xticks(range(len(model_order)))
-ax.set_xticklabels([f'{m}\n(n={len(df[df["gm"]==m])})' for m in model_order],
-                   fontsize=9, rotation=0, ha='center')
-ax.set_ylabel('Mean Accuracy', fontsize=11, fontweight='bold')
-ax.set_xlabel('Model Architecture', fontsize=11, fontweight='bold')
-ax.set_ylim([0.65, 0.82])
-ax.grid(axis='y', alpha=0.3, linestyle='--')
-ax.set_title('Average Performance Across All Datasets', fontsize=12, fontweight='bold', pad=15)
-
-# Add value labels on bars
-for i, (bar, mean, std) in enumerate(zip(bars, mean_acc, std_acc)):
-    height = bar.get_height()
-    ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.01,
-            f'{mean:.3f}', ha='center', va='bottom', fontsize=9, fontweight='bold')
-
-plt.tight_layout()
-plt.savefig('figures/exp/fig1_average_performance.pdf')
-plt.savefig('figures/exp/fig1_average_performance.png')
-plt.close()
-print("[OK] Figure 1 saved: Average performance bar chart")
-
-# ============================================================================
-# FIGURE 2: Depth sensitivity (line plot)
-# ============================================================================
-fig2, ax = plt.subplots(figsize=(8, 5))
-
-# Filter data for MUTAG, GCN, dim=32
-mutag_gcn_32 = df[(df['ds'] == 'MUTAG') & (df['model'] == 'GCNConv') & (df['dim'] == 32)]
-
-# Calculate mean accuracy for each (model, depth) combination
-depth_data = mutag_gcn_32.groupby(['gm', 'h'])['acc'].mean().unstack()
-
-# Plot line plot
-markers = {'BlockGNN': 'o', 'ResBlockGnn': 's', 'CrossBlockGnn': '^',
-          'GraphBlockGnn': 'd', 'ResGraphBlockGnn': 'v', 'CrossGraphBlockGnn': 'p'}
-colors = {'BlockGNN': '#e74c3c', 'ResBlockGnn': '#3498db', 'CrossBlockGnn': '#3498db',
-          'GraphBlockGnn': '#2ecc71', 'ResGraphBlockGnn': '#2ecc71', 'CrossGraphBlockGnn': '#9b59b6'}
-
-for model in model_order:
-    if model in depth_data.index:
-        ax.plot(range(1, 6), depth_data.loc[model],
-               marker=markers[model], color=colors[model],
-               linewidth=2, markersize=8, label=model)
-
-ax.set_xticks(range(1, 6))
-ax.set_xticklabels([f'h={i}' for i in range(1, 6)], fontsize=10)
-ax.set_xlabel('Number of Hidden Layers', fontsize=11, fontweight='bold')
-ax.set_ylabel('Accuracy', fontsize=11, fontweight='bold')
-ax.set_ylim([0.55, 0.85])
-ax.grid(alpha=0.3, linestyle='--')
-ax.legend(loc='upper right', fontsize=9, framealpha=0.9)
-ax.set_title('Depth Sensitivity on MUTAG (GCN, dim=32)', fontsize=12, fontweight='bold', pad=15)
-
-plt.tight_layout()
-plt.savefig('figures/exp/fig2_depth_sensitivity.pdf')
-plt.savefig('figures/exp/fig2_depth_sensitivity.png')
-plt.close()
-print("[OK] Figure 2 saved: Depth sensitivity line plot")
-
-# ============================================================================
-# FIGURE 3: Box plot of accuracy distribution (5 folds)
-# ============================================================================
-fig3, ax = plt.subplots(figsize=(10, 6))
-
-# Prepare data for box plot (use MUTAG as example)
-box_data = []
-box_labels = []
-for model in model_order:
-    model_df = df[(df['gm'] == model) & (df['ds'] == 'MUTAG') &
-                   (df['model'] == 'GCNConv') & (df['dim'] == 32) & (df['h'] == 2)]
-    if len(model_df) > 0:
-        # Extract acc0-acc4 values
-        fold_accs = []
-        for _, row in model_df.iterrows():
-            fold_accs.extend([row['acc0'], row['acc1'], row['acc2'], row['acc3'], row['acc4']])
-        box_data.append(fold_accs)
-        box_labels.append(model)
-
-# Create box plot
-bp = ax.boxplot(box_data, labels=box_labels, patch_artist=True,
-                showmeans=True, meanline=True)
-
-# Color boxes
-colors_box = ['#e74c3c', '#3498db', '#3498db', '#2ecc71', '#2ecc71', '#9b59b6']
-for patch, color in zip(bp['boxes'], colors_box):
-    patch.set_facecolor(color)
-    patch.set_alpha(0.7)
-
-ax.set_ylabel('Accuracy', fontsize=11, fontweight='bold')
-ax.set_xlabel('Model Architecture', fontsize=11, fontweight='bold')
-ax.set_ylim([0.5, 0.9])
-ax.grid(axis='y', alpha=0.3, linestyle='--')
-ax.set_title('5-Fold CV Distribution on MUTAG (GCN, h=2, dim=32)', fontsize=12, fontweight='bold', pad=15)
-plt.xticks(rotation=15, ha='right')
-
-plt.tight_layout()
-plt.savefig('figures/exp/fig3_boxplot_distribution.pdf')
-plt.savefig('figures/exp/fig3_boxplot_distribution.png')
-plt.close()
-print("[OK] Figure 3 saved: Box plot distribution")
-
-# ============================================================================
-# FIGURE 4: Heatmap of model × dataset performance
-# ============================================================================
-fig4, ax = plt.subplots(figsize=(8, 6))
-
-# Create pivot table: models as rows, datasets as columns
-heatmap_data = df.pivot_table(values='acc', index='gm', columns='ds', aggfunc='mean')
-heatmap_data = heatmap_data.reindex(model_order)
-
-# Plot heatmap
-im = ax.imshow(heatmap_data.values, cmap='YlGnBu', aspect='auto', vmin=0.5, vmax=1.0)
-
-# Set ticks
-ax.set_xticks(np.arange(len(heatmap_data.columns)))
-ax.set_yticks(np.arange(len(heatmap_data.index)))
-ax.set_xticklabels(heatmap_data.columns, fontsize=10)
-ax.set_yticklabels(heatmap_data.index, fontsize=10)
-
-# Add text annotations
-for i in range(len(heatmap_data.index)):
-    for j in range(len(heatmap_data.columns)):
-        text = ax.text(j, i, f'{heatmap_data.values[i, j]:.2f}',
-                      ha="center", va="center", color="black", fontsize=9, fontweight='bold')
-
-ax.set_xlabel('Dataset', fontsize=11, fontweight='bold')
-ax.set_ylabel('Model Architecture', fontsize=11, fontweight='bold')
-ax.set_title('Model Performance Heatmap (Mean Accuracy)', fontsize=12, fontweight='bold', pad=15)
-
-# Add colorbar
-cbar = plt.colorbar(im, ax=ax)
-cbar.set_label('Accuracy', fontsize=10, fontweight='bold')
-
-plt.tight_layout()
-plt.savefig('figures/exp/fig4_heatmap_performance.pdf')
-plt.savefig('figures/exp/fig4_heatmap_performance.png')
-plt.close()
-print("[OK] Figure 4 saved: Performance heatmap")
-
-print("\n" + "="*60)
-print("All figures generated successfully!")
-print("="*60)
-
-# ============================================================================
-# Generate LaTeX Tables
-# ============================================================================
-print("\nGenerating LaTeX tables...")
-
-latex_tables = []
-
-# ============================================================================
-# TABLE 1: Main Results
-# ============================================================================
-table1_latex = r"""
-% Table 1: Main Results on All Datasets
-\begin{table}[t]
-\centering
-\caption{Graph classification accuracy (mean $\pm$ std over 5-fold CV) on TUDataset benchmarks. Best results in bold.}
-\label{tab:main_results}
-\begin{tabular}{lcccc}
-\toprule
-Model & MUTAG & DD & MSRC\_9 & AIDS \\
-\midrule
-"""
-
-# Get best results for each dataset
-for model in model_order:
-    model_df = df[df['gm'] == model]
-    row_data = []
-    for ds in ['MUTAG', 'DD', 'MSRC_9', 'AIDS']:
-        ds_df = model_df[model_df['ds'] == ds]
-        if len(ds_df) > 0:
-            best = ds_df.loc[ds_df['acc'].idxmax()]
-            acc = best['acc']
-            std = best['acc_std_dev']
-            row_data.append(f'{acc:.3f} $\\pm$ {std:.4f}')
-        else:
-            row_data.append('--')
-
-    # Bold the best result for each dataset
-    is_best = False
-    for i, ds in enumerate(['MUTAG', 'DD', 'MSRC_9', 'AIDS']):
-        ds_df = df[df['ds'] == ds]
-        if len(ds_df) > 0:
-            best_acc = ds_df['acc'].max()
-            if abs(float(row_data[i].split('$\\pm$')[0]) - best_acc) < 0.001:
-                row_data[i] = f'\\textbf{{{row_data[i]}}}'
-
-    model_name = model.replace('_', '\\_')
-    table1_latex += f"{model_name} & {' & '.join(row_data)} \\\\\n"
-
-table1_latex += r"""\bottomrule
-\end{tabular}
-\end{table}
-"""
-
-latex_tables.append(('Table 1: Main Results', table1_latex))
-
-# ============================================================================
-# TABLE 2: Ablation Study - Impact of Residual Mechanism
-# ============================================================================
-table2_latex = r"""
-% Table 2: Ablation Study on Residual Mechanisms (MUTAG, GCN, dim=64)
-\begin{table}[t]
-\centering
-\caption{Ablation study on different residual mechanisms. Results on MUTAG with GCN operator and dim=64.}
-\label{tab:ablation}
-\begin{tabular}{lccccc}
-\toprule
-Residual Type & h=1 & h=2 & h=3 & h=4 & h=5 \\
-\midrule
-"""
-
-# Filter for MUTAG, GCN, dim=64
-mutag_gcn_64 = df[(df['ds'] == 'MUTAG') & (df['model'] == 'GCNConv') & (df['dim'] == 64)]
-
-ablation_models = [
-    ('None', 'BlockGNN'),
-    ('Intra-branch', 'ResBlockGnn'),
-    ('Node-level cross', 'CrossBlockGnn'),
-    ('Sequential graph', 'GraphBlockGnn'),
-    ('Sequential graph residual', 'ResGraphBlockGnn'),
-    ('Graph-level cross', 'CrossGraphBlockGnn'),
+FIGURE_DIRS = [
+    ROOT / "figures" / "exp",
+    ROOT / "paper" / "figures" / "exp",
+    ROOT / "py" / "figures" / "exp",
+]
+TABLE_DIRS = [
+    ROOT / "md",
+    ROOT / "py" / "md",
 ]
 
-for residual_name, model_name in ablation_models:
-    model_df = mutag_gcn_64[mutag_gcn_64['gm'] == model_name]
-    row_data = []
-    for h in [1, 2, 3, 4, 5]:
-        h_df = model_df[model_df['h'] == h]
-        if len(h_df) > 0:
-            acc = h_df['acc'].iloc[0]
-            row_data.append(f'{acc:.3f}')
-        else:
-            row_data.append('--')
+MODEL_ORDER = [
+    "BlockGNN",
+    "ResBlockGnn",
+    "CrossBlockGnn",
+    "GraphBlockGnn",
+    "ResGraphBlockGnn",
+    "CrossGraphBlockGnn",
+]
+DATASET_ORDER = ["MUTAG", "DD", "MSRC_9", "AIDS"]
+DEPTH_ORDER = [1, 2, 3, 4, 5]
+DIM_ORDER = [32, 64]
 
-    table2_latex += f"{residual_name} & {' & '.join(row_data)} \\\\\n"
+PALETTE = {
+    "BlockGNN": "#B03A2E",
+    "ResBlockGnn": "#1F618D",
+    "CrossBlockGnn": "#2874A6",
+    "GraphBlockGnn": "#117864",
+    "ResGraphBlockGnn": "#148F77",
+    "CrossGraphBlockGnn": "#7D3C98",
+}
 
-table2_latex += r"""\bottomrule
-\end{tabular}
-\end{table}
-"""
 
-latex_tables.append(('Table 2: Ablation Study', table2_latex))
+rcParams["font.family"] = "serif"
+rcParams["font.serif"] = ["Times New Roman", "DejaVu Serif"]
+rcParams["font.size"] = 10
+rcParams["figure.dpi"] = 300
+rcParams["savefig.dpi"] = 300
+rcParams["savefig.bbox"] = "tight"
 
-# ============================================================================
-# TABLE 3: Efficiency Comparison
-# ============================================================================
-table3_latex = r"""
-% Table 3: Efficiency Comparison (MUTAG, GCN, dim=32, h=2)
-\begin{table}[t]
-\centering
-\caption{Computational efficiency comparison. Execution time in seconds for 5-fold CV.}
-\label{tab:efficiency}
-\begin{tabular}{lcc}
-\toprule
-Model & Time (s) & Relative Overhead \\
-\midrule
-"""
 
-# Get timing data for MUTAG, GCN, dim=32, h=2
-timing_df = df[(df['ds'] == 'MUTAG') & (df['model'] == 'GCNConv') &
-               (df['dim'] == 32) & (df['h'] == 2)]
+def ensure_output_dirs() -> None:
+    for path in [*FIGURE_DIRS, *TABLE_DIRS]:
+        path.mkdir(parents=True, exist_ok=True)
 
-baseline_time = None
-for model in ['BlockGNN', 'ResBlockGnn', 'CrossBlockGnn', 'CrossGraphBlockGnn']:
-    model_df = timing_df[timing_df['gm'] == model]
-    if len(model_df) > 0:
-        time = model_df['execution_time'].iloc[0]
-        if baseline_time is None:
-            baseline_time = time
-        overhead = (time / baseline_time - 1) * 100
-        model_name = model.replace('_', '\\_')
-        table3_latex += f"{model_name} & {time:.1f} & {overhead:+.1f}\\% \\\\\n"
 
-table3_latex += r"""\bottomrule
-\end{tabular}
-\end{table}
-"""
+def load_merged_results() -> pd.DataFrame:
+    v3 = pd.read_excel(RECORDS_DIR / "v3result.xlsx")
+    v4 = pd.read_excel(RECORDS_DIR / "v4result.xlsx")
 
-latex_tables.append(('Table 3: Efficiency Comparison', table3_latex))
+    base = v3[~((v3["ds"] == "MUTAG") & (v3["model"] == "GCNConv"))].copy()
+    merged = pd.concat([base, v4], ignore_index=True)
 
-# Save all tables to file
-with open('md/exp_tables.tex', 'w', encoding='utf-8') as f:
-    for title, latex in latex_tables:
-        f.write(f"% {title}\n")
-        f.write(latex)
-        f.write("\n\n")
+    merged["fold_range"] = merged[[f"acc{i}" for i in range(5)]].max(axis=1) - merged[
+        [f"acc{i}" for i in range(5)]
+    ].min(axis=1)
+    return merged
 
-print(f"[OK] Generated {len(latex_tables)} LaTeX tables")
-for title, _ in latex_tables:
-    print(f"  - {title}")
 
-print("\n" + "="*60)
-print("Table generation completed!")
-print("="*60)
+def validate_record_exports() -> None:
+    checks = {
+        "v3result.xlsx": sorted(RECORDS_DIR.glob("graph_classify_v3_*")),
+        "v4result.xlsx": sorted(RECORDS_DIR.glob("graph_classify_v4_*")),
+    }
+    for excel_name, files in checks.items():
+        expected = len(pd.read_excel(RECORDS_DIR / excel_name))
+        observed = 0
+        for path in files:
+            with path.open("r", encoding="utf-8") as handle:
+                observed += sum(1 for line in handle if line.strip())
+        if observed != expected:
+            raise ValueError(
+                f"Record export mismatch for {excel_name}: "
+                f"expected {expected} rows, found {observed} raw lines."
+            )
+
+
+def save_figure(fig: plt.Figure, filename: str) -> None:
+    for out_dir in FIGURE_DIRS:
+        fig.savefig(out_dir / f"{filename}.pdf")
+        fig.savefig(out_dir / f"{filename}.png")
+
+
+def save_tables(content: str) -> None:
+    for out_dir in TABLE_DIRS:
+        (out_dir / "exp_tables.tex").write_text(content, encoding="utf-8")
+
+
+def build_main_results_table(df: pd.DataFrame) -> str:
+    rows = []
+    for model in MODEL_ORDER:
+        row = []
+        for dataset in DATASET_ORDER:
+            subset = df[(df["gm"] == model) & (df["ds"] == dataset)]
+            best = subset.loc[subset["acc"].idxmax()]
+            cell = f"{best['acc']:.3f} $\\pm$ {best['acc_std_dev']:.4f}"
+            if abs(best["acc"] - df[df["ds"] == dataset]["acc"].max()) < 1e-9:
+                cell = f"\\textbf{{{cell}}}"
+            row.append(cell)
+        rows.append(f"{model} & {' & '.join(row)} \\\\")
+
+    return "\n".join(
+        [
+            "% Table 1: Main Results",
+            r"\begin{table}[t]",
+            r"\centering",
+            r"\caption{Best 5-fold graph classification accuracy (mean $\pm$ std) for each architecture on each dataset after replacing the older MUTAG+GCNConv slice with the v4 rerun.}",
+            r"\label{tab:main_results}",
+            r"\begin{tabular}{lcccc}",
+            r"\toprule",
+            r"Model & MUTAG & DD & MSRC\_9 & AIDS \\",
+            r"\midrule",
+            *rows,
+            r"\bottomrule",
+            r"\end{tabular}",
+            r"\end{table}",
+        ]
+    )
+
+
+def build_mutag_rerun_table(df: pd.DataFrame) -> str:
+    subset = df[(df["ds"] == "MUTAG") & (df["model"] == "GCNConv")]
+    rows = []
+    for model in MODEL_ORDER:
+        model_df = subset[subset["gm"] == model]
+        best = model_df.loc[model_df["acc"].idxmax()]
+        rows.append(
+            f"{model} & {int(best['dim'])} & {int(best['h'])} & "
+            f"{best['acc']:.3f} & {best['acc_std_dev']:.4f} & {best['execution_time']:.1f} \\\\"
+        )
+
+    return "\n".join(
+        [
+            "% Table 2: Updated MUTAG GCN rerun summary",
+            r"\begin{table}[t]",
+            r"\centering",
+            r"\caption{Best configuration of each architecture on the updated MUTAG + GCNConv rerun slice (derived from v4 records).}",
+            r"\label{tab:ablation}",
+            r"\begin{tabular}{lccccc}",
+            r"\toprule",
+            r"Model & Dim & Depth & Acc. & Std. & Time (s) \\",
+            r"\midrule",
+            *rows,
+            r"\bottomrule",
+            r"\end{tabular}",
+            r"\end{table}",
+        ]
+    )
+
+
+def build_efficiency_table(df: pd.DataFrame) -> str:
+    subset = df[
+        (df["ds"] == "MUTAG")
+        & (df["model"] == "GCNConv")
+        & (df["dim"] == 32)
+        & (df["h"] == 2)
+    ].copy()
+    baseline = float(subset[subset["gm"] == "BlockGNN"]["execution_time"].iloc[0])
+
+    rows = []
+    for model in MODEL_ORDER:
+        row = subset[subset["gm"] == model].iloc[0]
+        overhead = (float(row["execution_time"]) / baseline - 1.0) * 100.0
+        rows.append(
+            f"{model} & {row['execution_time']:.1f} & {overhead:+.1f}\\% & {row['acc']:.3f} \\\\"
+        )
+
+    return "\n".join(
+        [
+            "% Table 3: Efficiency comparison",
+            r"\begin{table}[t]",
+            r"\centering",
+            r"\caption{Efficiency comparison on MUTAG with GCNConv, dim=32, and depth=2. Relative overhead is measured against BlockGNN.}",
+            r"\label{tab:efficiency}",
+            r"\begin{tabular}{lccc}",
+            r"\toprule",
+            r"Model & Time (s) & Relative Overhead & Accuracy \\",
+            r"\midrule",
+            *rows,
+            r"\bottomrule",
+            r"\end{tabular}",
+            r"\end{table}",
+        ]
+    )
+
+
+def generate_tables(df: pd.DataFrame) -> None:
+    tables = "\n\n".join(
+        [
+            build_main_results_table(df),
+            build_mutag_rerun_table(df),
+            build_efficiency_table(df),
+        ]
+    )
+    save_tables(tables)
+
+
+def generate_average_performance_figure(df: pd.DataFrame) -> None:
+    fig, ax = plt.subplots(figsize=(8.2, 5.2))
+
+    mean_acc = df.groupby("gm")["acc"].mean().reindex(MODEL_ORDER)
+    std_acc = df.groupby("gm")["acc"].std().reindex(MODEL_ORDER)
+
+    bars = ax.bar(
+        range(len(MODEL_ORDER)),
+        mean_acc,
+        yerr=std_acc,
+        capsize=5,
+        alpha=0.9,
+        edgecolor="black",
+        linewidth=1.0,
+        color=[PALETTE[model] for model in MODEL_ORDER],
+    )
+
+    ax.set_xticks(range(len(MODEL_ORDER)))
+    ax.set_xticklabels(
+        [f"{model}\n(n={len(df[df['gm'] == model])})" for model in MODEL_ORDER],
+        fontsize=9,
+    )
+    ax.set_ylabel("Mean accuracy", fontweight="bold")
+    ax.set_xlabel("Architecture", fontweight="bold")
+    ax.set_ylim(0.65, 0.82)
+    ax.grid(axis="y", alpha=0.3, linestyle="--")
+    ax.set_title("Average Performance Across All 720 Configurations", fontweight="bold")
+
+    for bar, mean, std in zip(bars, mean_acc, std_acc):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2.0,
+            bar.get_height() + std + 0.006,
+            f"{mean:.3f}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            fontweight="bold",
+        )
+
+    fig.tight_layout()
+    save_figure(fig, "fig1_average_performance")
+    plt.close(fig)
+
+
+def generate_depth_sensitivity_figure(df: pd.DataFrame) -> None:
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8), sharey=True)
+
+    markers = {
+        "BlockGNN": "o",
+        "ResBlockGnn": "s",
+        "CrossBlockGnn": "^",
+        "GraphBlockGnn": "D",
+        "ResGraphBlockGnn": "v",
+        "CrossGraphBlockGnn": "P",
+    }
+
+    for ax, dim in zip(axes, DIM_ORDER):
+        subset = df[(df["ds"] == "MUTAG") & (df["model"] == "GCNConv") & (df["dim"] == dim)]
+        pivot = subset.pivot(index="gm", columns="h", values="acc").reindex(MODEL_ORDER)
+
+        for model in MODEL_ORDER:
+            ax.plot(
+                DEPTH_ORDER,
+                pivot.loc[model, DEPTH_ORDER].values,
+                marker=markers[model],
+                color=PALETTE[model],
+                linewidth=2,
+                markersize=6,
+                label=model,
+            )
+
+        ax.set_xticks(DEPTH_ORDER)
+        ax.set_xlabel(f"Depth (dim={dim})", fontweight="bold")
+        ax.grid(alpha=0.25, linestyle="--")
+        ax.set_title(f"Updated MUTAG + GCNConv Rerun (dim={dim})", fontweight="bold")
+
+    axes[0].set_ylabel("Accuracy", fontweight="bold")
+    axes[0].set_ylim(0.55, 0.87)
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper center", ncol=3, frameon=False, bbox_to_anchor=(0.5, 1.06))
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    save_figure(fig, "fig2_depth_sensitivity")
+    plt.close(fig)
+
+
+def generate_fold_distribution_figure(df: pd.DataFrame) -> None:
+    subset = df[
+        (df["ds"] == "MUTAG")
+        & (df["model"] == "GCNConv")
+        & (df["dim"] == 64)
+        & (df["h"] == 2)
+    ].copy()
+    subset = subset.set_index("gm").reindex(MODEL_ORDER).reset_index()
+
+    fig, ax = plt.subplots(figsize=(10, 5.8))
+    box_data = [[row[f"acc{i}"] for i in range(5)] for _, row in subset.iterrows()]
+    labels = subset["gm"].tolist()
+
+    bp = ax.boxplot(box_data, tick_labels=labels, patch_artist=True, showmeans=True, meanline=True)
+    for patch, label in zip(bp["boxes"], labels):
+        patch.set_facecolor(PALETTE[label])
+        patch.set_alpha(0.75)
+
+    ax.set_ylabel("Fold accuracy", fontweight="bold")
+    ax.set_xlabel("Architecture", fontweight="bold")
+    ax.set_ylim(0.5, 0.95)
+    ax.grid(axis="y", alpha=0.25, linestyle="--")
+    ax.set_title("Five-Fold Distribution on MUTAG + GCNConv (dim=64, depth=2)", fontweight="bold")
+    plt.xticks(rotation=15, ha="right")
+
+    fig.tight_layout()
+    save_figure(fig, "fig3_boxplot_distribution")
+    plt.close(fig)
+
+
+def generate_heatmap_figure(df: pd.DataFrame) -> None:
+    heatmap_rows = []
+    for model in MODEL_ORDER:
+        row = []
+        for dataset in DATASET_ORDER:
+            subset = df[(df["gm"] == model) & (df["ds"] == dataset)]
+            row.append(float(subset["acc"].max()))
+        heatmap_rows.append(row)
+
+    heatmap = pd.DataFrame(heatmap_rows, index=MODEL_ORDER, columns=DATASET_ORDER)
+
+    fig, ax = plt.subplots(figsize=(8.0, 5.8))
+    im = ax.imshow(heatmap.values, cmap="YlGnBu", aspect="auto", vmin=0.58, vmax=1.0)
+
+    ax.set_xticks(np.arange(len(DATASET_ORDER)))
+    ax.set_yticks(np.arange(len(MODEL_ORDER)))
+    ax.set_xticklabels(DATASET_ORDER)
+    ax.set_yticklabels(MODEL_ORDER)
+    ax.set_xlabel("Dataset", fontweight="bold")
+    ax.set_ylabel("Architecture", fontweight="bold")
+    ax.set_title("Best Accuracy Heatmap Across Datasets", fontweight="bold")
+
+    for i in range(len(MODEL_ORDER)):
+        for j in range(len(DATASET_ORDER)):
+            ax.text(
+                j,
+                i,
+                f"{heatmap.values[i, j]:.3f}",
+                ha="center",
+                va="center",
+                fontsize=8.5,
+                fontweight="bold",
+                color="black",
+            )
+
+    cbar = fig.colorbar(im, ax=ax)
+    cbar.set_label("Best accuracy", fontweight="bold")
+    fig.tight_layout()
+    save_figure(fig, "fig4_heatmap_performance")
+    plt.close(fig)
+
+
+def main() -> None:
+    ensure_output_dirs()
+    validate_record_exports()
+    merged = load_merged_results()
+
+    generate_tables(merged)
+    generate_average_performance_figure(merged)
+    generate_depth_sensitivity_figure(merged)
+    generate_fold_distribution_figure(merged)
+    generate_heatmap_figure(merged)
+
+    print("Generated merged experiment figures and tables successfully.")
+
+
+if __name__ == "__main__":
+    main()

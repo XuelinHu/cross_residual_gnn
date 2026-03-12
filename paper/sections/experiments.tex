@@ -1,0 +1,96 @@
+\section{Experiments}
+\label{sec:experiments}
+
+This section is organized in the same result-first spirit as the reference paper: we first report the main benchmark results, then analyze the updated rerun slice in detail, and finally discuss stability and efficiency. All numbers are derived directly from the raw record exports under \texttt{records/}; we do not manually rewrite experimental values.
+
+\subsection{Experimental Settings}
+
+\subsubsection{Data Sources and Verification}
+
+The experiment archive contains two summary spreadsheets, \texttt{v3result.xlsx} and \texttt{v4result.xlsx}, together with their corresponding raw record files. We verified that the 24 v3 record files contain exactly 720 non-empty lines and that the 2 v4 record files contain exactly 60 non-empty lines, matching the spreadsheet row counts one-to-one. The v4 archive is not an additional experiment set; it is a rerun of the MUTAG + GCNConv slice. Therefore, our final analysis uses a merged benchmark in which the 60-row v4 rerun replaces the older MUTAG + GCNConv rows from v3, resulting in 720 final configurations.
+
+\subsubsection{Configuration Space}
+
+We evaluate six architectures:
+\begin{enumerate}
+    \item \textbf{BlockGNN}: plain stacked message passing
+    \item \textbf{ResBlockGnn}: single-branch residual reuse
+    \item \textbf{CrossBlockGnn}: two-branch node-level cross residual
+    \item \textbf{GraphBlockGnn}: sequential graph-level conditioning
+    \item \textbf{ResGraphBlockGnn}: repeated graph-level residual refinement
+    \item \textbf{CrossGraphBlockGnn}: graph-level cross residual between sequential block pairs
+\end{enumerate}
+
+Each architecture is instantiated with three operators (GCNConv, GATConv, TransformerConv), five depths ($h \in \{1,2,3,4,5\}$), and two hidden dimensions ($32$ and $64$). The full grid therefore contains $6 \times 3 \times 5 \times 2 \times 4 = 720$ evaluated settings across the four datasets MUTAG, DD, MSRC\_9, and AIDS.
+
+\subsubsection{Training Protocol}
+
+All runs follow the implementation in \texttt{geomatric/graph\_classify\_v2.py}: 5-fold cross-validation, Adam optimizer, learning rate $0.01$, weight decay $10^{-2}$, dropout $0.6$, and up to 1500 epochs with early stopping once the training loss falls below $0.001$. We report mean accuracy, fold standard deviation, and total execution time recorded by the experiment scripts.
+
+\subsection{Main Results}
+
+Table~\ref{tab:main_results} summarizes the best configuration of each architecture on each dataset. Figure~\ref{fig:average_performance} shows the average accuracy over all 720 merged configurations, while Figure~\ref{fig:heatmap} visualizes the best accuracy reached by each architecture on each dataset.
+
+\input{../md/exp_tables.tex}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.92\textwidth]{figures/exp/fig1_average_performance.pdf}
+    \caption{Average accuracy across all 720 merged configurations. ResBlockGnn achieves the highest global mean accuracy (0.775), followed by CrossBlockGnn (0.766).}
+    \label{fig:average_performance}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.86\textwidth]{figures/exp/fig4_heatmap_performance.pdf}
+    \caption{Best accuracy heatmap across datasets. MSRC\_9 is consistently easy, DD remains the hardest benchmark, and AIDS shows only a narrow spread between the strongest architectures.}
+    \label{fig:heatmap}
+\end{figure}
+
+Three observations stand out.
+
+\textbf{Residual reuse is the most reliable gain.} Averaged over the full configuration space, ResBlockGnn achieves the best mean accuracy of 0.775, ahead of CrossBlockGnn (0.766), GraphBlockGnn (0.748), BlockGNN (0.740), and CrossGraphBlockGnn (0.734). This ranking indicates that explicit feature reuse is more consistently beneficial than simply increasing architectural complexity.
+
+\textbf{The best architecture depends on the dataset.} ResBlockGnn reaches the strongest MUTAG result (0.832 with TransformerConv, dim=64, depth=2), ResGraphBlockGnn gives the best DD score (0.619 with TransformerConv, dim=64, depth=2), and CrossGraphBlockGnn obtains the best AIDS score (0.815 with GATConv, dim=32, depth=2). On MSRC\_9, three architectures reach the same top accuracy of 0.982, showing that this dataset is already close to saturation for several model families.
+
+\textbf{Dataset difficulty dominates absolute performance.} The mean accuracy over all settings is 0.898 on MSRC\_9, 0.799 on AIDS, 0.719 on MUTAG, and only 0.587 on DD. The DD improvements over the best BlockGNN baseline are therefore extremely small (0.14\% relative), whereas MUTAG and AIDS still benefit from architectural choices.
+
+\subsection{Updated MUTAG + GCNConv Rerun Analysis}
+
+The v4 rerun is especially useful because it refreshes the full MUTAG + GCNConv slice with both widths and all depths. Table~\ref{tab:ablation} lists the best rerun configuration of each architecture, and Figure~\ref{fig:depth_sensitivity} shows the full depth curves for both widths.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\textwidth]{figures/exp/fig2_depth_sensitivity.pdf}
+    \caption{Updated depth sensitivity on the rerun MUTAG + GCNConv slice. Dim=32 and dim=64 show different winners, which confirms that architecture comparisons should not rely on a single depth-width setting.}
+    \label{fig:depth_sensitivity}
+\end{figure}
+
+The rerun reveals a more nuanced pattern than a single headline score would suggest.
+
+\textbf{Graph-level conditioning can be strongest at shallow depth.} On the dim=32 branch, GraphBlockGnn peaks at 0.827 with depth 2, outperforming all other GCN-based variants in that slice. ResGraphBlockGnn is also strong at depth 2 (0.805), which means graph-level residual reuse is genuinely effective when the model remains shallow.
+
+\textbf{ResBlockGnn is the most depth-tolerant architecture in the rerun.} On the same dim=32 slice, BlockGNN drops from 0.800 at depth 1 to 0.600 at depth 5, a 25.0\% relative degradation. In contrast, ResBlockGnn reaches its peak at depth 4 (0.811) and still retains 0.773 at depth 5, showing that intra-branch residual accumulation is the most reliable safeguard against performance collapse.
+
+\textbf{Node-level cross residual is competitive but less stable.} On the dim=64 slice, CrossBlockGnn reaches 0.811 at depth 2, matching the best GCN rerun score of ResBlockGnn. However, its fold standard deviation at that point is 0.070, clearly larger than the 0.030 observed for ResBlockGnn in the same setting. Cross-branch exchange can therefore raise the ceiling, but it does not automatically improve robustness.
+
+\subsection{Stability and Efficiency}
+
+To separate average accuracy from robustness, Figure~\ref{fig:boxplot_distribution} plots the five-fold distribution on the shared slice MUTAG + GCNConv with dim=64 and depth=2. Table~\ref{tab:efficiency} reports execution time and relative overhead on the commonly referenced MUTAG + GCNConv setting with dim=32 and depth=2.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/exp/fig3_boxplot_distribution.pdf}
+    \caption{Fold-wise accuracy distribution on MUTAG + GCNConv (dim=64, depth=2). ResBlockGnn has the tightest spread, whereas CrossBlockGnn attains a high mean with noticeably larger variance.}
+    \label{fig:boxplot_distribution}
+\end{figure}
+
+Two complementary conclusions follow.
+
+\textbf{ResBlockGnn is the most stable architecture overall.} Across all 720 merged configurations, it has the lowest mean fold standard deviation (0.0312), narrowly ahead of CrossBlockGnn (0.0316), and clearly better than BlockGNN (0.0516). The box plot shows the same behavior on the shared rerun slice: ResBlockGnn keeps a tight fold range while remaining highly competitive in mean accuracy.
+
+\textbf{Efficiency sharply penalizes the more complex graph-level variants.} On MUTAG + GCNConv with dim=32 and depth=2, ResBlockGnn improves accuracy from 0.708 to 0.795 with only 4.1\% extra time. GraphBlockGnn reaches the strongest accuracy on that slice (0.827) but needs 73.1\% more time, while CrossGraphBlockGnn is both slower (+208.1\%) and weaker (0.622). The full-grid timing statistics tell the same story: average execution time rises from 9136 seconds for BlockGNN to 9572 seconds for ResBlockGnn, but jumps to 31266 seconds for CrossGraphBlockGnn.
+
+\subsection{Summary of Findings}
+
+The merged record analysis supports four final claims. First, residual reuse is a stronger general-purpose design choice than branch proliferation. Second, graph-level residual propagation is useful, but mainly in specific shallow or dataset-dependent regimes rather than as a universal winner. Third, node-level cross residual can reach strong peak accuracy, yet its gains come with higher variance and cost. Fourth, once accuracy, stability, and execution time are considered together, ResBlockGnn offers the best overall trade-off in this repository, while CrossGraphBlockGnn should be treated as a specialized model for datasets such as AIDS where its graph-level interaction is actually rewarded.
