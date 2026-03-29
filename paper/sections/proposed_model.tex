@@ -1,7 +1,7 @@
 \section{Proposed Model}
 \label{sec:model}
 
-ECR-GNN is implemented as a compact family of reusable graph classification modules. Instead of presenting an idealized design that differs from the executed code, this section follows the actual PyTorch Geometric implementation in \texttt{geomatric/graph\_classify\_v2.py}. The implementation exposes one operator factory and six model variants, all of which share the same input projection, stacked message-passing layers, global mean pooling, and linear graph classifier.
+ECR-GNN is formulated as a compact family of reusable graph classification architectures. All variants share the same input projection, stacked message-passing layers, global mean pooling, and linear graph classifier; they differ only in how intermediate node states and graph-level summaries are reused across depth and across branches.
 
 % Placeholder: insert a cleaned architecture overview figure here if a final diagram is prepared later.
 
@@ -28,19 +28,19 @@ All six architectures differ only in how they update $\mathbf{H}^{(\ell)}$ and h
 
 \subsection{Single-Branch and Node-Level Residual Blocks}
 
-\textbf{BlockGNN.} The plain baseline stacks $L$ copies of the same operator without residual reuse:
+\textbf{PlainGNN.} The plain baseline stacks $L$ copies of the same operator without residual reuse:
 \begin{equation}
 \mathbf{H}^{(\ell+1)} = \mathrm{Dropout}\!\left(\mathrm{ReLU}\!\left(\Phi_{\ell}\!\left(\mathbf{H}^{(\ell)}, \mathbf{A}\right)\right)\right).
 \end{equation}
 This model serves as the reference point for judging whether residual information flow is beneficial.
 
-\textbf{ResBlockGnn.} The first residual variant stores the previous hidden state within the same branch:
+\textbf{NodeResGNN.} The first residual variant stores the previous hidden state within the same branch:
 \begin{equation}
 \mathbf{H}^{(\ell+1)} = \mathrm{Dropout}\!\left(\mathrm{ReLU}\!\left(\Phi_{\ell}\!\left(\mathbf{H}^{(\ell)} + \mathbf{H}^{(\ell-1)}, \mathbf{A}\right)\right)\right).
 \end{equation}
-This design matches the code path where \texttt{x\_pre} is cached and added back before each layer call. The mechanism is lightweight and preserves historical features without creating extra branches.
+This mechanism is lightweight and preserves historical features without creating extra branches.
 
-\textbf{CrossBlockGnn.} The node-level cross-residual model maintains two parallel branches with separate input projections:
+\textbf{NodeCrossGNN.} The node-level cross-residual model maintains two parallel branches with separate input projections:
 \begin{align}
 \mathbf{H}^{(\ell+1)}_{1} &= \mathrm{Dropout}\!\left(\mathrm{ReLU}\!\left(\Phi^{(1)}_{\ell}\!\left(\mathbf{H}^{(\ell)}_{1} + \widetilde{\mathbf{H}}^{(\ell)}_{2}, \mathbf{A}\right)\right)\right), \\
 \mathbf{H}^{(\ell+1)}_{2} &= \mathrm{Dropout}\!\left(\mathrm{ReLU}\!\left(\Phi^{(2)}_{\ell}\!\left(\mathbf{H}^{(\ell)}_{2} + \widetilde{\mathbf{H}}^{(\ell)}_{1}, \mathbf{A}\right)\right)\right),
@@ -49,25 +49,25 @@ where $\widetilde{\mathbf{H}}^{(\ell)}_{k}$ is the cached hidden state from the 
 \begin{equation}
 \mathbf{H}^{(L)} = \mathbf{H}^{(L)}_{1} + \mathbf{H}^{(L)}_{2}.
 \end{equation}
-Compared with the single-branch residual block, CrossBlockGnn explicitly exchanges information between operator-aligned pathways at every depth.
+Compared with the single-branch residual block, NodeCrossGNN explicitly exchanges information between parallel pathways at every depth.
 
 \subsection{Graph-Level Residual Propagation}
 
-The code also defines three higher-level architectures that compose several block models sequentially and pass graph embeddings across them.
+We further consider three higher-level architectures that compose several block models sequentially and pass graph embeddings across them.
 
-\textbf{GraphBlockGnn.} Two plain BlockGNN modules are executed in sequence. The first block produces a graph embedding $\mathbf{g}^{(1)}$, which is added to node features and to the pooled graph representation inside the second block:
+\textbf{GraphCondGNN.} Two plain message-passing blocks are executed in sequence. The first block produces a graph embedding $\mathbf{g}^{(1)}$, which is added to node features and to the pooled graph representation inside the second block:
 \begin{equation}
 \mathbf{g}^{(2)} = B_{2}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(1)}\right).
 \end{equation}
 This introduces graph-level conditioning without intra-layer residual connections.
 
-\textbf{ResGraphBlockGnn.} This variant chains three graph-conditioned BlockGNN modules:
+\textbf{GraphResGNN.} This variant chains three graph-conditioned blocks:
 \begin{equation}
 \mathbf{g}^{(t+1)} = B_{t+1}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(t)}\right), \quad t \in \{1,2\}.
 \end{equation}
 Inside each block, the graph embedding is broadcast back to node states before the next graph convolution. The design can be viewed as repeated graph-level residual refinement.
 
-\textbf{CrossGraphBlockGnn.} The strongest graph-level interaction appears in the cross-graph variant. Four BlockGNN modules are organized as two sequential pairs. Within each stage, the two block outputs are swapped and reused as the next stage's graph-level input:
+\textbf{GraphCrossGNN.} The strongest graph-level interaction appears in the cross-graph variant. Four blocks are organized as two sequential pairs. Within each stage, the two block outputs are swapped and reused as the next stage's graph-level input:
 \begin{align}
 (\mathbf{g}^{(t)}_{1}, \mathbf{g}^{(t)}_{2}) &= \left(B_{2t-1}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(t-1)}_{1}\right),\ B_{2t}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(t-1)}_{2}\right)\right), \\
 (\mathbf{g}^{(t+1)}_{1}, \mathbf{g}^{(t+1)}_{2}) &= \left(\mathbf{g}^{(t)}_{2},\ \mathbf{g}^{(t)}_{1}\right).
@@ -76,7 +76,7 @@ The final graph embedding is
 \begin{equation}
 \mathbf{g}_{\mathrm{final}} = \mathbf{g}^{(T)}_{1} + \mathbf{g}^{(T)}_{2}.
 \end{equation}
-This is the implementation-level meaning of graph-level cross residual in our experiments: branches do not exchange node tensors directly, but they do swap pooled graph summaries across stages.
+In this variant, interaction occurs through exchanged pooled graph summaries rather than through direct node-tensor exchange.
 
 \subsection{Unified Training Objective}
 
@@ -88,29 +88,34 @@ optimized with Adam. Dropout is applied after every message-passing update and o
 
 \subsection{Algorithmic View}
 
-Table~\ref{tab:algorithmic_view} summarizes the implementation-level forward logic shared across the experiments in a compact three-line-table format.
+Algorithm~\ref{alg:ecr_forward} summarizes the shared forward logic in pseudocode form rather than as a descriptive table.
 
-\begin{table}[t]
+\begin{figure}[t]
 \centering
-\caption{Algorithmic view of the ECR-GNN forward process}
-\label{tab:algorithmic_view}
-\begin{tabular}{p{0.10\textwidth} p{0.84\textwidth}}
-\toprule
-Step & Description \\
-\midrule
-1 & Input a graph batch $(\mathbf{X}, \mathbf{A}, \mathbf{b})$, choose operator type $\Phi$, network depth $L$, and one architecture type from \textsc{BlockGNN}, \textsc{ResBlockGnn}, \textsc{CrossBlockGnn}, \textsc{GraphBlockGnn}, \textsc{ResGraphBlockGnn}, or \textsc{CrossGraphBlockGnn}. \\
-2 & Instantiate the message-passing blocks through the factory function $\textsc{GetBlockModel}(\Phi)$. \\
-3 & If the architecture is \textsc{BlockGNN}, apply one input projection followed by $L$ stacked operator layers. \\
-4 & If the architecture is \textsc{ResBlockGnn}, cache the previous hidden state and add it back before each layer update. \\
-5 & If the architecture is \textsc{CrossBlockGnn}, build two branches and inject the cached hidden state from the opposite branch at every depth. \\
-6 & If the architecture is \textsc{GraphBlockGnn} or \textsc{ResGraphBlockGnn}, execute multiple block models sequentially and reuse the previous graph embedding as graph-level context. \\
-7 & If the architecture is \textsc{CrossGraphBlockGnn}, process each block pair, compute two graph embeddings, and swap them before the next pair. \\
-8 & Pool the final node embeddings with global mean pooling. \\
-9 & Apply dropout and the linear classifier to obtain $\hat{\mathbf{y}}$, and return both logits and pooled graph embedding $\mathbf{g}$. \\
-\bottomrule
-\end{tabular}
-\end{table}
+\begin{minipage}{0.95\textwidth}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} graph batch $(\mathbf{X}, \mathbf{A}, \mathbf{b})$, operator $\Phi$, depth $L$, architecture type $M$
+\STATE Instantiate message-passing blocks with operator $\Phi$
+\IF{$M = \textsc{PlainGNN}$}
+    \STATE Apply one input projection and stack $L$ message-passing layers
+\ELSIF{$M = \textsc{NodeResGNN}$}
+    \STATE Cache the previous hidden state and add it before each layer update
+\ELSIF{$M = \textsc{NodeCrossGNN}$}
+    \STATE Build two branches and inject the opposite branch's cached state at every depth
+\ELSIF{$M \in \{\textsc{GraphCondGNN}, \textsc{GraphResGNN}\}$}
+    \STATE Execute sequential block models and reuse the previous graph embedding as graph-level context
+\ELSIF{$M = \textsc{GraphCrossGNN}$}
+    \STATE Process block pairs, compute two graph embeddings, and swap them before the next pair
+\ENDIF
+\STATE Pool the final node representations with global mean pooling to obtain $\mathbf{g}$
+\STATE Apply dropout and a linear classifier to produce logits $\hat{\mathbf{y}}$
+\STATE \textbf{Return:} $(\hat{\mathbf{y}}, \mathbf{g})$
+\end{algorithmic}
+\end{minipage}
+\caption{Pseudocode of the shared ECR-GNN forward procedure}
+\label{alg:ecr_forward}
+\end{figure}
 
 \subsection{Design Implications}
 
-This implementation leads to three practical hypotheses that are later verified by experiments. First, residual reuse should matter more consistently than simply adding more branches, because every successful variant still relies on repeated feature reuse. Second, node-level cross residual and graph-level residual passing are not interchangeable: the former exchanges intermediate node representations, whereas the latter only re-injects pooled graph summaries. Third, the usefulness of cross-branch fusion depends on dataset scale and operator bias; it is therefore necessary to analyze accuracy, stability, and efficiency jointly rather than reporting only the single best score.
+This architecture family suggests three practical hypotheses that are later examined experimentally. First, residual reuse should matter more consistently than simply adding more branches, because every successful variant still relies on repeated feature reuse. Second, node-level cross residual and graph-level residual passing are not interchangeable: the former exchanges intermediate node representations, whereas the latter only re-injects pooled graph summaries. Third, the usefulness of cross-branch fusion depends on dataset scale and operator bias; it is therefore necessary to analyze accuracy, stability, and efficiency jointly rather than reporting only the single best score.

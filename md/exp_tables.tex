@@ -1,37 +1,40 @@
 % Table 1: Main Results
 \begin{table}[t]
 \centering
-\caption{Best 5-fold graph classification accuracy (mean $\pm$ std) for each architecture on each dataset after replacing the older MUTAG+GCNConv slice with the v4 rerun.}
+\small
+\setlength{\tabcolsep}{4pt}
+\caption{Best 5-fold graph classification accuracy (mean $\pm$ std) for each architecture on each dataset under the final benchmark setting.}
 \label{tab:main_results}
 \begin{tabular}{lcccc}
 \toprule
 Model & MUTAG & DD & MSRC\_9 & AIDS \\
 \midrule
-BlockGNN & 0.822 $\pm$ 0.0404 & 0.618 $\pm$ 0.0211 & \textbf{0.982 $\pm$ 0.0170} & 0.810 $\pm$ 0.0213 \\
-ResBlockGnn & \textbf{0.832 $\pm$ 0.0315} & 0.611 $\pm$ 0.0316 & \textbf{0.982 $\pm$ 0.0265} & 0.812 $\pm$ 0.0068 \\
-CrossBlockGnn & 0.811 $\pm$ 0.0705 & 0.617 $\pm$ 0.0222 & 0.977 $\pm$ 0.0144 & 0.812 $\pm$ 0.0218 \\
-GraphBlockGnn & 0.827 $\pm$ 0.0653 & 0.609 $\pm$ 0.0277 & 0.977 $\pm$ 0.0144 & 0.812 $\pm$ 0.0173 \\
-ResGraphBlockGnn & 0.816 $\pm$ 0.0465 & \textbf{0.619 $\pm$ 0.0384} & 0.973 $\pm$ 0.0223 & 0.812 $\pm$ 0.0083 \\
-CrossGraphBlockGnn & 0.778 $\pm$ 0.0315 & 0.614 $\pm$ 0.0275 & \textbf{0.982 $\pm$ 0.0170} & \textbf{0.815 $\pm$ 0.0172} \\
+PlainGNN & 0.822 $\pm$ 0.0404 & 0.618 $\pm$ 0.0211 & \textbf{0.982 $\pm$ 0.0170} & 0.810 $\pm$ 0.0213 \\
+NodeResGNN & \textbf{0.832 $\pm$ 0.0315} & 0.611 $\pm$ 0.0316 & \textbf{0.982 $\pm$ 0.0265} & 0.812 $\pm$ 0.0068 \\
+NodeCrossGNN & 0.811 $\pm$ 0.0705 & 0.617 $\pm$ 0.0222 & 0.977 $\pm$ 0.0144 & 0.812 $\pm$ 0.0218 \\
+GraphCondGNN & 0.827 $\pm$ 0.0653 & 0.609 $\pm$ 0.0277 & 0.977 $\pm$ 0.0144 & 0.812 $\pm$ 0.0173 \\
+GraphResGNN & 0.816 $\pm$ 0.0465 & \textbf{0.619 $\pm$ 0.0384} & 0.973 $\pm$ 0.0223 & 0.812 $\pm$ 0.0083 \\
+GraphCrossGNN & 0.778 $\pm$ 0.0315 & 0.614 $\pm$ 0.0275 & \textbf{0.982 $\pm$ 0.0170} & \textbf{0.815 $\pm$ 0.0172} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-% Table 2: Updated MUTAG GCN rerun summary
+% Table 2: MUTAG GCN subset summary
 \begin{table}[t]
 \centering
-\caption{Best configuration of each architecture on the updated MUTAG + GCNConv rerun slice (derived from v4 records).}
+\small
+\caption{Best configuration of each architecture on the refreshed MUTAG + GCNConv subset.}
 \label{tab:ablation}
 \begin{tabular}{lccccc}
 \toprule
 Model & Dim & Depth & Acc. & Std. & Time (s) \\
 \midrule
-BlockGNN & 32 & 1 & 0.800 & 0.0930 & 577.4 \\
-ResBlockGnn & 32 & 4 & 0.811 & 0.0419 & 1018.8 \\
-CrossBlockGnn & 64 & 2 & 0.811 & 0.0705 & 1842.4 \\
-GraphBlockGnn & 32 & 2 & 0.827 & 0.0653 & 1228.7 \\
-ResGraphBlockGnn & 32 & 2 & 0.805 & 0.0733 & 1229.5 \\
-CrossGraphBlockGnn & 32 & 1 & 0.778 & 0.0315 & 1634.5 \\
+PlainGNN & 32 & 1 & 0.800 & 0.0930 & 577.4 \\
+NodeResGNN & 32 & 4 & 0.811 & 0.0419 & 1018.8 \\
+NodeCrossGNN & 64 & 2 & 0.811 & 0.0705 & 1842.4 \\
+GraphCondGNN & 32 & 2 & 0.827 & 0.0653 & 1228.7 \\
+GraphResGNN & 32 & 2 & 0.805 & 0.0733 & 1229.5 \\
+GraphCrossGNN & 32 & 1 & 0.778 & 0.0315 & 1634.5 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -39,18 +42,19 @@ CrossGraphBlockGnn & 32 & 1 & 0.778 & 0.0315 & 1634.5 \\
 % Table 3: Efficiency comparison
 \begin{table}[t]
 \centering
-\caption{Efficiency comparison on MUTAG with GCNConv, dim=32, and depth=2. Relative overhead is measured against BlockGNN.}
+\small
+\caption{Efficiency comparison on MUTAG with GCNConv, dim=32, and depth=2. Relative overhead is measured against PlainGNN.}
 \label{tab:efficiency}
 \begin{tabular}{lccc}
 \toprule
 Model & Time (s) & Relative Overhead & Accuracy \\
 \midrule
-BlockGNN & 709.8 & +0.0\% & 0.708 \\
-ResBlockGnn & 738.9 & +4.1\% & 0.795 \\
-CrossBlockGnn & 1158.0 & +63.1\% & 0.724 \\
-GraphBlockGnn & 1228.7 & +73.1\% & 0.827 \\
-ResGraphBlockGnn & 1229.5 & +73.2\% & 0.805 \\
-CrossGraphBlockGnn & 2187.2 & +208.1\% & 0.622 \\
+PlainGNN & 709.8 & +0.0\% & 0.708 \\
+NodeResGNN & 738.9 & +4.1\% & 0.795 \\
+NodeCrossGNN & 1158.0 & +63.1\% & 0.724 \\
+GraphCondGNN & 1228.7 & +73.1\% & 0.827 \\
+GraphResGNN & 1229.5 & +73.2\% & 0.805 \\
+GraphCrossGNN & 2187.2 & +208.1\% & 0.622 \\
 \bottomrule
 \end{tabular}
 \end{table}

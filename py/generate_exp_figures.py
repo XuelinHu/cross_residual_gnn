@@ -1,9 +1,9 @@
 """
 Generate figures and LaTeX tables for the paper's experiments section.
 
-This script merges the full v3 summary with the newer v4 rerun that
-replaces the MUTAG + GCNConv slice, validates the raw record exports,
-and writes figures/tables used by the paper manuscript.
+This script consolidates the benchmark summary files, validates the
+associated record exports, and writes the figures/tables used in the
+paper manuscript.
 """
 
 from __future__ import annotations
@@ -48,6 +48,15 @@ PALETTE = {
     "GraphBlockGnn": "#117864",
     "ResGraphBlockGnn": "#148F77",
     "CrossGraphBlockGnn": "#7D3C98",
+}
+
+DISPLAY_NAMES = {
+    "BlockGNN": "PlainGNN",
+    "ResBlockGnn": "NodeResGNN",
+    "CrossBlockGnn": "NodeCrossGNN",
+    "GraphBlockGnn": "GraphCondGNN",
+    "ResGraphBlockGnn": "GraphResGNN",
+    "CrossGraphBlockGnn": "GraphCrossGNN",
 }
 
 
@@ -106,6 +115,10 @@ def save_tables(content: str) -> None:
         (out_dir / "exp_tables.tex").write_text(content, encoding="utf-8")
 
 
+def model_label(model: str) -> str:
+    return DISPLAY_NAMES[model]
+
+
 def build_main_results_table(df: pd.DataFrame) -> str:
     rows = []
     for model in MODEL_ORDER:
@@ -117,14 +130,16 @@ def build_main_results_table(df: pd.DataFrame) -> str:
             if abs(best["acc"] - df[df["ds"] == dataset]["acc"].max()) < 1e-9:
                 cell = f"\\textbf{{{cell}}}"
             row.append(cell)
-        rows.append(f"{model} & {' & '.join(row)} \\\\")
+        rows.append(f"{model_label(model)} & {' & '.join(row)} \\\\")
 
     return "\n".join(
         [
             "% Table 1: Main Results",
             r"\begin{table}[t]",
             r"\centering",
-            r"\caption{Best 5-fold graph classification accuracy (mean $\pm$ std) for each architecture on each dataset after replacing the older MUTAG+GCNConv slice with the v4 rerun.}",
+            r"\small",
+            r"\setlength{\tabcolsep}{4pt}",
+            r"\caption{Best 5-fold graph classification accuracy (mean $\pm$ std) for each architecture on each dataset under the final benchmark setting.}",
             r"\label{tab:main_results}",
             r"\begin{tabular}{lcccc}",
             r"\toprule",
@@ -138,23 +153,24 @@ def build_main_results_table(df: pd.DataFrame) -> str:
     )
 
 
-def build_mutag_rerun_table(df: pd.DataFrame) -> str:
+def build_mutag_subset_table(df: pd.DataFrame) -> str:
     subset = df[(df["ds"] == "MUTAG") & (df["model"] == "GCNConv")]
     rows = []
     for model in MODEL_ORDER:
         model_df = subset[subset["gm"] == model]
         best = model_df.loc[model_df["acc"].idxmax()]
         rows.append(
-            f"{model} & {int(best['dim'])} & {int(best['h'])} & "
+            f"{model_label(model)} & {int(best['dim'])} & {int(best['h'])} & "
             f"{best['acc']:.3f} & {best['acc_std_dev']:.4f} & {best['execution_time']:.1f} \\\\"
         )
 
     return "\n".join(
         [
-            "% Table 2: Updated MUTAG GCN rerun summary",
+            "% Table 2: MUTAG GCN subset summary",
             r"\begin{table}[t]",
             r"\centering",
-            r"\caption{Best configuration of each architecture on the updated MUTAG + GCNConv rerun slice (derived from v4 records).}",
+            r"\small",
+            r"\caption{Best configuration of each architecture on the refreshed MUTAG + GCNConv subset.}",
             r"\label{tab:ablation}",
             r"\begin{tabular}{lccccc}",
             r"\toprule",
@@ -182,7 +198,7 @@ def build_efficiency_table(df: pd.DataFrame) -> str:
         row = subset[subset["gm"] == model].iloc[0]
         overhead = (float(row["execution_time"]) / baseline - 1.0) * 100.0
         rows.append(
-            f"{model} & {row['execution_time']:.1f} & {overhead:+.1f}\\% & {row['acc']:.3f} \\\\"
+            f"{model_label(model)} & {row['execution_time']:.1f} & {overhead:+.1f}\\% & {row['acc']:.3f} \\\\"
         )
 
     return "\n".join(
@@ -190,7 +206,8 @@ def build_efficiency_table(df: pd.DataFrame) -> str:
             "% Table 3: Efficiency comparison",
             r"\begin{table}[t]",
             r"\centering",
-            r"\caption{Efficiency comparison on MUTAG with GCNConv, dim=32, and depth=2. Relative overhead is measured against BlockGNN.}",
+            r"\small",
+            r"\caption{Efficiency comparison on MUTAG with GCNConv, dim=32, and depth=2. Relative overhead is measured against PlainGNN.}",
             r"\label{tab:efficiency}",
             r"\begin{tabular}{lccc}",
             r"\toprule",
@@ -208,7 +225,7 @@ def generate_tables(df: pd.DataFrame) -> None:
     tables = "\n\n".join(
         [
             build_main_results_table(df),
-            build_mutag_rerun_table(df),
+            build_mutag_subset_table(df),
             build_efficiency_table(df),
         ]
     )
@@ -234,7 +251,7 @@ def generate_average_performance_figure(df: pd.DataFrame) -> None:
 
     ax.set_xticks(range(len(MODEL_ORDER)))
     ax.set_xticklabels(
-        [f"{model}\n(n={len(df[df['gm'] == model])})" for model in MODEL_ORDER],
+        [f"{model_label(model)}\n(n={len(df[df['gm'] == model])})" for model in MODEL_ORDER],
         fontsize=9,
     )
     ax.set_ylabel("Mean accuracy", fontweight="bold")
@@ -283,13 +300,13 @@ def generate_depth_sensitivity_figure(df: pd.DataFrame) -> None:
                 color=PALETTE[model],
                 linewidth=2,
                 markersize=6,
-                label=model,
+                label=model_label(model),
             )
 
         ax.set_xticks(DEPTH_ORDER)
         ax.set_xlabel(f"Depth (dim={dim})", fontweight="bold")
         ax.grid(alpha=0.25, linestyle="--")
-        ax.set_title(f"Updated MUTAG + GCNConv Rerun (dim={dim})", fontweight="bold")
+        ax.set_title(f"Refreshed MUTAG + GCNConv Subset (dim={dim})", fontweight="bold")
 
     axes[0].set_ylabel("Accuracy", fontweight="bold")
     axes[0].set_ylim(0.55, 0.87)
@@ -311,11 +328,12 @@ def generate_fold_distribution_figure(df: pd.DataFrame) -> None:
 
     fig, ax = plt.subplots(figsize=(10, 5.8))
     box_data = [[row[f"acc{i}"] for i in range(5)] for _, row in subset.iterrows()]
-    labels = subset["gm"].tolist()
+    model_keys = subset["gm"].tolist()
+    labels = [model_label(model) for model in model_keys]
 
     bp = ax.boxplot(box_data, tick_labels=labels, patch_artist=True, showmeans=True, meanline=True)
-    for patch, label in zip(bp["boxes"], labels):
-        patch.set_facecolor(PALETTE[label])
+    for patch, model in zip(bp["boxes"], model_keys):
+        patch.set_facecolor(PALETTE[model])
         patch.set_alpha(0.75)
 
     ax.set_ylabel("Fold accuracy", fontweight="bold")
@@ -339,7 +357,11 @@ def generate_heatmap_figure(df: pd.DataFrame) -> None:
             row.append(float(subset["acc"].max()))
         heatmap_rows.append(row)
 
-    heatmap = pd.DataFrame(heatmap_rows, index=MODEL_ORDER, columns=DATASET_ORDER)
+    heatmap = pd.DataFrame(
+        heatmap_rows,
+        index=[model_label(model) for model in MODEL_ORDER],
+        columns=DATASET_ORDER,
+    )
 
     fig, ax = plt.subplots(figsize=(8.0, 5.8))
     im = ax.imshow(heatmap.values, cmap="YlGnBu", aspect="auto", vmin=0.58, vmax=1.0)
@@ -347,7 +369,7 @@ def generate_heatmap_figure(df: pd.DataFrame) -> None:
     ax.set_xticks(np.arange(len(DATASET_ORDER)))
     ax.set_yticks(np.arange(len(MODEL_ORDER)))
     ax.set_xticklabels(DATASET_ORDER)
-    ax.set_yticklabels(MODEL_ORDER)
+    ax.set_yticklabels([model_label(model) for model in MODEL_ORDER])
     ax.set_xlabel("Dataset", fontweight="bold")
     ax.set_ylabel("Architecture", fontweight="bold")
     ax.set_title("Best Accuracy Heatmap Across Datasets", fontweight="bold")
@@ -383,7 +405,7 @@ def main() -> None:
     generate_fold_distribution_figure(merged)
     generate_heatmap_figure(merged)
 
-    print("Generated merged experiment figures and tables successfully.")
+    print("Generated experiment figures and tables successfully.")
 
 
 if __name__ == "__main__":

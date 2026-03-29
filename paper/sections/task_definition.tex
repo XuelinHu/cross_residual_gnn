@@ -1,7 +1,7 @@
 \section{Task Definition}
 \label{sec:task}
 
-We formally define the graph classification problem and establish notation for our cross-residual framework that integrates multiple graph operators. Unlike traditional approaches that focus on a single operator (e.g., GCN or GAT), our framework treats graph convolution operators as modular components that can be systematically combined through cross-branch residual connections.
+We formally define the graph classification problem and establish notation for our cross-residual framework. Rather than binding the method to a single message-passing operator, we treat the operator choice as a modular backbone and study how different residual information-flow mechanisms affect graph classification behavior under a common formulation.
 
 \subsection{Graph Representation and Notation}
 
@@ -22,7 +22,7 @@ The function $f_\theta$ is parameterized by neural network weights $\theta$ and 
 
 \subsection{Message Passing with Multiple Operators}
 
-Our framework supports multiple message passing operators $\{\Phi_1, \Phi_2, \ldots, \Phi_K\}$, where each operator $\Phi_k$ imposes a distinct inductive bias on neighborhood aggregation. Common operators include:
+Our framework supports multiple message passing operators, where each operator imposes a distinct inductive bias on neighborhood aggregation. Common operators include:
 \begin{itemize}
     \item \textbf{GCN} \cite{kipf2016semi}: Normalized adjacency-based aggregation with low-pass filtering
     \item \textbf{GAT} \cite{velivckovic2017graph}: Attention-weighted aggregation with learnable importance coefficients
@@ -31,23 +31,23 @@ Our framework supports multiple message passing operators $\{\Phi_1, \Phi_2, \ld
     \item \textbf{Transformer} \cite{dwivedi2020generalization}: Self-attention over nodes for long-range dependencies
 \end{itemize}
 
-For a single operator $\Phi_k$, node representations are updated over $L$ layers. At layer $\ell$, the representation $\mathbf{h}_i^{(\ell, k)}$ of node $v_i$ in branch $k$ is computed as:
+For a chosen operator $\Phi$, node representations are updated over $L$ layers. At layer $\ell$, the representation $\mathbf{h}_i^{(\ell)}$ of node $v_i$ is computed as:
 
 \begin{equation}
-\mathbf{h}_i^{(\ell+1, k)} = \sigma\left(\mathbf{W}^{(\ell, k)} \cdot \text{AGGREGATE}_k\left(\left\{\mathbf{h}_j^{(\ell, k)} : j \in \mathcal{N}(i)\right\}, \mathbf{h}_i^{(\ell, k)}\right) + \mathbf{b}^{(\ell, k)}\right)
+\mathbf{h}_i^{(\ell+1)} = \sigma\left(\mathbf{W}^{(\ell)} \cdot \text{AGGREGATE}_{\Phi}\left(\left\{\mathbf{h}_j^{(\ell)} : j \in \mathcal{N}(i)\right\}, \mathbf{h}_i^{(\ell)}\right) + \mathbf{b}^{(\ell)}\right)
 \end{equation}
 
-where $\text{AGGREGATE}_k$ is the aggregation function specific to operator $\Phi_k$ (e.g., mean pooling for GCN, attention weights for GAT), $\mathbf{W}^{(\ell, k)}$ are learnable weights, $\mathbf{b}^{(\ell, k)}$ is a bias term, and $\sigma$ is a non-linear activation function (e.g., ReLU). Our cross-residual framework enhances this standard formulation by introducing cross-branch connections that enable information exchange between different operators $\Phi_k$ and $\Phi_{k'}$ at each layer, as detailed in Section~\ref{sec:model}.
+where $\text{AGGREGATE}_{\Phi}$ is the aggregation function induced by operator $\Phi$ (e.g., normalized neighborhood aggregation for GCN, attention-weighted aggregation for GAT), $\mathbf{W}^{(\ell)}$ are learnable weights, $\mathbf{b}^{(\ell)}$ is a bias term, and $\sigma$ is a non-linear activation function (e.g., ReLU). The proposed framework extends this standard formulation through residual reuse mechanisms that either preserve intermediate node states within or across branches, or propagate graph-level summaries across successive computation blocks, as detailed in Section~\ref{sec:model}.
 
 \subsection{Graph-Level Representation Learning}
 
-After $L$ layers of message passing across $K$ branches, we obtain node representations $\{\mathbf{h}_i^{(L, k)} : i = 1, \ldots, n\}$ for each branch $k$. A readout function $R_k$ aggregates node-level representations into a branch-specific graph-level embedding $\mathbf{h}_{\mathcal{G}}^{(k)} \in \mathbb{R}^{d_{\text{out}}}$:
+After $L$ layers of message passing, a readout function $R$ aggregates node-level representations into a graph-level embedding $\mathbf{h}_{\mathcal{G}} \in \mathbb{R}^{d_{\text{out}}}$:
 
 \begin{equation}
-\mathbf{h}_{\mathcal{G}}^{(k)} = R_k\left(\left\{\mathbf{h}_i^{(L, k)} : i = 1, \ldots, n\right\}\right)
+\mathbf{h}_{\mathcal{G}} = R\left(\left\{\mathbf{h}_i^{(L)} : i = 1, \ldots, n\right\}\right)
 \end{equation}
 
-Common readout functions include global mean pooling ($\frac{1}{n}\sum_{i=1}^n \mathbf{h}_i^{(L, k)}$), max pooling ($\max_{i=1,\ldots,n} \mathbf{h}_i^{(L, k)}$), and sum pooling ($\sum_{i=1}^n \mathbf{h}_i^{(L, k)}$). In our framework, the final graph-level representation $\mathbf{h}_{\mathcal{G}}$ combines embeddings from all $K$ branches through cross-residual connections, enabling the model to leverage complementary inductive biases from different operators.
+Common readout functions include mean, max, and sum pooling. In our framework, graph-level representations may also be reused across successive computation blocks, enabling later stages to incorporate coarse whole-graph context in addition to local message-passing features.
 
 \subsection{Learning Objective}
 
