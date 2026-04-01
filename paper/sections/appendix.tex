@@ -1,0 +1,62 @@
+\section{Why Residual Reuse Can Slow Over-smoothing}
+\label{app:oversmoothing}
+
+This appendix provides a simplified derivation that explains why residual reuse can mitigate over-smoothing. The goal is not to claim a full theorem for the nonlinear models in Section~\ref{sec:model}, but to show that the proposed residual pathways change the effective propagation filter from a single high-order power to a lower-order polynomial mixture.
+
+\subsection{Linearized Plain Propagation}
+
+Consider the standard linearized message-passing update
+\begin{equation}
+\mathbf{H}^{(\ell+1)} = \mathbf{S}\mathbf{H}^{(\ell)},
+\end{equation}
+where $\mathbf{S}$ is a normalized graph propagation operator and $\mathbf{H}^{(0)}=\mathbf{X}$. Ignoring nonlinearities and trainable weights yields
+\begin{equation}
+\mathbf{H}^{(\ell)} = \mathbf{S}^{\ell}\mathbf{X}.
+\end{equation}
+If $\mathbf{S}$ is diagonalizable as $\mathbf{S}=\mathbf{U}\mathbf{\Lambda}\mathbf{U}^{-1}$, then
+\begin{equation}
+\mathbf{H}^{(\ell)} = \mathbf{U}\mathbf{\Lambda}^{\ell}\mathbf{U}^{-1}\mathbf{X}.
+\end{equation}
+For normalized propagation, the dominant eigenvalue is typically close to $1$, while the remaining eigenvalues satisfy $|\lambda_i|<1$. As $\ell$ grows, the factors $\lambda_i^{\ell}$ suppress non-dominant components, so node embeddings gradually collapse toward a low-dimensional smooth subspace. This is the standard over-smoothing effect: nodes become increasingly difficult to distinguish because repeated propagation attenuates the higher-frequency components that encode local differences.
+
+\subsection{Node-Level Residual Reuse}
+
+Now consider a residual reuse update
+\begin{equation}
+\mathbf{H}^{(\ell+1)} = \mathbf{S}\bigl(\mathbf{H}^{(\ell)} + \beta \mathbf{H}^{(\ell-1)}\bigr),
+\label{eq:residual_reuse}
+\end{equation}
+where $\beta \ge 0$ controls the strength of the reused hidden state. The implementation studied in this paper corresponds to $\beta=1$.
+
+Define $\mathbf{H}^{(\ell)} = P_{\ell}(\mathbf{S})\mathbf{X}$ with $P_0(\mathbf{S})=\mathbf{I}$ and $P_1(\mathbf{S})=\mathbf{S}$. Then Eq.~\eqref{eq:residual_reuse} implies the polynomial recurrence
+\begin{equation}
+P_{\ell+1}(\mathbf{S}) = \mathbf{S}\bigl(P_{\ell}(\mathbf{S}) + \beta P_{\ell-1}(\mathbf{S})\bigr).
+\end{equation}
+The first few terms are
+\begin{align}
+P_1(\mathbf{S}) &= \mathbf{S}, \\
+P_2(\mathbf{S}) &= \mathbf{S}^2 + \beta \mathbf{S}, \\
+P_3(\mathbf{S}) &= \mathbf{S}^3 + 2\beta \mathbf{S}^2, \\
+P_4(\mathbf{S}) &= \mathbf{S}^4 + 3\beta \mathbf{S}^3 + \beta^2 \mathbf{S}^2.
+\end{align}
+Therefore, residual reuse no longer applies only the single power $\mathbf{S}^{\ell}$; instead, it produces a mixture of lower-order and higher-order propagation terms. In spectral coordinates, each eigen-component evolves as
+\begin{equation}
+z_i^{(\ell+1)} = \lambda_i\bigl(z_i^{(\ell)} + \beta z_i^{(\ell-1)}\bigr),
+\end{equation}
+which is fundamentally different from the plain recurrence $z_i^{(\ell)}=\lambda_i^{\ell}z_i^{(0)}$. The plain model attenuates every non-dominant mode with a pure monomial factor, whereas the residual model preserves a polynomial combination of powers of $\lambda_i$. As a result, informative mid-frequency components are not suppressed as aggressively at the same depth.
+
+\subsection{Implication for Over-smoothing}
+
+The derivation above suggests the following interpretation. Plain stacking behaves like a repeated low-pass filter whose order increases monotonically with depth. Residual reuse changes that filter into a polynomial response that still smooths the graph, but preserves more low-order propagation information from earlier layers. This does not eliminate smoothing, yet it slows the rate at which node representations collapse to an almost indistinguishable subspace. In other words, residual reuse can improve depth tolerance because it reduces the dominance of the highest propagation order.
+
+\subsection{Graph-Level Residual Passing}
+
+The same intuition extends to graph-level residual propagation. In the graph-conditioned variants, a pooled summary from the previous block is broadcast back to the current block, so the hidden state is no longer determined only by repeated applications of $\mathbf{S}$. A simplified affine form is
+\begin{equation}
+\mathbf{H}_{t}^{(\ell+1)} = \mathbf{S}\mathbf{H}_{t}^{(\ell)} + \mathbf{1}\bigl(\mathbf{g}_{t-1}\bigr)^{\top},
+\end{equation}
+where $\mathbf{g}_{t-1}$ is the preceding graph summary. The additive term injects a lower-order global context at every block and prevents the representation from being governed solely by deeper powers of the propagation operator. This offers a second pathway for delaying over-smoothing, although the empirical sections show that graph-level reuse is more sensitive to dataset structure and computational cost than the lighter node-level residual design.
+
+\subsection{Scope of the Derivation}
+
+This appendix uses a linearized analysis and therefore abstracts away nonlinear activations, dropout, optimizer dynamics, and operator-specific details. It should be read as an explanatory mechanism rather than as a complete proof. Still, it aligns with the empirical observation that node-level residual reuse remains more stable than plain stacking as depth increases, and it provides a compact theoretical rationale for why reusing earlier states can alleviate over-smoothing.
