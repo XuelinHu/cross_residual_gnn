@@ -34,10 +34,11 @@ except ImportError:
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-DATA_ROOT = Path("/data/ai_data" if platform.system() == "Linux" else "../data")
-RECORD_ROOT = Path("../records")
-LOG_ROOT = DATA_ROOT / "logs"
-RUN_ROOT = DATA_ROOT / "runs"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATA_ROOT = PROJECT_ROOT / "data"
+RECORD_ROOT = PROJECT_ROOT / "records"
+LOG_ROOT = PROJECT_ROOT / "logs"
+RUN_ROOT = PROJECT_ROOT / "runs"
 SEPARATOR = "__"
 
 MODEL_ALIASES = {
@@ -85,7 +86,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--name", type=str, default="GCNConv", help="Message passing operator.")
     parser.add_argument("--gname", type=str, default="PlainGNN", help="Architecture name.")
     parser.add_argument("--ds", type=str, default="MUTAG", help="TUDataset name.")
-    parser.add_argument("--ep", type=int, default=1500, help="Training epochs.")
+    parser.add_argument("--ep", type=int, default=500, help="Training epochs.")
     parser.add_argument("--lr", type=float, default=1e-2, help="Learning rate.")
     parser.add_argument("--weight_decay", type=float, default=1e-2)
     parser.add_argument("--drop", type=float, default=0.6)
@@ -94,6 +95,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--fold", type=int, default=0, help="Five-fold split index.")
     parser.add_argument("--seed", type=int, default=1024)
+    parser.add_argument("--val_ratio", type=float, default=0.1, help="Validation ratio within the training split.")
+    parser.add_argument("--patience", type=int, default=20, help="Early stopping patience on validation loss.")
+    parser.add_argument("--min_delta", type=float, default=0.0, help="Minimum validation-loss improvement to reset patience.")
     parser.add_argument("--jk_mode", type=str, default="cat", choices=["cat", "max", "lstm"])
     parser.add_argument(
         "--mode",
@@ -199,6 +203,24 @@ def split_dataset(dataset: TUDataset, fold: int) -> Tuple[List[torch.Tensor], Li
     test_dataset = list(dataset[fold_start:fold_end])
     train_dataset = list(dataset[:fold_start]) + list(dataset[fold_end:])
     return train_dataset, test_dataset
+
+
+def split_train_val_dataset(
+    train_dataset: List[torch.Tensor],
+    val_ratio: float,
+) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
+    if not train_dataset:
+        return [], []
+    if val_ratio <= 0.0:
+        return train_dataset, []
+
+    val_size = max(1, int(round(len(train_dataset) * val_ratio)))
+    val_size = min(val_size, len(train_dataset) - 1) if len(train_dataset) > 1 else 0
+    if val_size == 0:
+        return train_dataset, []
+    val_dataset = list(train_dataset[-val_size:])
+    inner_train_dataset = list(train_dataset[:-val_size])
+    return inner_train_dataset, val_dataset
 
 
 def build_loader(dataset_slice: List[torch.Tensor], batch_size: int, shuffle: bool) -> DataLoader:
@@ -578,7 +600,9 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
         return {"dataset_stats": stats}
 
     train_dataset, test_dataset = split_dataset(dataset, args.fold)
+    train_dataset, val_dataset = split_train_val_dataset(train_dataset, args.val_ratio)
     train_loader = build_loader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    val_loader = build_loader(val_dataset, batch_size=args.batch_size, shuffle=False) if val_dataset else None
     test_loader = build_loader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     model = build_model(args, dataset).to(DEVICE)
@@ -604,7 +628,11 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
 
     history: List[Dict[str, float]] = []
     best_epoch = -1
+    best_val_loss = float("inf")
+    best_val_acc = -1.0
     best_test_acc = -1.0
+    best_state_dict = deepcopy(model.state_dict())
+    patience_counter = 0
 
     for epoch in range(args.ep):
         model.train()
@@ -630,26 +658,35 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
             "loss": total_loss / max(total_graphs, 1),
             "acc": total_correct / max(total_graphs, 1),
         }
-        test_metrics = evaluate(model, test_loader, criterion)
+        val_metrics = evaluate(model, val_loader, criterion) if val_loader is not None else train_metrics
 
-        if test_metrics["acc"] > best_test_acc:
-            best_test_acc = test_metrics["acc"]
+        improved = val_metrics["loss"] < (best_val_loss - args.min_delta)
+        if improved:
+            best_val_loss = val_metrics["loss"]
+            best_val_acc = val_metrics["acc"]
             best_epoch = epoch
+            best_state_dict = deepcopy(model.state_dict())
+            patience_counter = 0
+        else:
+            patience_counter += 1
 
         epoch_record = {
             "epoch": epoch,
             "train_loss": train_metrics["loss"],
             "train_acc": train_metrics["acc"],
-            "test_loss": test_metrics["loss"],
-            "test_acc": test_metrics["acc"],
+            "val_loss": val_metrics["loss"],
+            "val_acc": val_metrics["acc"],
+            "patience_counter": patience_counter,
         }
         history.append(epoch_record)
 
         if writer is not None:
             writer.add_scalar("loss/train", train_metrics["loss"], epoch)
-            writer.add_scalar("loss/test", test_metrics["loss"], epoch)
+            if val_loader is not None:
+                writer.add_scalar("loss/val", val_metrics["loss"], epoch)
             writer.add_scalar("acc/train", train_metrics["acc"], epoch)
-            writer.add_scalar("acc/test", test_metrics["acc"], epoch)
+            if val_loader is not None:
+                writer.add_scalar("acc/val", val_metrics["acc"], epoch)
 
         if epoch == 0 or (epoch + 1) % 50 == 0 or epoch == args.ep - 1:
             print(
@@ -657,20 +694,35 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
                 + format_metrics(
                     train_loss=train_metrics["loss"],
                     train_acc=train_metrics["acc"],
-                    test_loss=test_metrics["loss"],
-                    test_acc=test_metrics["acc"],
+                    val_loss=val_metrics["loss"],
+                    val_acc=val_metrics["acc"],
+                    patience=patience_counter,
                 )
             )
 
+        if patience_counter >= args.patience:
+            print(
+                f"[early_stop] epoch={epoch + 1} best_epoch={best_epoch + 1} "
+                f"best_val_loss={best_val_loss:.5f}"
+            )
+            break
+
     if writer is not None:
         writer.close()
+
+    model.load_state_dict(best_state_dict)
+    test_metrics = evaluate(model, test_loader, criterion)
+    best_test_acc = test_metrics["acc"]
 
     summary = {
         "config": vars(args),
         "dataset_stats": stats,
         "parameter_stats": parameter_stats,
         "best_epoch": best_epoch,
+        "best_val_loss": best_val_loss,
+        "best_val_acc": best_val_acc,
         "best_test_acc": best_test_acc,
+        "test_loss": test_metrics["loss"],
         "history": history,
     }
     save_json(
