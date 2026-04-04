@@ -1,96 +1,73 @@
 \section{Experiments}
 \label{sec:experiments}
 
-This section is organized in a result-first manner: we first report the main benchmark results, then analyze a refreshed MUTAG + GCNConv subset in detail, and finally discuss stability and efficiency.
+This section reports the topic-facing evaluation of CR-GNN on protein-related graph datasets. The main goal is not to maximize benchmark count, but to determine whether cross-residual information flow offers a useful advantage over simpler residual baselines under a stable and reproducible protocol.
 
 \subsection{Experimental Settings}
 
-\subsubsection{Data Sources and Consolidation}
+\subsubsection{Model Set}
 
-The benchmark combines the full experiment grid with a refreshed evaluation of the MUTAG + GCNConv subset. For the final analysis, the refreshed subset replaces the earlier measurements of the same setting so that each configuration is counted only once. The resulting benchmark contains 720 evaluated configurations in total.
-
-\subsubsection{Configuration Space}
-
-We evaluate six architectures:
+We evaluate five architectures under the same message-passing backbone:
 \begin{enumerate}
-    \item \textbf{PlainGNN}: plain stacked message passing
+    \item \textbf{PlainGNN}: plain stacked propagation
     \item \textbf{NodeResGNN}: single-branch residual reuse
     \item \textbf{NodeCrossGNN}: two-branch node-level cross residual
-    \item \textbf{GraphCondGNN}: sequential graph-level conditioning
     \item \textbf{GraphResGNN}: repeated graph-level residual refinement
-    \item \textbf{GraphCrossGNN}: graph-level cross residual between sequential block pairs
+    \item \textbf{GraphCrossGNN}: graph-level cross residual across sequential block pairs
 \end{enumerate}
 
-Each architecture is instantiated with three operators (GCNConv, GATConv, TransformerConv), five depths ($h \in \{1,2,3,4,5\}$), and two hidden dimensions ($32$ and $64$). The full grid therefore contains $6 \times 3 \times 5 \times 2 \times 4 = 720$ evaluated settings across the four datasets MUTAG, DD, MSRC\_9, and AIDS.
+GraphCondGNN is excluded from the topic-facing main comparison because the present paper aims to sharpen the residual versus cross-residual story rather than to keep every exploratory architecture in the main table.
 
-\subsubsection{Training Protocol}
+\subsubsection{Data Protocol}
 
-All runs use the same training protocol: 5-fold cross-validation, Adam optimizer, learning rate $0.01$, weight decay $10^{-2}$, dropout $0.6$, and up to 1500 epochs with early stopping once the training loss falls below $0.001$. We report mean accuracy, fold standard deviation, and total execution time.
+All topic-facing experiments use the protocol described in Section~\ref{sec:datasets}: stratified 5-fold graph-level evaluation with a stratified validation split inside each training fold. The validation split ratio is 0.1. Model selection is based on validation loss, and the best checkpoint is evaluated on the held-out test fold.
 
-\subsection{Main Results}
+\subsubsection{Optimization}
 
-Table~\ref{tab:main_results} summarizes the best configuration of each architecture on each dataset. Figure~\ref{fig:average_performance} shows the average accuracy over all 720 evaluated configurations, while Figure~\ref{fig:heatmap} visualizes the best accuracy reached by each architecture on each dataset.
+All runs use Adam with validation-based early stopping, \texttt{ReduceLROnPlateau}, and gradient clipping. The shared defaults are batch size 32, gradient clipping norm 2.0, scheduler factor 0.5, scheduler patience 15, and minimum learning rate $10^{-5}$.
 
-\input{../md/exp_tables.tex}
+For the plain and residual baselines, we use a common setting:
+\begin{itemize}
+    \item epochs = 200
+    \item patience = 60
+    \item learning rate = 0.005
+    \item weight decay = $10^{-4}$
+    \item dropout = 0.5
+    \item hidden dimension = 64
+    \item hidden layers = 4
+\end{itemize}
 
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=0.92\textwidth]{figures/exp/fig1_average_performance.pdf}
-    \caption{Average accuracy across all 720 evaluated configurations. NodeResGNN achieves the highest global mean accuracy (0.775), followed by NodeCrossGNN (0.766).}
-    \label{fig:average_performance}
-\end{figure}
+The cross-residual models use the stronger settings identified during the tuning stage. In particular, PROTEINS and DD use dataset-specific cross-model hyperparameters, while ENZYMES currently uses the default cross-residual protocol inherited from the tuned V3 setup.
 
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=0.86\textwidth]{figures/exp/fig4_heatmap_performance.pdf}
-    \caption{Best accuracy heatmap across datasets. MSRC\_9 is consistently easy, DD remains the hardest benchmark, and AIDS shows only a narrow spread between the strongest architectures.}
-    \label{fig:heatmap}
-\end{figure}
+\subsection{Main Topic-Facing Results}
 
-Three observations stand out.
+Table~\ref{tab:topic_main_results} reports the main topic-facing benchmark results, and Table~\ref{tab:topic_aux_results} summarizes the associated optimization behavior and parameter counts.
 
-\textbf{Residual reuse is the most reliable gain.} Averaged over the full configuration space, NodeResGNN achieves the best mean accuracy of 0.775, ahead of NodeCrossGNN (0.766), GraphCondGNN (0.748), PlainGNN (0.740), and GraphCrossGNN (0.734). This ranking indicates that preserving intermediate representations is more consistently beneficial than simply increasing branch count or graph-level routing complexity.
+\input{../md/topic_exp_tables.tex}
 
-\textbf{The gain pattern follows dataset structure rather than a single universal winner.} On MUTAG, the best result is reached by NodeResGNN, which is consistent with the benefit of stabilizing shallow-to-medium-depth feature reuse on small molecular graphs. On AIDS, GraphCrossGNN attains the highest single score, but the average spread between architectures is narrow, indicating that this benchmark rewards graph-level interaction only in a limited regime. Most importantly, MSRC\_9 shows the clearest architecture sensitivity in the mean-result view: NodeResGNN and NodeCrossGNN substantially outperform PlainGNN on average, which is consistent with the intuition that region-adjacency graphs depend on coordinated multi-region patterns and therefore benefit from stronger local-global information coupling. By contrast, DD shows only marginal separation between model families, suggesting that very large and sparse protein graphs are harder to improve through the current residual-readout design alone.
+The results support three practical conclusions.
 
-\textbf{Dataset difficulty and structural match jointly determine the outcome.} The mean accuracy over all settings is 0.898 on MSRC\_9, 0.799 on AIDS, 0.719 on MUTAG, and only 0.587 on DD. However, high absolute accuracy alone does not explain the observed pattern. The larger average gains on MSRC\_9 and MUTAG indicate that architectural choices matter when useful information must be preserved across multiple depths or multiple semantic regions, whereas the near-tied DD results suggest that the present framework is less suited to benchmarks dominated by large, sparse, and structurally heterogeneous graphs. This interpretation is an inference from the measured performance pattern together with the known benchmark characteristics.
+\textbf{Residual reuse remains the strongest default design.} On PROTEINS, GraphResGNN achieves the best mean accuracy of $0.7196 \pm 0.0420$, improving over PlainGNN ($0.7071 \pm 0.0273$) and both cross-residual variants. On DD, NodeResGNN is best at $0.7300 \pm 0.0201$, again ahead of both NodeCrossGNN and GraphCrossGNN. These two datasets therefore favor residual reuse more clearly than cross-path exchange under the final topic-facing protocol.
 
-\subsection{Refreshed MUTAG + GCNConv Analysis}
+\textbf{Cross-residual gains are selective rather than dominant.} ENZYMES is the dataset on which cross-residual variants are most visibly competitive in the final suite: GraphCrossGNN reaches $0.2917 \pm 0.0732$ and NodeCrossGNN reaches $0.2850 \pm 0.0528$, both above PlainGNN ($0.2350 \pm 0.0493$). Even there, however, GraphResGNN remains best at $0.3067 \pm 0.0779$. The practical interpretation is that cross-residual interaction can help on some structure-function classification regimes, but the benefit is not strong enough in the present benchmarks to displace residual baselines as the primary reference.
 
-This refreshed subset is especially useful because it covers the full MUTAG + GCNConv setting with both widths and all depths. Table~\ref{tab:ablation} lists the best configuration of each architecture on this subset, and Figure~\ref{fig:depth_sensitivity} shows the full depth curves for both widths.
+\textbf{The relevant comparison is structural fit, not architectural complexity alone.} The final benchmark does not identify one universal winner. Instead, it shows that graph-level residual propagation is strongest on PROTEINS and ENZYMES, whereas node-level residual reuse is strongest on DD. This is exactly why the paper emphasizes a controlled family comparison rather than a single headline architecture.
 
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=\textwidth]{figures/exp/fig2_depth_sensitivity.pdf}
-    \caption{Depth sensitivity on the refreshed MUTAG + GCNConv subset. Dim=32 and dim=64 show different winners, which confirms that architecture comparisons should not rely on a single depth-width setting.}
-    \label{fig:depth_sensitivity}
-\end{figure}
+\subsection{Topic-Facing Analysis Assets}
 
-This subset reveals a more nuanced pattern than a single headline score would suggest.
+To support interpretation beyond a scalar accuracy number, the current V3 pipeline records:
+\begin{itemize}
+    \item TensorBoard traces for loss, accuracy, learning rate, gradient norm, and embedding statistics
+    \item exported artifacts for graph embeddings, logits, predictions, and confusion-matrix reconstruction
+    \item parameter counts and per-fold optimization histories saved in the JSON logs
+\end{itemize}
 
-\textbf{Graph-level conditioning can be strongest at shallow depth.} On the dim=32 branch, GraphCondGNN peaks at 0.827 with depth 2, outperforming all other GCN-based variants in that setting. GraphResGNN is also strong at depth 2 (0.805), which means graph-level residual reuse is genuinely effective when the graph summary remains informative and the model is not yet deep enough to over-compress it.
+These analysis outputs are useful for checking whether a model improves because it truly preserves useful structure or merely benefits from an unstable training trajectory.
 
-\textbf{NodeResGNN is the most depth-tolerant architecture in the refreshed subset.} On the same dim=32 setting, PlainGNN drops from 0.800 at depth 1 to 0.600 at depth 5, a 25.0\% relative degradation. In contrast, NodeResGNN reaches its peak at depth 4 (0.811) and still retains 0.773 at depth 5, showing that intra-branch residual accumulation is the most reliable safeguard against performance collapse.
+\subsection{Supplementary Benchmarks}
 
-\textbf{Node-level cross residual is competitive but less stable.} On the dim=64 setting, NodeCrossGNN reaches 0.811 at depth 2, matching the best GCN result of NodeResGNN. However, its fold standard deviation at that point is 0.070, clearly larger than the 0.030 observed for NodeResGNN in the same setting. Cross-branch exchange can therefore raise the ceiling, but it does not automatically improve robustness.
+Datasets such as MUTAG, AIDS, and Mutagenicity are still useful as supplementary robustness checks, but they are not used to define the main biological claim of the paper. MSRC\_9 is omitted from the main text because it is outside the biological scope of the target venue. This separation is intentional: the topic-facing narrative should be driven by protein-related evidence rather than by generic graph benchmark breadth.
 
-\subsection{Stability and Efficiency}
+\subsection{Current Limitations}
 
-To separate average accuracy from robustness, Figure~\ref{fig:boxplot_distribution} plots the five-fold distribution on the shared MUTAG + GCNConv setting with dim=64 and depth=2. Table~\ref{tab:efficiency} reports execution time and relative overhead on the commonly referenced MUTAG + GCNConv setting with dim=32 and depth=2.
-
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=0.95\textwidth]{figures/exp/fig3_boxplot_distribution.pdf}
-    \caption{Fold-wise accuracy distribution on MUTAG + GCNConv (dim=64, depth=2). NodeResGNN has the tightest spread, whereas NodeCrossGNN attains a high mean with noticeably larger variance.}
-    \label{fig:boxplot_distribution}
-\end{figure}
-
-Two complementary conclusions follow.
-
-\textbf{NodeResGNN is the most stable architecture overall.} Across all 720 evaluated configurations, it has the lowest mean fold standard deviation (0.0312), narrowly ahead of NodeCrossGNN (0.0316), and clearly better than PlainGNN (0.0516). The box plot shows the same behavior on the shared MUTAG + GCNConv setting: NodeResGNN keeps a tight fold range while remaining highly competitive in mean accuracy.
-
-\textbf{Efficiency sharply penalizes the more complex graph-level variants.} On MUTAG + GCNConv with dim=32 and depth=2, NodeResGNN improves accuracy from 0.708 to 0.795 with only 4.1\% extra time. GraphCondGNN reaches the strongest accuracy on that setting (0.827) but needs 73.1\% more time, while GraphCrossGNN is both slower (+208.1\%) and weaker (0.622). The full-grid timing statistics tell the same story: average execution time rises from 9136 seconds for PlainGNN to 9572 seconds for NodeResGNN, but jumps to 31266 seconds for GraphCrossGNN. In other words, the simplest residual mechanism offers the best default trade-off, whereas graph-level cross interaction should be reserved for tasks where the data structure clearly rewards it.
-
-\subsection{Summary of Findings}
-
-The full benchmark analysis supports four final claims. First, residual reuse is a stronger default design choice than branch proliferation. Second, cross-branch interaction is best understood as a targeted mechanism for graph classification settings that require sustained coupling between local patterns and global arrangement, with MSRC\_9 providing the clearest evidence for this behavior in the current benchmark. Third, graph-level residual propagation is useful, but mainly in shallow or otherwise dataset-dependent regimes rather than as a universal winner. Fourth, once accuracy, stability, and execution time are considered together, NodeResGNN offers the best overall trade-off in the current study, while the more complex graph-level cross variants should be treated as specialized models whose benefits depend on structural fit to the data.
+The experiments are still structure-centric rather than fully omics-integrative. As a result, the present paper supports a conservative claim: CR-GNN is an effective biomolecular graph representation architecture on protein-related benchmarks. It does not yet justify a stronger claim about integrative omics prediction or direct discovery of novel genes, domains, or motifs. That stronger claim would require either node-level biological prediction tasks or graph datasets with richer heterogeneous biological signals.

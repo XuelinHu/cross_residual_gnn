@@ -98,6 +98,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--val_ratio", type=float, default=0.1, help="Validation ratio within the training split.")
     parser.add_argument("--patience", type=int, default=20, help="Early stopping patience on validation loss.")
     parser.add_argument("--min_delta", type=float, default=0.0, help="Minimum validation-loss improvement to reset patience.")
+    parser.add_argument("--grad_clip", type=float, default=2.0, help="Gradient clipping norm. Set <=0 to disable.")
+    parser.add_argument("--lr_factor", type=float, default=0.5, help="ReduceLROnPlateau decay factor.")
+    parser.add_argument("--lr_patience", type=int, default=15, help="ReduceLROnPlateau patience.")
+    parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate for scheduler.")
     parser.add_argument("--jk_mode", type=str, default="cat", choices=["cat", "max", "lstm"])
     parser.add_argument(
         "--mode",
@@ -195,31 +199,83 @@ def load_dataset(dataset_name: str) -> TUDataset:
     return dataset.shuffle()
 
 
+def dataset_labels(dataset: Iterable[torch.Tensor]) -> List[int]:
+    return [int(graph.y.view(-1)[0]) for graph in dataset]
+
+
+def stratified_kfold_indices(labels: List[int], n_splits: int, seed: int) -> List[Tuple[List[int], List[int]]]:
+    rng = random.Random(seed)
+    label_to_indices: Dict[int, List[int]] = {}
+    for index, label in enumerate(labels):
+        label_to_indices.setdefault(label, []).append(index)
+
+    folds: List[List[int]] = [[] for _ in range(n_splits)]
+    for indices in label_to_indices.values():
+        shuffled = list(indices)
+        rng.shuffle(shuffled)
+        for offset, index in enumerate(shuffled):
+            folds[offset % n_splits].append(index)
+
+    split_pairs: List[Tuple[List[int], List[int]]] = []
+    all_indices = set(range(len(labels)))
+    for fold_indices in folds:
+        test_indices = sorted(fold_indices)
+        train_indices = sorted(all_indices - set(test_indices))
+        split_pairs.append((train_indices, test_indices))
+    return split_pairs
+
+
+def stratified_train_val_indices(labels: List[int], val_ratio: float, seed: int) -> Tuple[List[int], List[int]]:
+    rng = random.Random(seed)
+    label_to_indices: Dict[int, List[int]] = {}
+    for index, label in enumerate(labels):
+        label_to_indices.setdefault(label, []).append(index)
+
+    train_indices: List[int] = []
+    val_indices: List[int] = []
+    for indices in label_to_indices.values():
+        shuffled = list(indices)
+        rng.shuffle(shuffled)
+        val_count = int(round(len(shuffled) * val_ratio))
+        if len(shuffled) > 1:
+            val_count = max(1, min(len(shuffled) - 1, val_count))
+        else:
+            val_count = 0
+        val_indices.extend(shuffled[:val_count])
+        train_indices.extend(shuffled[val_count:])
+    return sorted(train_indices), sorted(val_indices)
+
+
 def split_dataset(dataset: TUDataset, fold: int) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
-    total_graphs = len(dataset)
-    fold_size = total_graphs // 5
-    fold_start = fold * fold_size
-    fold_end = total_graphs if fold == 4 else (fold + 1) * fold_size
-    test_dataset = list(dataset[fold_start:fold_end])
-    train_dataset = list(dataset[:fold_start]) + list(dataset[fold_end:])
+    graph_list = list(dataset)
+    labels = dataset_labels(graph_list)
+    folds = stratified_kfold_indices(labels, n_splits=5, seed=0)
+    train_indices, test_indices = folds[fold]
+    train_dataset = [graph_list[index] for index in train_indices]
+    test_dataset = [graph_list[index] for index in test_indices]
     return train_dataset, test_dataset
 
 
 def split_train_val_dataset(
     train_dataset: List[torch.Tensor],
     val_ratio: float,
+    seed: int,
 ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
     if not train_dataset:
         return [], []
     if val_ratio <= 0.0:
         return train_dataset, []
 
-    val_size = max(1, int(round(len(train_dataset) * val_ratio)))
-    val_size = min(val_size, len(train_dataset) - 1) if len(train_dataset) > 1 else 0
-    if val_size == 0:
+    if len(train_dataset) <= 1:
         return train_dataset, []
-    val_dataset = list(train_dataset[-val_size:])
-    inner_train_dataset = list(train_dataset[:-val_size])
+
+    labels = dataset_labels(train_dataset)
+    if len(set(labels)) < 2:
+        return train_dataset, []
+
+    train_indices, val_indices = stratified_train_val_indices(labels, val_ratio=val_ratio, seed=seed)
+    inner_train_dataset = [train_dataset[index] for index in train_indices]
+    val_dataset = [train_dataset[index] for index in val_indices]
     return inner_train_dataset, val_dataset
 
 
@@ -564,6 +620,27 @@ def count_parameters(model: nn.Module) -> Dict[str, int]:
     }
 
 
+def gradient_norm(model: nn.Module) -> float:
+    squared_norm = 0.0
+    for parameter in model.parameters():
+        if parameter.grad is None:
+            continue
+        grad_value = float(parameter.grad.detach().norm(2).item())
+        squared_norm += grad_value * grad_value
+    return squared_norm ** 0.5
+
+
+def tensor_stats(tensor: torch.Tensor) -> Dict[str, float]:
+    if tensor.numel() == 0:
+        return {"mean": 0.0, "std": 0.0, "max": 0.0}
+    detached = tensor.detach()
+    return {
+        "mean": float(detached.mean().item()),
+        "std": float(detached.std(unbiased=False).item()) if detached.numel() > 1 else 0.0,
+        "max": float(detached.max().item()),
+    }
+
+
 def evaluate(model: nn.Module, loader: DataLoader, criterion: nn.Module) -> Dict[str, float]:
     model.eval()
     total_correct = 0
@@ -600,13 +677,20 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
         return {"dataset_stats": stats}
 
     train_dataset, test_dataset = split_dataset(dataset, args.fold)
-    train_dataset, val_dataset = split_train_val_dataset(train_dataset, args.val_ratio)
+    train_dataset, val_dataset = split_train_val_dataset(train_dataset, args.val_ratio, seed=args.seed + args.fold)
     train_loader = build_loader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = build_loader(val_dataset, batch_size=args.batch_size, shuffle=False) if val_dataset else None
     test_loader = build_loader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     model = build_model(args, dataset).to(DEVICE)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode="min",
+        factor=args.lr_factor,
+        patience=args.lr_patience,
+        min_lr=args.min_lr,
+    )
     criterion = nn.CrossEntropyLoss().to(DEVICE)
     parameter_stats = count_parameters(model)
 
@@ -639,13 +723,23 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
         total_correct = 0
         total_loss = 0.0
         total_graphs = 0
+        grad_norm_sum = 0.0
+        grad_norm_steps = 0
+        embedding_abs_mean_sum = 0.0
+        embedding_abs_max = 0.0
+        embedding_std_sum = 0.0
+        logits_abs_mean_sum = 0.0
+        logits_abs_max = 0.0
 
         for batch_data in train_loader:
             batch_data = prepare_batch(batch_data)
             optimizer.zero_grad()
-            logits, _ = model(batch_data.x, batch_data.edge_index, batch_data.batch)
+            logits, graph_embedding = model(batch_data.x, batch_data.edge_index, batch_data.batch)
             loss = criterion(logits, batch_data.y)
             loss.backward()
+            batch_grad_norm = gradient_norm(model)
+            if args.grad_clip > 0.0:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.grad_clip)
             optimizer.step()
 
             predictions = logits.argmax(dim=1)
@@ -653,12 +747,32 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
             total_correct += int((predictions == batch_data.y).sum())
             total_loss += float(loss.item()) * batch_size
             total_graphs += batch_size
+            grad_norm_sum += batch_grad_norm
+            grad_norm_steps += 1
+
+            embedding_stats = tensor_stats(graph_embedding.abs())
+            logits_stats = tensor_stats(logits.abs())
+            embedding_abs_mean_sum += embedding_stats["mean"] * batch_size
+            embedding_std_sum += float(graph_embedding.detach().std(unbiased=False).item()) * batch_size
+            embedding_abs_max = max(embedding_abs_max, embedding_stats["max"])
+            logits_abs_mean_sum += logits_stats["mean"] * batch_size
+            logits_abs_max = max(logits_abs_max, logits_stats["max"])
 
         train_metrics = {
             "loss": total_loss / max(total_graphs, 1),
             "acc": total_correct / max(total_graphs, 1),
         }
+        train_diagnostics = {
+            "grad_norm": grad_norm_sum / max(grad_norm_steps, 1),
+            "embedding_abs_mean": embedding_abs_mean_sum / max(total_graphs, 1),
+            "embedding_std": embedding_std_sum / max(total_graphs, 1),
+            "embedding_abs_max": embedding_abs_max,
+            "logits_abs_mean": logits_abs_mean_sum / max(total_graphs, 1),
+            "logits_abs_max": logits_abs_max,
+        }
         val_metrics = evaluate(model, val_loader, criterion) if val_loader is not None else train_metrics
+        scheduler.step(val_metrics["loss"])
+        current_lr = optimizer.param_groups[0]["lr"]
 
         improved = val_metrics["loss"] < (best_val_loss - args.min_delta)
         if improved:
@@ -676,6 +790,13 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
             "train_acc": train_metrics["acc"],
             "val_loss": val_metrics["loss"],
             "val_acc": val_metrics["acc"],
+            "grad_norm": train_diagnostics["grad_norm"],
+            "embedding_abs_mean": train_diagnostics["embedding_abs_mean"],
+            "embedding_std": train_diagnostics["embedding_std"],
+            "embedding_abs_max": train_diagnostics["embedding_abs_max"],
+            "logits_abs_mean": train_diagnostics["logits_abs_mean"],
+            "logits_abs_max": train_diagnostics["logits_abs_max"],
+            "lr": current_lr,
             "patience_counter": patience_counter,
         }
         history.append(epoch_record)
@@ -687,6 +808,16 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
             writer.add_scalar("acc/train", train_metrics["acc"], epoch)
             if val_loader is not None:
                 writer.add_scalar("acc/val", val_metrics["acc"], epoch)
+            writer.add_scalar("optim/lr", current_lr, epoch)
+            writer.add_scalar("optim/grad_norm", train_diagnostics["grad_norm"], epoch)
+            writer.add_scalar("embedding/abs_mean", train_diagnostics["embedding_abs_mean"], epoch)
+            writer.add_scalar("embedding/std", train_diagnostics["embedding_std"], epoch)
+            writer.add_scalar("embedding/abs_max", train_diagnostics["embedding_abs_max"], epoch)
+            writer.add_scalar("logits/abs_mean", train_diagnostics["logits_abs_mean"], epoch)
+            writer.add_scalar("logits/abs_max", train_diagnostics["logits_abs_max"], epoch)
+            if epoch == 0 or (epoch + 1) % 25 == 0 or epoch == args.ep - 1:
+                writer.add_histogram("embedding/graph_embedding", graph_embedding.detach().cpu(), epoch)
+                writer.add_histogram("logits/logits", logits.detach().cpu(), epoch)
 
         if epoch == 0 or (epoch + 1) % 50 == 0 or epoch == args.ep - 1:
             print(
@@ -696,6 +827,7 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
                     train_acc=train_metrics["acc"],
                     val_loss=val_metrics["loss"],
                     val_acc=val_metrics["acc"],
+                    lr=current_lr,
                     patience=patience_counter,
                 )
             )

@@ -1,144 +1,73 @@
 \section{Datasets}
 \label{sec:datasets}
 
-To comprehensively evaluate the effectiveness of ECR-GNN, we conduct experiments on four benchmark datasets from the TU Dortmund University (TUDataset) collection \cite{keriven2020benchmark}. These datasets vary in size, domain, and graph characteristics, providing a robust testbed for evaluating cross-residual mechanisms and multi-operator architectures.
+The original project evaluated a broad mixture of TU benchmarks, including molecular, vision, and generic graph-classification datasets. For the present submission target, that breadth is not an advantage. We therefore reorganize the experimental evidence around protein-oriented datasets and treat non-protein benchmarks only as supplementary robustness checks. This section describes the topic-facing dataset package used in the main paper.
+
+\subsection{Topic-Facing Dataset Selection}
+
+Our main experiments use three graph classification datasets from the TU Dortmund collection accessed through PyTorch Geometric \cite{fey2019fast}:
+
+\begin{itemize}
+    \item \textbf{PROTEINS}: graph-level protein classification
+    \item \textbf{DD}: protein structure graph classification on much larger and sparser graphs
+    \item \textbf{ENZYMES}: enzyme-oriented multi-class graph classification
+\end{itemize}
+
+This selection is deliberate. PROTEINS and DD are the strongest biological anchors already present in our codebase, while ENZYMES improves topic fit with only minimal engineering change because it remains within the same TUDataset interface. By contrast, datasets such as MUTAG, AIDS, and Mutagenicity are retained only as supplementary evidence, and MSRC\_9 is excluded from the topic-facing main text because it is not biologically relevant to the target venue.
 
 \subsection{Dataset Overview}
 
-We use the following datasets in our experiments:
-
-\paragraph{MUTAG}
-MUTAG is a standard benchmark dataset for molecular property prediction, consisting of 188 chemical compounds representing nitroaromatic molecules. Each graph corresponds to a molecule, where nodes represent atoms and edges represent chemical bonds. The task is binary classification: predicting whether a molecule has mutagenic effects on the Gram-negative bacterium \textit{Salmonella typhimurium}. This dataset is widely used in graph classification literature due to its small size and well-defined task, making it suitable for controlled ablation studies.
+\paragraph{PROTEINS}
+PROTEINS contains graph representations of proteins, where nodes denote secondary structure elements and edges encode neighborhood relations between them. The task is binary graph classification. In the current data export, the dataset contains 1,113 graphs, 2 classes, and 3 input features per node. The average graph has 39.06 nodes and 72.82 edges, although the size variation is substantial.
 
 \paragraph{DD}
-The DD dataset contains 1,178 protein structure graphs. Each graph represents a protein, where nodes correspond to amino acids and edges reflect spatial proximity relations. The task is binary classification: distinguishing enzymes from non-enzymes. Compared with the molecular datasets, DD contains much larger and structurally sparser graphs, making it a challenging benchmark for models that rely on compact graph-level summaries.
+DD is a protein structure dataset in which each graph corresponds to a protein and nodes represent amino acids or structure-related units linked by proximity-derived edges. The task is binary classification. DD is the largest and sparsest benchmark in the main package, with 1,178 graphs, 2 classes, and 89 input features. On average, graphs contain 284.32 nodes and 715.66 edges, with individual graphs reaching 5,748 nodes.
 
-\paragraph{MSRC\_9}
-MSRC\_9 is a computer-vision graph classification dataset containing 221 segmented images from the Microsoft Research Cambridge collection. Each graph is a region adjacency graph in which nodes represent segmented image regions and edges encode spatial adjacency between neighboring regions. The task is multi-class classification over 8 categories. Compared with the molecular benchmarks, MSRC\_9 emphasizes global spatial arrangement and inter-region context, making it useful for testing whether residual information reuse can preserve discriminative structure across multiple semantic regions.
-
-\paragraph{AIDS}
-AIDS is a bioinformatics dataset containing 2,000 chemical compounds screened for activity against HIV. Each graph represents a molecule, with nodes as atoms and edges as chemical bonds. The task is binary classification: predicting whether a compound is active against HIV. This is the largest dataset in our experiments, challenging the model's scalability and ability to learn from diverse molecular structures.
+\paragraph{ENZYMES}
+ENZYMES is a 6-class enzyme classification benchmark with 600 graphs and 3 input features. It is attractive for the present paper because it is protein- and enzyme-oriented while still being easy to integrate into the existing graph-classification pipeline. The average graph has 32.63 nodes and 62.14 edges, and the class distribution is perfectly balanced across the six categories.
 
 \subsection{Dataset Statistics}
 
-Table~\ref{tab:datasets} summarizes the key statistics of the datasets used in our experiments. Statistics are computed from the TUDataset loader in PyTorch Geometric.
+Table~\ref{tab:topic_datasets} summarizes the key statistics used in the topic-facing experiments.
 
 \begin{table}[t]
 \centering
-\caption{Summary of graph classification datasets used in experiments}
-\label{tab:datasets}
+\caption{Summary of the topic-facing biomolecular graph datasets.}
+\label{tab:topic_datasets}
 \begin{tabular}{lccccc}
 \toprule
-Dataset & \# Graphs & \# Classes & Feature Dim. & Domain & Task Type \\
+Dataset & \# Graphs & \# Classes & Feature Dim. & Avg. Nodes & Avg. Edges \\
 \midrule
-MUTAG & 188 & 2 & Dataset-specific TU features & Bio & Binary \\
-DD & 1,178 & 2 & Dataset-specific TU features & Bio & Binary \\
-MSRC\_9 & 221 & 8 & Dataset-specific TU features & Vision & Multi-class \\
-AIDS & 2,000 & 2 & Dataset-specific TU features & Bio & Binary \\
+PROTEINS & 1113 & 2 & 3 & 39.06 & 72.82 \\
+DD & 1178 & 2 & 89 & 284.32 & 715.66 \\
+ENZYMES & 600 & 6 & 3 & 32.63 & 62.14 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Data Loading and Configuration}
+\subsection{Data Loading}
 
-All datasets are obtained from the TUDataset collection through PyTorch Geometric \cite{fey2019fast}.
+All datasets are loaded through the PyTorch Geometric \texttt{TUDataset} interface. Each graph is represented as a \texttt{Data} object containing node features \texttt{x}, graph connectivity \texttt{edge\_index}, graph label \texttt{y}, and batch indices generated during mini-batch loading. If a graph is missing node attributes, the loader replaces them with a constant all-ones feature, ensuring that every benchmark can be processed by the same training code.
 
-\paragraph{Dataset Source}
-We use the standard benchmark splits generated from the four named datasets MUTAG, DD, MSRC\_9, and AIDS, all accessed through the same TUDataset interface.
+No additional graph augmentation, feature normalization, or edge-attribute modeling is applied in the topic-facing protocol. This is a deliberate choice: the goal is to isolate the effect of residual and cross-residual information flow rather than to combine it with a large preprocessing stack.
 
-\paragraph{Graph Representation}
-Each graph is represented as a PyTorch Geometric \texttt{Data} object containing:
+\subsection{Splitting Protocol}
+
+The present V3 code no longer uses the earlier contiguous fold slicing scheme. Instead, all reported topic-facing results follow a stratified two-stage split:
+
 \begin{itemize}
-    \item \textbf{x}: Node feature matrix of shape $(n \times d_{\text{in}})$, where $n$ is the number of nodes and $d_{\text{in}}$ is the input feature dimension specific to the dataset
-    \item \textbf{edge\_index}: Graph connectivity in COO format, shape $(2, |\mathcal{E}|)$, where $|\mathcal{E}|$ is the number of edges
-    \item \textbf{y}: Graph-level label (scalar for binary/multi-class classification)
-    \item \textbf{batch}: Batch assignment vector (for mini-batch processing)
+    \item \textbf{Outer evaluation}: stratified 5-fold cross-validation at the graph level
+    \item \textbf{Inner validation}: a stratified random validation subset sampled from the training fold with validation ratio 0.1
 \end{itemize}
 
-\paragraph{Node Features}
-Node features are provided by the TUDataset loader in the form exposed by PyTorch Geometric. No additional feature engineering or normalization is applied during data loading. The feature dimension $d_{\text{in}}$ is dataset-specific and automatically inferred by the loader. In practice, these inputs are derived from the node labels or node attributes available in each dataset, so the effective feature semantics differ across molecular, protein, and region-adjacency graphs.
+This change is important. Under weaker settings, several models collapsed toward majority-class behavior, which blurred architectural differences. The stratified outer fold construction and stratified inner validation split now provide a more reliable basis for early stopping and model comparison.
 
-\paragraph{Edge Attributes and Self-Loops}
-\textbf{Edge attributes} are not used in our experiments. All graph convolution operators (GCN, GAT, Transformer) operate on unweighted graphs. \textbf{Self-loops} are added automatically by specific operators when required (e.g., GCN adds self-loops via $\tilde{\mathbf{A}} = \mathbf{A} + \mathbf{I}$), rather than through a separate preprocessing step.
-
-\subsection{Data Splitting Protocol}
-
-We use 5-fold cross-validation for all datasets to ensure robust evaluation and enable fair comparison across model variants.
-
-\paragraph{5-Fold Cross-Validation}
-Each dataset is randomly shuffled once using a fixed seed and then partitioned into 5 equal-sized folds. For each fold $k \in \{0, 1, 2, 3, 4\}$:
-\begin{enumerate}
-    \item Fold $k$ is held out as the test set
-    \item The remaining 4 folds are concatenated to form the training set
-    \item The model is trained on the training set and evaluated on the test set
-    \item This process is repeated for all 5 folds, and the mean accuracy and standard deviation across folds are reported
-\end{enumerate}
-
-The split is implemented as:
-\begin{equation}
-\begin{aligned}
-\text{train\_dataset} &= \mathcal{D}[0:k \cdot \text{split\_len}] \cup \mathcal{D}[(k+1) \cdot \text{split\_len}:|\mathcal{D}|] \\
-\text{test\_dataset} &= \mathcal{D}[k \cdot \text{split\_len}:(k+1) \cdot \text{split\_len}]
-\end{aligned}
-\end{equation}
-where $\mathcal{D}$ is the full dataset, $\text{split\_len} = |\mathcal{D}| / 5$, and $k$ is the fold index.
-
-\paragraph{Reproducibility}
-To ensure reproducibility, random seeds are set before training:
-\begin{itemize}
-    \item PyTorch random seed: 1024
-    \item NumPy random seed: 1024
-    \item Python random seed: 1024
-    \item CUDA random seed: 1024 (if GPU is available)
-\end{itemize}
-The dataset shuffling is deterministic given the fixed random seed, ensuring that the 5-fold splits are consistent across different experimental runs.
-
-\paragraph{No Official Splits Used}
-We do not rely on predefined benchmark splits. Instead, we generate a unified 5-fold evaluation protocol for all datasets so that every architecture is assessed under the same partitioning scheme. All results report mean accuracy and standard deviation computed from the 5 folds.
-
-\subsection{Data Preprocessing and Augmentation}
-
-\paragraph{Minimal Preprocessing}
-Our framework applies minimal preprocessing to the raw datasets:
-\begin{itemize}
-    \item \textbf{Dataset shuffling:} The dataset is shuffled once using the fixed random seed before creating 5-fold splits
-    \item \textbf{Batching:} Graphs are grouped into mini-batches of size 32
-    \item \textbf{No feature normalization:} Node features are used as-is without scaling or centering
-    \item \textbf{No graph augmentation:} No edge dropout, node dropping, or subgraph sampling is applied
-\end{itemize}
-
-\paragraph{Batching Strategy}
-Training and test graphs are processed with separate mini-batch loaders:
-\begin{itemize}
-    \item \textbf{Training loader:} batch size 32 with shuffling at each epoch
-    \item \textbf{Test loader:} batch size 32 without shuffling for deterministic evaluation
-\end{itemize}
-The batch size of 32 is used across all datasets and models.
-
-\paragraph{Regularization}
-While not data augmentation per se, we apply \textbf{dropout} regularization during training:
-\begin{itemize}
-    \item Dropout probability: 0.6 (default, configurable via \texttt{--drop} argument)
-    \item Applied after each message passing layer
-    \item Applied before the final classifier
-\end{itemize}
-Dropout acts as a form of implicit data augmentation by randomly dropping node features during training, which helps prevent overfitting despite the small dataset sizes.
+All experiments use a fixed global seed for reproducibility, while the inner train/validation split uses a fold-dependent seed so that every outer fold keeps a deterministic but distinct validation partition.
 
 \subsection{Evaluation Metrics}
 
-Following standard practice in graph classification literature, we evaluate model performance using:
+The primary evaluation metric is graph classification accuracy on the held-out test fold. For each method and dataset, we report the mean and standard deviation of the best test accuracy over the 5 stratified folds. We also track test loss, best epoch, parameter count, learning-rate history, gradient norms, and embedding statistics, which are used in the analysis scripts and TensorBoard logs.
 
-\paragraph{Accuracy}
-Accuracy is the primary evaluation metric, computed as the proportion of correctly classified graphs:
-\begin{equation}
-\text{Accuracy} = \frac{1}{|\mathcal{D}_{\text{test}}|} \sum_{i=1}^{|\mathcal{D}_{\text{test}}|} \mathbb{1}[\hat{y}_i = y_i]
-\end{equation}
-where $\mathcal{D}_{\text{test}}$ is the test set, $\hat{y}_i$ is the predicted label, and $y_i$ is the ground-truth label.
+\subsection{Scope Note}
 
-\paragraph{Aggregation Across Folds}
-For each dataset, we report:
-\begin{itemize}
-    \item \textbf{Mean accuracy:} $\mu = \frac{1}{5}\sum_{k=0}^{4} \text{acc}_k$, where $\text{acc}_k$ is the accuracy on fold $k$
-    \item \textbf{Standard deviation:} $\sigma = \sqrt{\frac{1}{5}\sum_{k=0}^{4} (\text{acc}_k - \mu)^2}$
-\end{itemize}
-These statistics are computed across the 5 folds, providing a robust measure of model performance and stability. Results are reported in the format ``mean $\pm$ standard deviation'' (e.g., ``$0.85 \pm 0.03$'').
+Although these datasets are more biologically aligned than the generic benchmark mixture used earlier in the project, they still do not constitute a full integrative omics benchmark suite. Accordingly, the claims of this paper are intentionally conservative. We position the method as a biomolecular graph representation framework evaluated on protein-related datasets, not as a complete omics-integration system or a direct solution to novel gene, domain, or motif discovery.
