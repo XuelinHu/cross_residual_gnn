@@ -11,6 +11,7 @@ from typing import Dict, List, Tuple
 FOCUSED_MAIN_DATASETS = ["MUTAG", "PROTEINS", "DD", "MSRC_9"]
 TOPIC_DATASETS = ["PROTEINS", "DD", "ENZYMES"]
 EXTENDED_DATASETS = ["AIDS", "Mutagenicity"]
+ALL_DATASETS = ["MUTAG", "PROTEINS", "DD", "ENZYMES", "MSRC_9", "AIDS", "Mutagenicity"]
 
 BASELINE_PROTOCOLS: Dict[str, Dict[str, object]] = {
     "PlainGNN": {
@@ -175,6 +176,7 @@ def main() -> None:
     )
     parser.add_argument("--folds", nargs="+", type=int, default=[0, 1, 2, 3, 4])
     parser.add_argument("--max_workers", type=int, default=4)
+    parser.add_argument("--tensorboard", action="store_true", help="Enable TensorBoard logging for every run.")
     args = parser.parse_args()
 
     if args.dataset_group == "main":
@@ -184,9 +186,13 @@ def main() -> None:
     elif args.dataset_group == "extended":
         datasets = EXTENDED_DATASETS
     else:
-        datasets = FOCUSED_MAIN_DATASETS + EXTENDED_DATASETS
+        datasets = ALL_DATASETS
 
     jobs = build_jobs(datasets, args.models, args.folds)
+    if args.tensorboard:
+        for index, job in enumerate(jobs):
+            dataset, model, fold, cmd = job
+            jobs[index] = (dataset, model, fold, [*cmd, "--tensorboard"])
     started = time.time()
     with cf.ThreadPoolExecutor(max_workers=args.max_workers) as executor:
         futures = [executor.submit(run_job, job) for job in jobs]

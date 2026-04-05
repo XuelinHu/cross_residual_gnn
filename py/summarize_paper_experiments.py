@@ -15,6 +15,7 @@ FOCUSED_MODELS = ["PlainGNN", "NodeResGNN", "NodeCrossGNN", "GraphResGNN", "Grap
 MAIN_DATASETS = ["MUTAG", "PROTEINS", "DD", "MSRC_9"]
 TOPIC_DATASETS = ["PROTEINS", "DD", "ENZYMES"]
 EXTENDED_DATASETS = ["AIDS", "Mutagenicity"]
+ALL_DATASETS = ["MUTAG", "PROTEINS", "DD", "ENZYMES", "MSRC_9", "AIDS", "Mutagenicity"]
 
 
 def latest_matching_log(dataset: str, model: str, fold: int) -> Path:
@@ -82,7 +83,7 @@ def main() -> None:
     elif args.dataset_group == "extended":
         datasets = EXTENDED_DATASETS
     else:
-        datasets = MAIN_DATASETS + EXTENDED_DATASETS
+        datasets = ALL_DATASETS
 
     print(format_table(datasets, args.models))
 
