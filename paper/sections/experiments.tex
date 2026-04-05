@@ -75,7 +75,22 @@ Tables~\ref{tab:all_results_1}--\ref{tab:all_winners} summarize the final full-s
 
 \input{../md/all_exp_tables.tex}
 
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/exp/fig1_full_suite_results.pdf}
+\caption{Full-suite benchmark over all seven datasets. Each bar reports mean 5-fold best test accuracy, and error bars show the fold-level standard deviation. The figure makes the winner pattern visually explicit: residual variants dominate on PROTEINS, DD, ENZYMES, and AIDS, while cross variants win on MUTAG, MSRC\_9, and Mutagenicity.}
+\label{fig:full_suite_results}
+\end{figure*}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/exp/fig2_cross_advantage_heatmap.pdf}
+\caption{Accuracy deltas that define the practical value of cross-residual routing. Positive values indicate an advantage for the cross design, while negative values indicate that the corresponding plain or residual alternative remains stronger.}
+\label{fig:cross_advantage_heatmap}
+\end{figure}
+
 The full-suite winner pattern is immediately informative. NodeCrossGNN wins on MUTAG and Mutagenicity, GraphCrossGNN wins on MSRC\_9, GraphResGNN wins on PROTEINS, ENZYMES, and AIDS, and NodeResGNN wins on DD. PlainGNN does not win any dataset in the final suite.
+\FloatBarrier
 
 \subsection{Main Findings}
 
@@ -87,6 +102,13 @@ The full-suite winner pattern is immediately informative. NodeCrossGNN wins on M
 
 \textbf{Plain stacking is no longer a credible final baseline.} PlainGNN remains competitive on PROTEINS and DD, but it never wins a dataset in the final suite and is usually surpassed by either a residual or a cross-residual variant. This is important for the paper narrative: the meaningful comparison is no longer cross versus plain, but cross versus the stronger residual family.
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.96\linewidth]{figures/exp/fig3_rank_winner_summary.pdf}
+\caption{Aggregate ranking signals across the complete suite. The left panel reports average rank, where smaller is better. The right panel reports dataset winner counts. NodeCrossGNN has the best average rank, but GraphResGNN has the largest number of outright wins, which explains why residual reuse remains the stronger default family in the final narrative.}
+\label{fig:rank_winner_summary}
+\end{figure}
+
 \subsection{Topic-Facing Biological Interpretation}
 
 For the target venue, the most relevant evidence still comes from PROTEINS, DD, and ENZYMES.
@@ -96,6 +118,13 @@ On \textbf{PROTEINS}, GraphResGNN is clearly strongest, indicating that repeated
 On \textbf{DD}, NodeResGNN and NodeCrossGNN are nearly tied, with NodeResGNN retaining a narrow lead. This indicates that node-level hidden-state reuse is important on large sparse protein graphs, but cross exchange does not produce a decisive improvement over simpler residual reuse.
 
 On \textbf{ENZYMES}, cross variants become more attractive. GraphCrossGNN reaches $0.3017 \pm 0.0750$ and NodeCrossGNN reaches $0.3000 \pm 0.0580$, both clearly above PlainGNN at $0.2450 \pm 0.0407$. Even so, GraphResGNN still remains the best model. Therefore, ENZYMES is the cleanest topic-facing dataset for arguing that cross-residual pathways can recover useful information that plain stacking loses, but not for arguing that cross should replace residual baselines outright.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/exp/fig4_topic_focus_results.pdf}
+\caption{Focused comparison on the topic-facing datasets PROTEINS, DD, and ENZYMES. The pattern is mixed rather than one-sided: graph-level residual refinement is strongest on PROTEINS and ENZYMES, while DD favors node-level reuse, with NodeCrossGNN remaining competitive but not dominant.}
+\label{fig:topic_focus_results}
+\end{figure}
 
 \subsection{Ablation Conclusions}
 
@@ -107,6 +136,36 @@ The final ablation story is therefore precise:
 \end{itemize}
 
 This is the strongest claim that the current evidence supports. Cross-residual design should be presented as a meaningful and reusable architectural design space, not as a universal winner over residual reuse.
+
+\subsection{Parameter Sensitivity}
+
+To complement the structural ablation, we ran a focused parameter scan for the two cross-residual models on the topic-facing datasets PROTEINS, DD, and ENZYMES. The scan varies depth ($h \in \{3,4,5\}$), dropout ($\{0.2,0.3,0.5\}$), and learning rate ($\{0.002,0.003,0.005\}$) on fold 0 while keeping the stabilized V3 training protocol fixed. Figures~\ref{fig:depth_sensitivity}--\ref{fig:lr_sensitivity} summarize the resulting trends.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/exp/fig5_depth_sensitivity_v3.pdf}
+\caption{Depth sensitivity of the cross-residual models on the topic-facing datasets. NodeCrossGNN is most depth-sensitive on PROTEINS, while GraphCrossGNN on DD benefits strongly from the shallower three-layer setting.}
+\label{fig:depth_sensitivity}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/exp/fig6_dropout_sensitivity_v3.pdf}
+\caption{Dropout sensitivity of the cross-residual models. PROTEINS favors lighter regularization for GraphCrossGNN, DD prefers moderate-to-strong regularization, and ENZYMES remains unstable across all tested dropout settings.}
+\label{fig:dropout_sensitivity}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/exp/fig7_lr_sensitivity_v3.pdf}
+\caption{Learning-rate sensitivity of the cross-residual models. DD shows the clearest optimization dependence, with both cross variants improving under a more aggressive learning rate schedule.}
+\label{fig:lr_sensitivity}
+\end{figure}
+
+The sensitivity patterns are dataset-specific rather than uniform. On \textbf{PROTEINS}, NodeCrossGNN is most sensitive to depth, with the three-layer configuration outperforming the deeper alternatives, while GraphCrossGNN benefits from lighter dropout. On \textbf{DD}, both cross variants are more optimization-sensitive: larger learning rates help, and GraphCrossGNN is especially sensitive to depth, where the three-layer setting is substantially better than four layers. On \textbf{ENZYMES}, however, the scan exposes a different regime. Many runs obtain the best validation loss at or near the first epoch, which indicates that the small validation split is too noisy to provide a reliable tuning signal.
+
+To verify whether the ENZYMES fold-0 hints were actionable, we ran a 5-fold tuned follow-up with the most promising settings from the scan. The tuned NodeCrossGNN setting ($h=3$, drop$=0.2$, lr$=0.003$) reaches $0.2767 \pm 0.0698$, and the tuned GraphCrossGNN setting ($h=3$, drop$=0.2$, lr$=0.002$) reaches $0.2917 \pm 0.0675$. Both remain below the original full-suite ENZYMES cross results, so we do not replace the main table with the tuned numbers. Instead, the follow-up supports a more careful interpretation: on the smallest dataset, validation noise can dominate local hyperparameter gains, and apparent fold-level improvements do not necessarily transfer to the 5-fold mean.
+\FloatBarrier
 
 \subsection{Analysis Assets}
 

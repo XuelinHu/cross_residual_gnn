@@ -118,6 +118,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--debug", action="store_true", help="Skip file writes.")
     parser.add_argument("--tensorboard", action="store_true", help="Write TensorBoard logs if available.")
+    parser.add_argument("--exp_tag", type=str, default="", help="Optional tag appended to output filenames.")
     parser.add_argument("--report_dataset_stats", action="store_true", help="Print dataset statistics before training.")
     parser.add_argument("--save_dataset_stats", action="store_true", help="Save dataset statistics to records.")
     return parser.parse_args()
@@ -162,6 +163,12 @@ def format_metrics(**metrics: object) -> str:
         else:
             parts.append(f"{key}={value}")
     return "\t".join(parts)
+
+
+def with_exp_tag(prefix: str, exp_tag: str) -> str:
+    if not exp_tag:
+        return prefix
+    return f"{prefix}_{exp_tag}"
 
 
 def save_json(payload: Dict[str, object], prefix: str, debug: bool) -> Optional[Path]:
@@ -707,7 +714,11 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
 
     writer = None
     if args.tensorboard and SummaryWriter is not None:
-        log_dir = RUN_ROOT / f"{args.gname}_{args.name}_{args.ds}_{args.dim}_{args.h_layer}_{timestamp()}"
+        tb_prefix = with_exp_tag(
+            f"{args.gname}_{args.name}_{args.ds}_{args.dim}_{args.h_layer}",
+            args.exp_tag,
+        )
+        log_dir = RUN_ROOT / f"{tb_prefix}_{timestamp()}"
         writer = SummaryWriter(str(log_dir))
 
     history: List[Dict[str, float]] = []
@@ -859,7 +870,7 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
     }
     save_json(
         summary,
-        prefix=f"train_{args.ds}_{args.gname}_{args.name}_fold{args.fold}",
+        prefix=with_exp_tag(f"train_{args.ds}_{args.gname}_{args.name}_fold{args.fold}", args.exp_tag),
         debug=args.debug,
     )
     return summary

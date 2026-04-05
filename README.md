@@ -31,26 +31,31 @@ The current codebase also includes:
 - JSON result export
 - scripts for batch execution, summarization, and report generation
 
+Older V2-era assets have been moved into [achivement_V2](/ds1/workspace/ai/cross_residual_gnn/achivement_V2) so that the repository root reflects the active `v3` workflow.
+
 ## Repository Layout
 
 ```text
 cross_residual_gnn/
+├── achivement_V2/               # Archived V2-era code and notes
 ├── geomatric/
 │   ├── graph_classify_v3.py
-│   ├── graph_classify_v2.py
-│   ├── node_classify.py
-│   └── achivement/
 ├── py/
 │   ├── run_paper_experiments.py
 │   ├── summarize_paper_experiments.py
 │   ├── generate_all_result_reports.py
-│   ├── generate_topic_tables.py
+│   ├── generate_suite_analysis_figures.py
+│   ├── run_sensitivity_experiments.py
+│   ├── generate_sensitivity_reports.py
+│   ├── run_enzymes_tuned_cross.py
 │   ├── generate_exp_figures.py
 │   └── export_analysis_artifacts.py
 ├── md/
 │   ├── all_results_summary.txt
 │   ├── all_exp_tables.tex
 │   ├── all_ablation_analysis.md
+│   ├── sensitivity_summary.md
+│   ├── parameter_sensitivity_analysis.md
 │   ├── formal_experiment_protocol.md
 │   └── paper_gap_checklist.md
 ├── figures/
@@ -128,6 +133,7 @@ python py/summarize_paper_experiments.py --dataset_group all
 
 ```bash
 python py/generate_all_result_reports.py
+python py/generate_suite_analysis_figures.py
 ```
 
 This writes:
@@ -135,8 +141,22 @@ This writes:
 - [md/all_results_summary.txt](/ds1/workspace/ai/cross_residual_gnn/md/all_results_summary.txt)
 - [md/all_exp_tables.tex](/ds1/workspace/ai/cross_residual_gnn/md/all_exp_tables.tex)
 - [md/all_ablation_analysis.md](/ds1/workspace/ai/cross_residual_gnn/md/all_ablation_analysis.md)
+- figures under [paper/figures/exp](/ds1/workspace/ai/cross_residual_gnn/paper/figures/exp)
 
-### 5. TensorBoard
+### 5. Run parameter sensitivity scans
+
+```bash
+python py/run_sensitivity_experiments.py --fold 0 --max_workers 6
+python py/generate_sensitivity_reports.py
+```
+
+This writes:
+
+- [md/sensitivity_summary.md](/ds1/workspace/ai/cross_residual_gnn/md/sensitivity_summary.md)
+- [md/parameter_sensitivity_analysis.md](/ds1/workspace/ai/cross_residual_gnn/md/parameter_sensitivity_analysis.md)
+- sensitivity figures under [paper/figures/exp](/ds1/workspace/ai/cross_residual_gnn/paper/figures/exp)
+
+### 6. TensorBoard
 
 ```bash
 tensorboard --logdir runs --port 6006
@@ -208,4 +228,4 @@ latexmk -pdf -interaction=nonstopmode main.tex
 
 - Large runtime outputs such as `logs/`, `runs/`, `data/`, and intermediate `records/` are intentionally ignored by Git.
 - The codebase still does not implement a true integrative-omics benchmark. The current scope is biomolecular graph representation learning with a protein-oriented main evaluation.
-- A final method figure and author metadata are still needed before submission.
+- The remaining paper-side manual work is mainly author metadata, final reference audit, and venue-specific submission materials.
