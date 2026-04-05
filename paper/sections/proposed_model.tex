@@ -1,9 +1,14 @@
 \section{Proposed Model}
 \label{sec:model}
 
-ECR-GNN is formulated as a compact family of reusable graph classification architectures. All variants share the same input projection, stacked message-passing layers, global mean pooling, and linear graph classifier; they differ only in how intermediate node states and graph-level summaries are reused across depth and across branches.
+CR-GNN is formulated as a compact family of reusable graph classification architectures. All variants share the same input projection, stacked message-passing layers, global mean pooling, and linear graph classifier; they differ only in how intermediate node states and graph-level summaries are reused across depth and across branches.
 
-% Placeholder: insert a cleaned architecture overview figure here if a final diagram is prepared later.
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/cr_gnn_family_overview.pdf}
+\caption{Overview of the CR-GNN family used in this paper. The main comparison moves from plain stacking to node-level residual reuse, node-level cross exchange, graph-level residual refinement, and graph-level cross-summary exchange.}
+\label{fig:crgnn_family}
+\end{figure}
 
 \subsection{Operator Factory and Shared Backbone}
 
@@ -24,7 +29,7 @@ The final graph prediction is produced by
 \hat{\mathbf{y}} = \mathbf{W}_{\mathrm{clf}}\,\mathrm{Dropout}(\mathbf{g}) + \mathbf{b}_{\mathrm{clf}}.
 \end{equation}
 
-All six architectures differ only in how they update $\mathbf{H}^{(\ell)}$ and how they reuse graph-level embeddings across blocks.
+The full implementation family contains six architectures, including the auxiliary GraphCondGNN variant. The main paper experiments focus on five core models, but all family members differ only in how they update $\mathbf{H}^{(\ell)}$ and how they reuse graph-level embeddings across blocks.
 
 \subsection{Single-Branch and Node-Level Residual Blocks}
 
@@ -112,7 +117,7 @@ Algorithm~\ref{alg:ecr_forward} summarizes the shared forward logic in pseudocod
 \STATE \textbf{Return:} $(\hat{\mathbf{y}}, \mathbf{g})$
 \end{algorithmic}
 \end{minipage}
-\caption{Pseudocode of the shared ECR-GNN forward procedure}
+\caption{Pseudocode of the shared CR-GNN forward procedure}
 \label{alg:ecr_forward}
 \end{figure}
 

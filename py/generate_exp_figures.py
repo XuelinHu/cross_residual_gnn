@@ -22,7 +22,6 @@ RECORDS_DIR = ROOT / "records"
 FIGURE_DIRS = [
     ROOT / "figures" / "exp",
     ROOT / "paper" / "figures" / "exp",
-    ROOT / "py" / "figures" / "exp",
 ]
 TABLE_DIRS = [
     ROOT / "md",
