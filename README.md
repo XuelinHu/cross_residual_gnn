@@ -10,6 +10,7 @@
 Research code for Cross-Residual Graph Neural Networks (CR-GNN), a controlled graph-classification architecture family that compares plain stacking, residual reuse, and cross-residual information exchange under a unified training protocol.
 
 The current repository is centered on the stabilized `v3` graph-classification pipeline in [geomatric/graph_classify_v3.py](/ds1/workspace/ai/cross_residual_gnn/geomatric/graph_classify_v3.py). The paper narrative is framed around protein-oriented graph benchmarks, while the final implementation study also includes a broader full-suite robustness evaluation.
+- https://www.frontiersin.org/research-topics/73895/prediction-of-novel-domains-motifs-genes-and-proteins-through-integrative-omics-approaches
 
 ## Overview
 
