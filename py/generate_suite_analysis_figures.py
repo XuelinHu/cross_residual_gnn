@@ -101,6 +101,39 @@ def save(fig: plt.Figure, filename: str) -> None:
         fig.savefig(out_dir / f"{filename}.png", dpi=300, bbox_inches="tight")
 
 
+def add_bar_labels(
+    ax: plt.Axes,
+    bars,
+    fmt: str = "{:.3f}",
+    fontsize: int = 8,
+    rotation: int = 90,
+    inside: bool = False,
+) -> None:
+    for bar in bars:
+        height = bar.get_height()
+        if inside:
+            y = max(height - 0.018, height * 0.65)
+            va = "top"
+            color = "white"
+        else:
+            y = height + 0.006
+            va = "bottom"
+            color = "black"
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            y,
+            fmt.format(height),
+            ha="center",
+            va=va,
+            fontsize=fontsize,
+            rotation=rotation,
+            color=color,
+            fontweight="bold" if inside else None,
+            clip_on=False,
+            zorder=5,
+        )
+
+
 def plot_full_suite(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
     apply_paper_style()
     datasets = completed_datasets(summary)
@@ -114,7 +147,7 @@ def plot_full_suite(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
     for offset, model in zip(offsets, MODELS):
         means = [summary[dataset][model]["mean_acc"] for dataset in datasets]
         stds = [summary[dataset][model]["std_acc"] for dataset in datasets]
-        ax.bar(
+        bars = ax.bar(
             x + offset,
             means,
             width=width,
@@ -126,6 +159,7 @@ def plot_full_suite(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
             capsize=3,
             zorder=3,
         )
+        add_bar_labels(ax, bars, fontsize=7)
 
     ax.set_xticks(x)
     ax.set_xticklabels(datasets, rotation=20)
@@ -241,12 +275,12 @@ def plot_topic_focus(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
     datasets = [dataset for dataset in TOPIC_DATASETS if dataset in completed_datasets(summary)]
     if not datasets:
         return
-    fig, axes = plt.subplots(1, len(datasets), figsize=(11.5, 4.1), sharey=True)
+    fig, axes = plt.subplots(1, len(datasets), figsize=(11.2, 3.8), sharey=True)
     if len(datasets) == 1:
         axes = [axes]
     for ax, dataset in zip(axes, datasets):
         means = [summary[dataset][model]["mean_acc"] for model in MODELS]
-        ax.bar(
+        bars = ax.bar(
             np.arange(len(MODELS)),
             means,
             color=[MODEL_COLORS[model] for model in MODELS],
@@ -254,13 +288,29 @@ def plot_topic_focus(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
             linewidth=0.8,
             zorder=3,
         )
+        for bar in bars:
+            value = bar.get_height()
+            ax.annotate(
+                f"{value:.3f}",
+                xy=(bar.get_x() + bar.get_width() / 2, value),
+                xytext=(0, 4),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+                color="black",
+                bbox={"facecolor": "white", "edgecolor": "none", "pad": 0.2},
+                clip_on=False,
+                zorder=6,
+            )
         ax.set_title(dataset)
         ax.set_xticks(np.arange(len(MODELS)))
         ax.set_xticklabels([MODEL_DISPLAY[model] for model in MODELS], rotation=30, ha="right")
+        ax.set_ylim(0, max(means) + 0.10)
+        ax.margins(y=0.12)
         style_axis(ax)
     axes[0].set_ylabel("Mean 5-fold best test accuracy")
-    fig.suptitle("Focused comparison on the main biological datasets", y=1.04)
-    fig.tight_layout()
+    fig.subplots_adjust(left=0.08, right=0.995, top=0.88, bottom=0.30, wspace=0.12)
     save(fig, "fig4_topic_focus_results")
     plt.close(fig)
 

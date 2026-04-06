@@ -1,20 +1,20 @@
 \section{Proposed Model}
 \label{sec:model}
 
-CR-GNN is formulated as a compact family of reusable graph classification architectures. All variants share the same input projection, stacked message-passing layers, global mean pooling, and linear graph classifier; they differ only in how intermediate node states and graph-level summaries are reused across depth and across branches.
+Based on the task formulation above, CR-GNN is defined as a compact family of graph classification architectures. All variants share the same input projection, stacked message-passing layers, graph-level pooling, and linear classifier; they differ only in how intermediate node states and graph-level summaries are reused across depth and across branches.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.98\linewidth]{figures/cr_gnn_family_overview.pdf}
-\caption{Overview of the CR-GNN family used in this paper. The main comparison moves from plain stacking to node-level residual reuse, node-level cross exchange, graph-level residual refinement, and graph-level cross-summary exchange.}
-\label{fig:crgnn_family}
+\includegraphics[width=0.98\linewidth]{figures/cr_gnn_schematic.png}
+\caption{Schematic view of the CR-GNN pipeline. All models share the same graph-classification backbone, while node-level reuse and graph-level summary reuse define the residual and cross-residual variants.}
+\label{fig:crgnn_schematic}
 \end{figure}
 
 \subsection{Operator Factory and Shared Backbone}
 
-Let $\mathcal{G}=(\mathcal{V},\mathcal{E})$ be a graph with node feature matrix $\mathbf{X}\in\mathbb{R}^{n\times d_{\mathrm{in}}}$ and adjacency structure $\mathbf{A}$. The operator factory instantiates one of three message-passing layers,
+Let $\mathcal{G}=(\mathcal{V},\mathcal{E})$ be a graph with node feature matrix $\mathbf{X}\in\mathbb{R}^{n\times d_{\mathrm{in}}}$ and adjacency structure $\mathbf{A}$. The model can be instantiated with one of several standard message-passing operators,
 \[
-\Phi \in \{\mathrm{GCNConv},\ \mathrm{GATConv},\ \mathrm{TransformerConv}\},
+\Phi \in \{\mathrm{GCN},\ \mathrm{GAT},\ \mathrm{Graph\mbox{-}Transformer}\},
 \]
 and reuses the same operator type throughout a model instance. For a hidden width $d$, every branch starts with an input projection
 \begin{equation}
@@ -22,33 +22,34 @@ and reuses the same operator type throughout a model instance. For a hidden widt
 \end{equation}
 followed by $L$ hidden layers and a readout
 \begin{equation}
-\mathbf{g} = \mathrm{MeanPool}\!\left(\mathbf{H}^{(L)}\right).
+\mathbf{g} = \mathrm{Pool}\!\left(\mathbf{H}^{(L)}\right).
 \end{equation}
 The final graph prediction is produced by
 \begin{equation}
-\hat{\mathbf{y}} = \mathbf{W}_{\mathrm{clf}}\,\mathrm{Dropout}(\mathbf{g}) + \mathbf{b}_{\mathrm{clf}}.
+\hat{\mathbf{y}} = \mathbf{W}_{\mathrm{clf}}\,\psi(\mathbf{g}) + \mathbf{b}_{\mathrm{clf}},
 \end{equation}
+where $\psi(\cdot)$ denotes regularized graph-level feature transformation before classification.
 
-The full implementation family contains six architectures, including the auxiliary GraphCondGNN variant. The main paper experiments focus on five core models, but all family members differ only in how they update $\mathbf{H}^{(\ell)}$ and how they reuse graph-level embeddings across blocks.
+The main paper focuses on five architectures: PlainGNN, NodeResGNN, NodeCrossGNN, GraphResGNN, and GraphCrossGNN. They differ only in how they update $\mathbf{H}^{(\ell)}$ and how they reuse graph-level embeddings across blocks.
 
 \subsection{Single-Branch and Node-Level Residual Blocks}
 
 \textbf{PlainGNN.} The plain baseline stacks $L$ copies of the same operator without residual reuse:
 \begin{equation}
-\mathbf{H}^{(\ell+1)} = \mathrm{Dropout}\!\left(\mathrm{ReLU}\!\left(\Phi_{\ell}\!\left(\mathbf{H}^{(\ell)}, \mathbf{A}\right)\right)\right).
+\mathbf{H}^{(\ell+1)} = \psi\!\left(\mathrm{ReLU}\!\left(\Phi_{\ell}\!\left(\mathbf{H}^{(\ell)}, \mathbf{A}\right)\right)\right).
 \end{equation}
 This model serves as the reference point for judging whether residual information flow is beneficial.
 
 \textbf{NodeResGNN.} The first residual variant stores the previous hidden state within the same branch:
 \begin{equation}
-\mathbf{H}^{(\ell+1)} = \mathrm{Dropout}\!\left(\mathrm{ReLU}\!\left(\Phi_{\ell}\!\left(\mathbf{H}^{(\ell)} + \mathbf{H}^{(\ell-1)}, \mathbf{A}\right)\right)\right).
+\mathbf{H}^{(\ell+1)} = \psi\!\left(\mathrm{ReLU}\!\left(\Phi_{\ell}\!\left(\mathbf{H}^{(\ell)} + \mathbf{H}^{(\ell-1)}, \mathbf{A}\right)\right)\right).
 \end{equation}
 This mechanism is lightweight and preserves historical features without creating extra branches.
 
 \textbf{NodeCrossGNN.} The node-level cross-residual model maintains two parallel branches with separate input projections:
 \begin{align}
-\mathbf{H}^{(\ell+1)}_{1} &= \mathrm{Dropout}\!\left(\mathrm{ReLU}\!\left(\Phi^{(1)}_{\ell}\!\left(\mathbf{H}^{(\ell)}_{1} + \widetilde{\mathbf{H}}^{(\ell)}_{2}, \mathbf{A}\right)\right)\right), \\
-\mathbf{H}^{(\ell+1)}_{2} &= \mathrm{Dropout}\!\left(\mathrm{ReLU}\!\left(\Phi^{(2)}_{\ell}\!\left(\mathbf{H}^{(\ell)}_{2} + \widetilde{\mathbf{H}}^{(\ell)}_{1}, \mathbf{A}\right)\right)\right),
+\mathbf{H}^{(\ell+1)}_{1} &= \psi\!\left(\mathrm{ReLU}\!\left(\Phi^{(1)}_{\ell}\!\left(\mathbf{H}^{(\ell)}_{1} + \widetilde{\mathbf{H}}^{(\ell)}_{2}, \mathbf{A}\right)\right)\right), \\
+\mathbf{H}^{(\ell+1)}_{2} &= \psi\!\left(\mathrm{ReLU}\!\left(\Phi^{(2)}_{\ell}\!\left(\mathbf{H}^{(\ell)}_{2} + \widetilde{\mathbf{H}}^{(\ell)}_{1}, \mathbf{A}\right)\right)\right),
 \end{align}
 where $\widetilde{\mathbf{H}}^{(\ell)}_{k}$ is the cached hidden state from the opposite branch before its current update. The final node representation is the branch sum
 \begin{equation}
@@ -58,13 +59,7 @@ Compared with the single-branch residual block, NodeCrossGNN explicitly exchange
 
 \subsection{Graph-Level Residual Propagation}
 
-We further consider three higher-level architectures that compose several block models sequentially and pass graph embeddings across them.
-
-\textbf{GraphCondGNN.} Two plain message-passing blocks are executed in sequence. The first block produces a graph embedding $\mathbf{g}^{(1)}$, which is added to node features and to the pooled graph representation inside the second block:
-\begin{equation}
-\mathbf{g}^{(2)} = B_{2}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(1)}\right).
-\end{equation}
-This introduces graph-level conditioning without intra-layer residual connections.
+We further consider two higher-level architectures that compose several block models sequentially and pass graph embeddings across them.
 
 \textbf{GraphResGNN.} This variant chains three graph-conditioned blocks:
 \begin{equation}
@@ -89,37 +84,33 @@ All model variants use the same graph classification objective:
 \begin{equation}
 \mathcal{L}(\theta) = - \frac{1}{N} \sum_{i=1}^{N}\sum_{c=1}^{C} y_{i,c}\log \hat{y}_{i,c},
 \end{equation}
-optimized with Adam. Dropout is applied after every message-passing update and once more before the classifier. The experiments in Section~\ref{sec:experiments} therefore isolate architectural differences rather than changes in loss, optimizer, or data protocol.
+with the same loss definition used for every architecture. The experiments in Section~\ref{sec:experiments} therefore isolate architectural differences rather than changes in objective or evaluation protocol.
 
 \subsection{Algorithmic View}
 
-Algorithm~\ref{alg:ecr_forward} summarizes the shared forward logic in pseudocode form rather than as a descriptive table.
+Table~\ref{tab:crgnn_algorithm} summarizes the shared forward logic in a compact three-line format.
 
-\begin{figure}[t]
+\begin{table}[t]
 \centering
-\begin{minipage}{0.95\textwidth}
-\begin{algorithmic}[1]
-\STATE \textbf{Input:} graph batch $(\mathbf{X}, \mathbf{A}, \mathbf{b})$, operator $\Phi$, depth $L$, architecture type $M$
-\STATE Instantiate message-passing blocks with operator $\Phi$
-\IF{$M = \textsc{PlainGNN}$}
-    \STATE Apply one input projection and stack $L$ message-passing layers
-\ELSIF{$M = \textsc{NodeResGNN}$}
-    \STATE Cache the previous hidden state and add it before each layer update
-\ELSIF{$M = \textsc{NodeCrossGNN}$}
-    \STATE Build two branches and inject the opposite branch's cached state at every depth
-\ELSIF{$M \in \{\textsc{GraphCondGNN}, \textsc{GraphResGNN}\}$}
-    \STATE Execute sequential block models and reuse the previous graph embedding as graph-level context
-\ELSIF{$M = \textsc{GraphCrossGNN}$}
-    \STATE Process block pairs, compute two graph embeddings, and swap them before the next pair
-\ENDIF
-\STATE Pool the final node representations with global mean pooling to obtain $\mathbf{g}$
-\STATE Apply dropout and a linear classifier to produce logits $\hat{\mathbf{y}}$
-\STATE \textbf{Return:} $(\hat{\mathbf{y}}, \mathbf{g})$
-\end{algorithmic}
-\end{minipage}
-\caption{Pseudocode of the shared CR-GNN forward procedure}
-\label{alg:ecr_forward}
-\end{figure}
+\small
+\caption{Shared forward procedure of the CR-GNN family.}
+\label{tab:crgnn_algorithm}
+\begin{tabular}{p{0.10\linewidth} p{0.82\linewidth}}
+\toprule
+Step & Procedure \\
+\midrule
+1 & Input graph features $\mathbf{X}$ and structure $\mathbf{A}$, choose depth $L$, and select one architecture from \textsc{PlainGNN}, \textsc{NodeResGNN}, \textsc{NodeCrossGNN}, \textsc{GraphResGNN}, and \textsc{GraphCrossGNN}. \\
+2 & Apply the shared input projection to obtain initial hidden states. \\
+3 & If the model is \textsc{PlainGNN}, update one branch sequentially for $L$ layers without explicit state reuse. \\
+4 & If the model is \textsc{NodeResGNN}, add the cached previous hidden state before each layer update. \\
+5 & If the model is \textsc{NodeCrossGNN}, maintain two branches and inject the opposite branch's cached state at every depth. \\
+6 & If the model is \textsc{GraphResGNN}, execute sequential blocks and reuse the previous graph embedding as graph-level context. \\
+7 & If the model is \textsc{GraphCrossGNN}, compute paired graph embeddings and swap them before the next block stage. \\
+8 & Pool the final node representations to obtain $\mathbf{g}$, then apply the graph-level classifier to produce logits $\hat{\mathbf{y}}$. \\
+9 & Return the prediction $\hat{\mathbf{y}}$ and the final graph embedding $\mathbf{g}$. \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Design Implications}
 

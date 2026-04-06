@@ -1,7 +1,7 @@
 \section{Task Definition}
 \label{sec:task}
 
-We formally define the graph classification problem and establish notation for our cross-residual framework. Rather than binding the method to a single message-passing operator, we treat the operator choice as a modular backbone and study how different residual information-flow mechanisms affect graph classification behavior under a common formulation.
+We formally define the graph classification problem and establish notation for the five-model comparison used throughout the paper. Rather than changing many components at once, we keep the graph classification setting fixed and study how different residual information-flow mechanisms affect graph-level prediction under a common formulation.
 
 \subsection{Graph Representation and Notation}
 
@@ -20,24 +20,35 @@ Given a training dataset $\mathcal{D} = \{(\mathcal{G}_i, y_i)\}_{i=1}^{N}$ cons
 
 The function $f_\theta$ is parameterized by neural network weights $\theta$ and operates by first learning node-level representations through message passing, then aggregating these into a graph-level representation, and finally mapping this representation to the output label space.
 
-\subsection{Message Passing with Multiple Operators}
+\subsection{Main Comparison Setting}
 
-Our framework supports multiple message passing operators, where each operator imposes a distinct inductive bias on neighborhood aggregation. Common operators include:
+The main paper compares five architectures under the same graph-classification pipeline:
 \begin{itemize}
-    \item \textbf{GCN} \cite{kipf2016semi}: Normalized adjacency-based aggregation with low-pass filtering
-    \item \textbf{GAT} \cite{velivckovic2017graph}: Attention-weighted aggregation with learnable importance coefficients
-    \item \textbf{GraphSAGE} \cite{hamilton2017inductive}: Sampling-based aggregation with mean/LSTM/pooling operators
-    \item \textbf{GIN} \cite{xu2018powerful}: Injective aggregation for maximum discriminative power
-    \item \textbf{Transformer} \cite{dwivedi2020generalization}: Self-attention over nodes for long-range dependencies
+    \item \textbf{PlainGNN}: sequential message passing without explicit state reuse
+    \item \textbf{NodeResGNN}: single-branch node-level residual reuse
+    \item \textbf{NodeCrossGNN}: two-branch node-level cross exchange
+    \item \textbf{GraphResGNN}: graph-level residual propagation across sequential blocks
+    \item \textbf{GraphCrossGNN}: graph-level cross-summary exchange across paired blocks
 \end{itemize}
 
-For a chosen operator $\Phi$, node representations are updated over $L$ layers. At layer $\ell$, the representation $\mathbf{h}_i^{(\ell)}$ of node $v_i$ is computed as:
+The comparison is designed to isolate \emph{where} information is reused: inside one branch, across parallel branches, or through pooled graph summaries passed between blocks. This design makes the main experimental question precise: when does cross-path interaction help beyond plain stacking and beyond a simpler residual baseline?
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/task_model_comparison.png}
+\caption{Main model comparison in this paper. The five architectures differ only in how intermediate node states or graph summaries are reused, which allows a controlled study of residual and cross-residual information flow.}
+\label{fig:task_model_comparison}
+\end{figure}
+
+\subsection{Message Passing with Multiple Operators}
+
+Let $\Phi$ denote a message-passing operator. For a chosen backbone, node representations are updated over $L$ layers. At layer $\ell$, the representation $\mathbf{h}_i^{(\ell)}$ of node $v_i$ is computed as:
 
 \begin{equation}
 \mathbf{h}_i^{(\ell+1)} = \sigma\left(\mathbf{W}^{(\ell)} \cdot \text{AGGREGATE}_{\Phi}\left(\left\{\mathbf{h}_j^{(\ell)} : j \in \mathcal{N}(i)\right\}, \mathbf{h}_i^{(\ell)}\right) + \mathbf{b}^{(\ell)}\right)
 \end{equation}
 
-where $\text{AGGREGATE}_{\Phi}$ is the aggregation function induced by operator $\Phi$ (e.g., normalized neighborhood aggregation for GCN, attention-weighted aggregation for GAT), $\mathbf{W}^{(\ell)}$ are learnable weights, $\mathbf{b}^{(\ell)}$ is a bias term, and $\sigma$ is a non-linear activation function (e.g., ReLU). The proposed framework extends this standard formulation through residual reuse mechanisms that either preserve intermediate node states within or across branches, or propagate graph-level summaries across successive computation blocks, as detailed in Section~\ref{sec:model}.
+where $\text{AGGREGATE}_{\Phi}$ is the aggregation function induced by $\Phi$, $\mathbf{W}^{(\ell)}$ and $\mathbf{b}^{(\ell)}$ are learnable parameters, and $\sigma$ is a non-linear activation function. In the experiments reported later, all five models are compared under the same GCN-style backbone so that the observed differences are attributable to information-flow design rather than to operator changes.
 
 \subsection{Graph-Level Representation Learning}
 
@@ -65,4 +76,4 @@ The model is trained end-to-end by minimizing the cross-entropy loss function:
 \mathcal{L}(\theta) = -\frac{1}{N} \sum_{i=1}^{N} \sum_{c=1}^{C} y_{i,c} \log(\hat{y}_{i,c})
 \end{equation}
 
-where $y_{i,c} \in \{0, 1\}$ is the ground-truth label indicator (one-hot encoding) for graph $\mathcal{G}_i$ and class $c$, and $\hat{y}_{i,c}$ is the predicted probability for class $c$. For binary classification, this reduces to the binary cross-entropy loss. The parameters $\theta$ include all weights in the message passing layers, readout functions, cross-residual connections, and the classifier, which are optimized using gradient-based methods (e.g., Adam) with backpropagation.
+where $y_{i,c} \in \{0, 1\}$ is the ground-truth label indicator (one-hot encoding) for graph $\mathcal{G}_i$ and class $c$, and $\hat{y}_{i,c}$ is the predicted probability for class $c$. For binary classification, this reduces to the binary cross-entropy loss. With this common formulation fixed, the next section instantiates the five CR-GNN variants and specifies how each one reuses intermediate node states or graph summaries.
