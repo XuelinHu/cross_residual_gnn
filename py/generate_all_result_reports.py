@@ -3,16 +3,24 @@ from __future__ import annotations
 import glob
 import json
 import statistics as st
+import sys
 from pathlib import Path
 from typing import Dict, List
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from experiment_catalog import ALL_ACTIVE_DATASETS, FOCUSED_MODELS, MAIN_BIOLOGICAL_DATASETS, SUPPLEMENTARY_DATASETS
+
 LOG_DIR = ROOT / "logs"
 MD_DIR = ROOT / "md"
 
-DATASETS = ["MUTAG", "PROTEINS", "DD", "ENZYMES", "MSRC_9", "AIDS", "Mutagenicity"]
-MODELS = ["PlainGNN", "NodeResGNN", "NodeCrossGNN", "GraphResGNN", "GraphCrossGNN"]
+DATASETS = ALL_ACTIVE_DATASETS
+MAIN_DATASETS = MAIN_BIOLOGICAL_DATASETS
+SUPP_DATASETS = SUPPLEMENTARY_DATASETS
+MODELS = FOCUSED_MODELS
 
 TXT_OUT = MD_DIR / "all_results_summary.txt"
 TEX_OUT = MD_DIR / "all_exp_tables.tex"
@@ -37,7 +45,14 @@ def load_result(dataset: str, model: str, fold: int) -> Dict[str, object]:
 
 
 def summarize_model(dataset: str, model: str) -> Dict[str, object]:
-    rows = [load_result(dataset, model, fold) for fold in range(5)]
+    try:
+        rows = [load_result(dataset, model, fold) for fold in range(5)]
+    except FileNotFoundError:
+        return {
+            "dataset": dataset,
+            "model": model,
+            "pending": True,
+        }
     accs = [float(row["best_test_acc"]) for row in rows]
     losses = [float(row["test_loss"]) for row in rows]
     epochs = [int(row["best_epoch"]) + 1 for row in rows]
@@ -65,7 +80,7 @@ def collect_summary() -> Dict[str, Dict[str, Dict[str, object]]]:
 
 
 def ranked_rows(summary: Dict[str, Dict[str, Dict[str, object]]], dataset: str) -> List[Dict[str, object]]:
-    rows = [summary[dataset][model] for model in MODELS]
+    rows = [summary[dataset][model] for model in MODELS if not summary[dataset][model].get("pending")]
     rows.sort(key=lambda row: (-row["mean_acc"], row["mean_loss"]))
     return rows
 
@@ -74,7 +89,8 @@ def build_text_summary(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
     lines: List[str] = []
     for dataset in DATASETS:
         lines.append(f"## {dataset}")
-        for index, row in enumerate(ranked_rows(summary, dataset), 1):
+        rows = ranked_rows(summary, dataset)
+        for index, row in enumerate(rows, 1):
             fold_text = ",".join(f"{value:.5f}" for value in row["fold_accs"])
             lines.append(
                 f"{index}. {row['model']}\tmean_acc={row['mean_acc']:.5f}\t"
@@ -82,6 +98,9 @@ def build_text_summary(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
                 f"mean_best_epoch={row['mean_best_epoch']:.1f}\tparams={row['params']}"
             )
             lines.append(f"   folds={fold_text}")
+        for model in MODELS:
+            if summary[dataset][model].get("pending"):
+                lines.append(f"- {model}\tpending=no complete log set found")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -95,11 +114,15 @@ def format_metric(row: Dict[str, object], best_acc: float) -> str:
 
 def build_tex_tables(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
     best_by_dataset = {
-        dataset: max(summary[dataset].values(), key=lambda row: row["mean_acc"])["mean_acc"]
+        dataset: max(
+            (row for row in summary[dataset].values() if not row.get("pending")),
+            key=lambda row: row["mean_acc"],
+        )["mean_acc"]
         for dataset in DATASETS
+        if ranked_rows(summary, dataset)
     }
 
-    chunks = [DATASETS[:4], DATASETS[4:]]
+    chunks = [MAIN_DATASETS, SUPP_DATASETS]
     tables: List[str] = []
     for table_index, datasets in enumerate(chunks, 1):
         colspec = "l" + ("c" * len(datasets))
@@ -108,10 +131,10 @@ def build_tex_tables(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
             r"\centering",
             r"\small",
             (
-                r"\caption{Full 5-fold benchmark results on the complete dataset suite. "
+                r"\caption{Main biological benchmark results. "
                 r"Numbers are mean best test accuracy $\pm$ standard deviation.}"
                 if table_index == 1
-                else r"\caption{Full-suite continuation table for the remaining datasets.}"
+                else r"\caption{Supplementary robustness benchmark results.}"
             ),
             rf"\label{{tab:all_results_{table_index}}}",
             rf"\begin{{tabular}}{{{colspec}}}",
@@ -120,7 +143,13 @@ def build_tex_tables(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
             r"\midrule",
         ]
         for model in MODELS:
-            cells = [format_metric(summary[dataset][model], best_by_dataset[dataset]) for dataset in datasets]
+            cells = []
+            for dataset in datasets:
+                row = summary[dataset][model]
+                if row.get("pending"):
+                    cells.append("--")
+                else:
+                    cells.append(format_metric(row, best_by_dataset[dataset]))
             lines.append(f"{model} & {' & '.join(cells)} \\\\")
         lines.extend([r"\bottomrule", r"\end{tabular}", r"\end{table*}"])
         tables.append("\n".join(lines))
@@ -137,11 +166,15 @@ def build_tex_tables(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
         r"\midrule",
     ]
     for dataset in DATASETS:
-        winner = ranked_rows(summary, dataset)[0]
-        lines.append(
-            f"{tex_escape(dataset)} & {winner['model']} & {winner['mean_acc']:.4f} & "
-            f"{winner['mean_best_epoch']:.1f} & {winner['params']} \\\\"
-        )
+        rows = ranked_rows(summary, dataset)
+        if not rows:
+            lines.append(f"{tex_escape(dataset)} & pending & -- & -- & -- \\\\")
+        else:
+            winner = rows[0]
+            lines.append(
+                f"{tex_escape(dataset)} & {winner['model']} & {winner['mean_acc']:.4f} & "
+                f"{winner['mean_best_epoch']:.1f} & {winner['params']} \\\\"
+            )
     lines.extend([r"\bottomrule", r"\end{tabular}", r"\end{table}"])
     tables.append("\n".join(lines))
     return "\n\n".join(tables) + "\n"
@@ -169,6 +202,9 @@ def build_analysis(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
     lines.extend(["", "## Dataset Winners", ""])
     for dataset in DATASETS:
         rows = ranked_rows(summary, dataset)
+        if not rows:
+            lines.append(f"- `{dataset}`: pending, no complete log set found yet.")
+            continue
         winner = rows[0]
         win_counts[winner["model"]] += 1
         for rank, row in enumerate(rows, 1):
@@ -191,6 +227,9 @@ def build_analysis(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
     graph_cross_over_graph_res = 0
 
     for dataset in DATASETS:
+        if not ranked_rows(summary, dataset):
+            lines.append(f"- `{dataset}`: pending, no complete log set found yet.")
+            continue
         plain = summary[dataset]["PlainGNN"]["mean_acc"]
         node_res = summary[dataset]["NodeResGNN"]["mean_acc"]
         node_cross = summary[dataset]["NodeCrossGNN"]["mean_acc"]
@@ -218,10 +257,10 @@ def build_analysis(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
             "",
             "## Aggregated Conclusions",
             "",
-            f"- Best cross model beats `PlainGNN` on `{cross_wins_over_plain}/7` datasets.",
-            f"- Best cross model beats the best residual baseline on `{cross_wins_over_residual}/7` datasets.",
-            f"- `NodeCrossGNN` beats `NodeResGNN` on `{node_cross_over_node_res}/7` datasets.",
-            f"- `GraphCrossGNN` beats `GraphResGNN` on `{graph_cross_over_graph_res}/7` datasets.",
+            f"- Best cross model beats `PlainGNN` on `{cross_wins_over_plain}` completed datasets.",
+            f"- Best cross model beats the best residual baseline on `{cross_wins_over_residual}` completed datasets.",
+            f"- `NodeCrossGNN` beats `NodeResGNN` on `{node_cross_over_node_res}` completed datasets.",
+            f"- `GraphCrossGNN` beats `GraphResGNN` on `{graph_cross_over_graph_res}` completed datasets.",
             "",
             "## Interpretation",
             "",
@@ -231,6 +270,7 @@ def build_analysis(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
     best_cross_datasets = [
         dataset
         for dataset in DATASETS
+        if ranked_rows(summary, dataset)
         if max(
             summary[dataset]["NodeCrossGNN"]["mean_acc"],
             summary[dataset]["GraphCrossGNN"]["mean_acc"],
@@ -242,16 +282,16 @@ def build_analysis(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
     ]
     lines.append(
         "- `Cross` is not the strongest default family in the full suite. "
-        f"It only beats the best residual baseline on {len(best_cross_datasets)}/7 datasets: "
+        f"It only beats the best residual baseline on {len(best_cross_datasets)} completed datasets: "
         + ", ".join(f"`{dataset}`" for dataset in best_cross_datasets)
         + "."
     )
     lines.append(
-        "- `Residual` remains the strongest overall family by winner count. "
-        "It wins on `PROTEINS`, `DD`, `ENZYMES`, and `AIDS`, so it is still the safer default choice."
+        "- `Residual` remains the strongest default family across the active benchmark package, "
+        "especially on the topic-facing protein-oriented datasets."
     )
     lines.append(
-        "- `Cross` still has selective value. It wins outright on `MUTAG`, `MSRC_9`, and `Mutagenicity`, "
+        "- `Cross` still has selective value. It wins outright on selected datasets such as `MUTAG` and `Mutagenicity`, "
         "which means the idea is useful, but not universally dominant."
     )
     lines.append(

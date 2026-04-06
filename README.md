@@ -9,7 +9,7 @@
 
 Research code for Cross-Residual Graph Neural Networks (CR-GNN), a controlled graph-classification architecture family that compares plain stacking, residual reuse, and cross-residual information exchange under a unified training protocol.
 
-The current repository is centered on the stabilized `v3` graph-classification pipeline in [geomatric/graph_classify_v3.py](/ds1/workspace/ai/cross_residual_gnn/geomatric/graph_classify_v3.py). The paper narrative is framed around protein-oriented graph benchmarks, while the final implementation study also includes a broader full-suite robustness evaluation.
+The current repository is centered on the stabilized `v3` graph-classification pipeline in [geomatric/graph_classify_v3.py](/ds1/workspace/ai/cross_residual_gnn/geomatric/graph_classify_v3.py). The paper narrative is framed around a protein-oriented biological package, while the supplementary experiments retain a broader robustness evaluation. The current scope is still biomolecular graph learning rather than a completed integrative-omics system, but the revised manuscript also strengthens the logical bridge toward plant-related graph inference.
 - https://www.frontiersin.org/research-topics/73895/prediction-of-novel-domains-motifs-genes-and-proteins-through-integrative-omics-approaches
 
 ## Overview
@@ -174,28 +174,40 @@ When `--tensorboard` is enabled, the training loop logs:
 
 ## Datasets
 
-The currently prepared local dataset suite includes:
+Main biological package:
 
-- `MUTAG`
 - `PROTEINS`
 - `DD`
 - `ENZYMES`
-- `MSRC_9`
+
+Supplementary robustness package:
+
+- `MUTAG`
 - `AIDS`
 - `Mutagenicity`
 
-The paper uses:
+The revised paper uses:
 
-- `PROTEINS`, `DD`, `ENZYMES` as the protein-oriented main benchmark
-- `MUTAG`, `AIDS`, `Mutagenicity`, `MSRC_9` as broader structural validation
+- `PROTEINS`, `DD`, `ENZYMES` as the main biological benchmark package
+- `MUTAG`, `AIDS`, `Mutagenicity` as supplementary structural validation
+
+Generate unified dataset statistics and paper tables with:
+
+```bash
+python py/generate_dataset_statistics_report.py
+```
+
+This writes:
+
+- [md/dataset_statistics_summary.md](/ds1/workspace/ai/cross_residual_gnn/md/dataset_statistics_summary.md)
+- [md/dataset_statistics_tables.tex](/ds1/workspace/ai/cross_residual_gnn/md/dataset_statistics_tables.tex)
 
 ## Current Paper-Level Conclusions
 
-Under the stabilized full-suite protocol:
+Under the current archive:
 
-- residual variants win `4/7` datasets
-- cross-residual variants win `3/7` datasets
-- the best cross model beats the plain baseline on `6/7` datasets
+- residual variants are the strongest default family on the completed topic-facing TU datasets
+- cross-residual variants remain selectively strong on selected supplementary datasets
 
 So the current evidence supports a dataset-dependent advantage for cross-residual design, not a universal claim that cross always beats residual reuse.
 
@@ -205,7 +217,6 @@ So the current evidence supports a dataset-dependent advantage for cross-residua
 - `PROTEINS`: `GraphResGNN`
 - `DD`: `NodeResGNN`
 - `ENZYMES`: `GraphResGNN`
-- `MSRC_9`: `GraphCrossGNN`
 - `AIDS`: `GraphResGNN`
 - `Mutagenicity`: `NodeCrossGNN`
 
@@ -228,5 +239,5 @@ latexmk -pdf -interaction=nonstopmode main.tex
 ## Notes
 
 - Large runtime outputs such as `logs/`, `runs/`, `data/`, and intermediate `records/` are intentionally ignored by Git.
-- The codebase still does not implement a true integrative-omics benchmark. The current scope is biomolecular graph representation learning with a protein-oriented main evaluation.
+- The codebase still does not implement a true integrative-omics benchmark. The current scope is biomolecular graph representation learning with a protein-oriented main evaluation and a clearer extension path toward plant-related graph inference.
 - The remaining paper-side manual work is mainly author metadata, final reference audit, and venue-specific submission materials.

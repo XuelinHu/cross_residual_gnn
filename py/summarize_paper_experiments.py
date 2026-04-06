@@ -4,18 +4,23 @@ import argparse
 import glob
 import json
 import statistics as st
+import sys
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from experiment_catalog import ALL_ACTIVE_DATASETS, FOCUSED_MODELS, MAIN_BIOLOGICAL_DATASETS, SUPPLEMENTARY_DATASETS
+
 LOG_DIR = ROOT / "logs"
 
-FOCUSED_MODELS = ["PlainGNN", "NodeResGNN", "NodeCrossGNN", "GraphResGNN", "GraphCrossGNN"]
-MAIN_DATASETS = ["MUTAG", "PROTEINS", "DD", "MSRC_9"]
-TOPIC_DATASETS = ["PROTEINS", "DD", "ENZYMES"]
-EXTENDED_DATASETS = ["AIDS", "Mutagenicity"]
-ALL_DATASETS = ["MUTAG", "PROTEINS", "DD", "ENZYMES", "MSRC_9", "AIDS", "Mutagenicity"]
+MAIN_DATASETS = MAIN_BIOLOGICAL_DATASETS
+TOPIC_DATASETS = MAIN_BIOLOGICAL_DATASETS
+EXTENDED_DATASETS = SUPPLEMENTARY_DATASETS
+ALL_DATASETS = ALL_ACTIVE_DATASETS
 
 
 def latest_matching_log(dataset: str, model: str, fold: int) -> Path:
@@ -32,7 +37,14 @@ def load_result(dataset: str, model: str, fold: int) -> Dict[str, object]:
 
 
 def summarize_model(dataset: str, model: str) -> Dict[str, object]:
-    rows = [load_result(dataset, model, fold) for fold in range(5)]
+    try:
+        rows = [load_result(dataset, model, fold) for fold in range(5)]
+    except FileNotFoundError:
+        return {
+            "dataset": dataset,
+            "model": model,
+            "pending": True,
+        }
     accs = [float(row["best_test_acc"]) for row in rows]
     losses = [float(row["test_loss"]) for row in rows]
     epochs = [int(row["best_epoch"]) + 1 for row in rows]
@@ -53,8 +65,10 @@ def format_table(datasets: Iterable[str], models: Iterable[str]) -> str:
     for dataset in datasets:
         lines.append(f"## {dataset}")
         summaries = [summarize_model(dataset, model) for model in models]
-        summaries.sort(key=lambda row: (-row["mean_acc"], row["mean_loss"]))
-        for index, row in enumerate(summaries, 1):
+        ready = [row for row in summaries if not row.get("pending")]
+        pending = [row for row in summaries if row.get("pending")]
+        ready.sort(key=lambda row: (-row["mean_acc"], row["mean_loss"]))
+        for index, row in enumerate(ready, 1):
             fold_text = ",".join(f"{value:.5f}" for value in row["fold_accs"])
             lines.append(
                 f"{index}. {row['model']}\tmean_acc={row['mean_acc']:.5f}\t"
@@ -62,6 +76,8 @@ def format_table(datasets: Iterable[str], models: Iterable[str]) -> str:
                 f"mean_best_epoch={row['mean_best_epoch']:.1f}"
             )
             lines.append(f"   folds={fold_text}")
+        for row in pending:
+            lines.append(f"- {row['model']}\tpending=no complete log set found")
         lines.append("")
     return "\n".join(lines)
 

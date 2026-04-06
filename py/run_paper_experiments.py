@@ -5,13 +5,18 @@ import concurrent.futures as cf
 import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import Dict, List, Tuple
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-FOCUSED_MAIN_DATASETS = ["MUTAG", "PROTEINS", "DD", "MSRC_9"]
-TOPIC_DATASETS = ["PROTEINS", "DD", "ENZYMES"]
-EXTENDED_DATASETS = ["AIDS", "Mutagenicity"]
-ALL_DATASETS = ["MUTAG", "PROTEINS", "DD", "ENZYMES", "MSRC_9", "AIDS", "Mutagenicity"]
+from experiment_catalog import ALL_ACTIVE_DATASETS, FOCUSED_MODELS, MAIN_BIOLOGICAL_DATASETS, SUPPLEMENTARY_DATASETS
+
+TOPIC_DATASETS = MAIN_BIOLOGICAL_DATASETS
+EXTENDED_DATASETS = SUPPLEMENTARY_DATASETS
+ALL_DATASETS = ALL_ACTIVE_DATASETS
 
 BASELINE_PROTOCOLS: Dict[str, Dict[str, object]] = {
     "PlainGNN": {
@@ -165,13 +170,13 @@ def main() -> None:
     parser.add_argument(
         "--dataset_group",
         choices=["main", "topic", "extended", "all"],
-        default="main",
+        default="topic",
         help="Dataset bundle to execute.",
     )
     parser.add_argument(
         "--models",
         nargs="+",
-        default=["PlainGNN", "NodeResGNN", "NodeCrossGNN", "GraphResGNN", "GraphCrossGNN"],
+        default=FOCUSED_MODELS,
         help="Model list to execute.",
     )
     parser.add_argument("--folds", nargs="+", type=int, default=[0, 1, 2, 3, 4])
@@ -180,7 +185,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.dataset_group == "main":
-        datasets = FOCUSED_MAIN_DATASETS
+        datasets = TOPIC_DATASETS
     elif args.dataset_group == "topic":
         datasets = TOPIC_DATASETS
     elif args.dataset_group == "extended":

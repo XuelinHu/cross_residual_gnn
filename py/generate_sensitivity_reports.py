@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import glob
 import json
+import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -9,6 +10,11 @@ import matplotlib.pyplot as plt
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from py.plot_style import MODEL_COLORS, MODEL_MARKERS, apply_paper_style, style_axis
+
 LOG_DIR = ROOT / "logs"
 MD_DIR = ROOT / "md"
 FIG_DIR = ROOT / "paper" / "figures" / "exp"
@@ -27,7 +33,6 @@ BASE_CONFIGS: Dict[Tuple[str, str], Dict[str, float]] = {
 }
 
 DISPLAY = {"NodeCrossGNN": "NodeCross", "GraphCrossGNN": "GraphCross"}
-COLORS = {"NodeCrossGNN": "#2563eb", "GraphCrossGNN": "#dc2626"}
 
 
 def load_rows() -> List[Dict[str, object]]:
@@ -105,6 +110,7 @@ def build_markdown(rows: List[Dict[str, object]]) -> str:
 
 
 def plot_sweep(rows: List[Dict[str, object]], sweep: str, filename: str, ylabel: str = "Fold-0 Best Test Accuracy") -> None:
+    apply_paper_style()
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     fig, axes = plt.subplots(len(DATASETS), 1, figsize=(8.2, 10.5), sharex=False)
     if len(DATASETS) == 1:
@@ -117,14 +123,15 @@ def plot_sweep(rows: List[Dict[str, object]], sweep: str, filename: str, ylabel:
             ax.plot(
                 [row[sweep] for row in subset],
                 [row["best_test_acc"] for row in subset],
-                marker="o",
-                linewidth=2.0,
-                color=COLORS[model],
+                marker=MODEL_MARKERS[model],
+                linewidth=1.9,
+                markersize=5.2,
+                color=MODEL_COLORS[model],
                 label=DISPLAY[model],
             )
-        ax.set_title(dataset, fontweight="bold")
+        ax.set_title(dataset)
         ax.set_ylabel(ylabel)
-        ax.grid(alpha=0.25, linestyle="--")
+        style_axis(ax)
         ax.legend(frameon=False, ncol=2)
     axes[-1].set_xlabel(sweep)
     fig.tight_layout()

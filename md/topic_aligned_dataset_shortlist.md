@@ -1,5 +1,7 @@
 # Topic-Aligned Dataset Shortlist
 
+> Note: this shortlist has been normalized to the final paper scope, and only the retained extension directions remain below.
+
 ## Purpose
 
 This note ranks candidate datasets by two constraints:
@@ -56,34 +58,9 @@ Recommended use:
 
 - these should remain the main datasets for the topic-facing version
 
-### Tier 2: Best Next Step If You Accept Moderate Refactoring
+### Tier 2: Strong Topic Fit, But Requires Task Expansion
 
-#### 3. ogbg-ppa
-
-Why it fits:
-
-- protein-protein association neighborhood graphs
-- graph-level prediction on protein association networks
-- biologically much closer to the target topic than small-molecule benchmarks
-
-Why it helps the paper:
-
-- keeps the task at graph classification, which matches your strongest code path
-- adds a more modern, biologically meaningful benchmark than TU-only evaluation
-
-Integration cost:
-
-- moderate
-- requires switching from `TUDataset` to OGB graph property prediction loader
-- requires using official dataset split and likely OGB evaluation utilities
-
-Recommended use:
-
-- this is the best single new dataset if you want stronger biological relevance without fully changing task type
-
-### Tier 3: Strong Topic Fit, But Requires Task Expansion
-
-#### 4. PPI (PyG)
+#### 3. PPI (PyG)
 
 Why it fits:
 
@@ -106,7 +83,7 @@ Recommended use:
 
 - strongest near-term option if you want to start touching genuine biological function prediction
 
-#### 5. ogbn-proteins
+#### 4. ogbn-proteins
 
 Why it fits:
 
@@ -158,9 +135,8 @@ Recommended use:
 If you want the best return for the least engineering effort, adopt datasets in this order:
 
 1. `ENZYMES`
-2. `ogbg-ppa`
-3. `PPI`
-4. `ogbn-proteins`
+2. `PPI`
+3. `ogbn-proteins`
 
 ## Suggested Topic-Facing Experimental Bundle
 
@@ -171,15 +147,6 @@ If you want the best return for the least engineering effort, adopt datasets in 
 - `ENZYMES`
 
 This bundle is the easiest way to improve topic fit while keeping your current graph classification code path.
-
-### Stronger Biology Bundle
-
-- `PROTEINS`
-- `DD`
-- `ENZYMES`
-- `ogbg-ppa`
-
-This is the best graph-classification-only package.
 
 ### Stronger Topic-Alignment Bundle
 
@@ -196,8 +163,8 @@ For the current codebase, the most pragmatic plan is:
 
 1. add `ENZYMES` now
 2. keep `PROTEINS` and `DD` as core datasets
-3. if there is time for one meaningful extension, add `ogbg-ppa`
-4. if you want to materially improve topic fit, make `PPI` the first node-level extension
+3. if you want to materially improve topic fit, make `PPI` the first node-level extension
+4. if you can afford larger-scale engineering work, consider `ogbn-proteins`
 
 ## Source Notes
 
@@ -205,4 +172,4 @@ This shortlist is based on:
 
 - TUDataset collection and dataset descriptions for `DD`, `ENZYMES`, and `PROTEINS`
 - PyG dataset documentation for `PPI`
-- OGB dataset documentation for `ogbg-ppa` and `ogbn-proteins`
+- official dataset documentation for `ogbn-proteins`

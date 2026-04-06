@@ -1,31 +1,31 @@
 \section{Datasets}
 \label{sec:datasets}
 
-The original project evaluated a broad mixture of TU benchmarks, including molecular, vision, and generic graph-classification datasets. For the present submission target, that breadth alone is not an advantage. We therefore organize the evidence in two layers: a protein-oriented main benchmark used for the biological narrative, and a broader full-suite benchmark used to characterize the architectural behavior of plain, residual, and cross-residual variants. This section describes both layers and clarifies how they are used in the paper.
+The original project evaluated a broad mixture of graph benchmarks. For the present submission target, that breadth alone is not an advantage. We therefore organize all datasets into a unified two-layer package: a main biological benchmark that supports the paper's core protein-oriented narrative, and a supplementary robustness package that preserves method-level stress testing without diluting the biological focus. This section presents every active dataset in one place, together with task type, source, split protocol, and graph statistics.
 
-\subsection{Protein-Oriented Main Benchmark}
+\subsection{Unified Benchmark Package}
 
-Our main experiments use three graph classification datasets from the TU Dortmund collection accessed through PyTorch Geometric \cite{fey2019fast}:
+The main biological benchmark consists of:
 
 \begin{itemize}
-    \item \textbf{PROTEINS}: graph-level protein classification
-    \item \textbf{DD}: protein structure graph classification on much larger and sparser graphs
-    \item \textbf{ENZYMES}: enzyme-oriented multi-class graph classification
+    \item \textbf{PROTEINS}: graph-level protein classification from the TU Dortmund collection accessed through PyTorch Geometric \cite{fey2019fast,morris2020tudataset}
+    \item \textbf{DD}: large sparse protein structure graph classification from the same TU collection \cite{morris2020tudataset}
+    \item \textbf{ENZYMES}: enzyme-oriented multi-class graph classification, again within the TU interface \cite{morris2020tudataset}
 \end{itemize}
 
-This selection is deliberate. PROTEINS and DD are the strongest biological anchors already present in our codebase, while ENZYMES improves topic fit with only minimal engineering change because it remains within the same TUDataset interface. These three datasets drive the protein-oriented interpretation in the main text.
+The supplementary robustness package consists of:
 
-\subsection{Full-Suite Structural Validation}
-
-To avoid over-claiming from only three datasets, we also evaluate the same model family on the complete local benchmark suite:
 \begin{itemize}
-    \item \textbf{Supplementary biomolecular or chemical datasets}: MUTAG, AIDS, Mutagenicity
-    \item \textbf{Out-of-scope control dataset}: MSRC\_9
+    \item \textbf{MUTAG}
+    \item \textbf{AIDS}
+    \item \textbf{Mutagenicity}
 \end{itemize}
 
-This broader suite is not introduced to strengthen topical fit. Instead, it serves a different purpose: it tests whether the observed behavior of plain, residual, and cross-residual information flow is stable across datasets with different graph scales, label structures, and semantic domains. Accordingly, the paper uses PROTEINS, DD, and ENZYMES for the main biological narrative, while the full-suite results are used as structural evidence about the architecture family.
+This organization is deliberate. PROTEINS, DD, and ENZYMES preserve continuity with the existing codebase and provide the cleanest protein-oriented story available in the current project. The supplementary datasets remain useful as structural robustness checks, but they no longer define the main biological claim.
 
-\subsection{Dataset Overview}
+\subsection{Main Biological Datasets}
+
+With this package structure fixed, we next describe the three main datasets in more detail, because they carry the core biological interpretation used later in the experiments section.
 
 \paragraph{PROTEINS}
 PROTEINS contains graph representations of proteins, where nodes denote secondary structure elements and edges encode neighborhood relations between them. The task is binary graph classification. In the current data export, the dataset contains 1,113 graphs, 2 classes, and 3 input features per node. The average graph has 39.06 nodes and 72.82 edges, although the size variation is substantial.
@@ -36,48 +36,43 @@ DD is a protein structure dataset in which each graph corresponds to a protein a
 \paragraph{ENZYMES}
 ENZYMES is a 6-class enzyme classification benchmark with 600 graphs and 3 input features. It is attractive for the present paper because it is protein- and enzyme-oriented while still being easy to integrate into the existing graph-classification pipeline. The average graph has 32.63 nodes and 62.14 edges, and the class distribution is perfectly balanced across the six categories.
 
-\subsection{Dataset Statistics}
+\subsection{Unified Dataset Statistics}
 
-Table~\ref{tab:topic_datasets} summarizes the key statistics of the protein-oriented main benchmark.
+Tables~\ref{tab:dataset_main_package} and~\ref{tab:dataset_supp_package} summarize all datasets used in the revised manuscript. The key point is that every dataset is now positioned explicitly either as part of the main biological package or as supplementary robustness evidence.
 
-\begin{table}[t]
-\centering
-\caption{Summary of the protein-oriented main benchmark datasets.}
-\label{tab:topic_datasets}
-\begin{tabular}{lccccc}
-\toprule
-Dataset & \# Graphs & \# Classes & Feature Dim. & Avg. Nodes & Avg. Edges \\
-\midrule
-PROTEINS & 1113 & 2 & 3 & 39.06 & 72.82 \\
-DD & 1178 & 2 & 89 & 284.32 & 715.66 \\
-ENZYMES & 600 & 6 & 3 & 32.63 & 62.14 \\
-\bottomrule
-\end{tabular}
-\end{table}
+\input{../md/dataset_statistics_tables.tex}
 
 \subsection{Data Loading}
 
-All datasets are loaded through the PyTorch Geometric \texttt{TUDataset} interface. Each graph is represented as a \texttt{Data} object containing node features \texttt{x}, graph connectivity \texttt{edge\_index}, graph label \texttt{y}, and batch indices generated during mini-batch loading. If a graph is missing node attributes, the loader replaces them with a constant all-ones feature, ensuring that every benchmark can be processed by the same training code.
+After clarifying what each dataset represents, we briefly specify how these graphs are loaded and normalized into a common training interface.
+
+The revised codebase uses the PyTorch Geometric \texttt{TUDataset} interface \cite{fey2019fast,morris2020tudataset} for the active paper datasets. Each graph is represented as a \texttt{Data} object containing node features \texttt{x}, connectivity \texttt{edge\_index}, graph label \texttt{y}, and batch indices generated during mini-batch loading. If a graph is missing node attributes, the loader replaces them with a constant all-ones feature so that every benchmark remains compatible with the same training code.
 
 No additional graph augmentation, feature normalization, or edge-attribute modeling is applied in the final protocol. This is a deliberate choice: the goal is to isolate the effect of residual and cross-residual information flow rather than to combine it with a large preprocessing stack.
 
 \subsection{Splitting Protocol}
 
-The present V3 code no longer uses the earlier contiguous fold slicing scheme. Instead, all reported results, both for the protein-oriented benchmark and for the full suite, follow a stratified two-stage split:
+Once the shared data interface is fixed, the next issue is how to evaluate the models comparably across datasets.
+
+The present V3 code no longer uses the earlier contiguous fold slicing scheme. Instead, all reported results follow the same stratified two-stage split:
 
 \begin{itemize}
     \item \textbf{Outer evaluation}: stratified 5-fold cross-validation at the graph level
-    \item \textbf{Inner validation}: a stratified random validation subset sampled from the training fold with validation ratio 0.1
+    \item \textbf{Inner validation}: a stratified validation subset sampled from the training fold with validation ratio 0.1
 \end{itemize}
 
-This change is important. Under weaker settings, several models collapsed toward majority-class behavior, which blurred architectural differences. The stratified outer fold construction and stratified inner validation split now provide a more reliable basis for early stopping and model comparison.
+This distinction is important. Under weaker settings, several models collapsed toward majority-class behavior, which blurred architectural differences. The stratified protocol provides a more reliable basis for early stopping and model comparison on the active biological datasets.
 
-All experiments use a fixed global seed for reproducibility, while the inner train/validation split uses a fold-dependent seed so that every outer fold keeps a deterministic but distinct validation partition.
+All experiments use deterministic seed control, and the inner train/validation split uses a fold-dependent seed so that every outer fold keeps a deterministic but distinct validation partition.
 
 \subsection{Evaluation Metrics}
+
+Given this unified split design, the remaining evaluation choices are straightforward.
 
 The primary evaluation metric is graph classification accuracy on the held-out test fold. For each method and dataset, we report the mean and standard deviation of the best test accuracy over the 5 stratified folds. We also track test loss, best epoch, parameter count, learning-rate history, gradient norms, and embedding statistics, which are used in the analysis scripts and TensorBoard logs.
 
 \subsection{Scope Note}
 
-Although the main benchmark is more biologically aligned than the generic benchmark mixture used earlier in the project, it still does not constitute a full integrative omics suite. Accordingly, the claims of this paper are intentionally conservative. We position the method as a biomolecular graph representation framework evaluated through a protein-oriented main benchmark and a broader structural validation suite, not as a complete omics-integration system or a direct solution to novel gene, domain, or motif discovery.
+These design decisions also define the evidential boundary of the paper.
+
+Although the revised benchmark package is more biologically aligned than the earlier generic mixture, it still does not constitute a full integrative omics suite. Accordingly, the claims of this paper are intentionally conservative. We position the method as a biomolecular graph representation framework evaluated through a protein-oriented main benchmark with an explicit extension path toward plant-related graph inference, not as a complete omics-integration system or a direct solution to novel gene, domain, or motif discovery.

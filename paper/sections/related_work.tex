@@ -1,7 +1,7 @@
 \section{Related Work}
 \label{sec:related}
 
-We review related work from five perspectives: graph neural networks for graph classification, message passing architectures and operators, deep GNN training challenges, hybrid architectures, and cross-layer aggregation mechanisms. Our work builds upon these foundations by introducing a unified framework for comparing multiple residual information-flow patterns under a shared graph classification setting.
+The introduction motivated CR-GNN as a response to information loss in protein-oriented graph inference, with a methodologically grounded extension path toward plant-related graph learning. To place that motivation on firmer footing, we review related work from six perspectives: graph neural networks for graph classification, message passing architectures and operators, deep GNN training challenges, hybrid architectures, cross-layer aggregation mechanisms, and biological graph benchmarks.
 
 \subsection{Graph Neural Networks for Graph Classification}
 
@@ -38,3 +38,9 @@ Cross-layer connections aim to capture multi-scale information by aggregating fe
 Propagation-based methods improve information flow across multiple hops: APPNP \cite{klicpera2018combining} combines personalized PageRank with neural predictions, while PairNorm \cite{zhao2020pair} and DropEdge \cite{rong2019dropedge} mitigate over-smoothing through normalization and regularization. Recent work on over-smoothing \cite{chen2023revisiting, zhao2020tackling} provides comprehensive analysis and solutions.
 
 Despite these advances, most cross-layer methods operate within a single homogeneous branch using one type of operator. A fundamental limitation is that they rarely distinguish between residual reuse at the node-representation level and residual reuse at the graph-summary level. Our framework focuses on this distinction by introducing node-level and graph-level cross-residual mechanisms within a common graph classification design space. This perspective enables a more direct comparison of how different information-flow patterns affect robustness, depth tolerance, and graph-level discrimination.
+
+\subsection{Biological Graph Benchmarks and Extension Context}
+
+Biological graph learning benchmarks span several levels of realism. TU datasets such as PROTEINS, DD, and ENZYMES remain widely used because they are easy to reproduce and expose meaningful differences in graph-scale behavior \cite{morris2020tudataset}. This matters for our revised benchmark package because these datasets provide a stable and interpretable protein-oriented core while preserving direct compatibility with our graph classification pipeline.
+
+At the same time, graph-based learning is becoming increasingly relevant in plant computational biology. Recent work covers plant protein identification, graph-based biological network analysis, and plant functional annotation \cite{suiIdentificationPlantVacuole2023,charulekhaUncoveringComplicatedPlant,baongoImprovingPlantFunctional2025}. These studies do not validate our exact cross-residual design, but they do make the extension logic more concrete: if plant prediction tasks require jointly preserving local structural cues and broader graph context, then improved cross-layer information reuse is methodologically relevant there as well. This literature therefore supports the framing adopted in this paper: current evidence is protein-oriented, but the extension toward plant-related graph inference is technically motivated rather than speculative. With that context in place, we next describe the benchmark package used to test the architecture under a controlled biological setting.

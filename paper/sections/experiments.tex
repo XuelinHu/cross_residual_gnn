@@ -5,6 +5,8 @@ This section reports the final V3 evaluation after the training protocol, hyperp
 
 \subsection{Experimental Settings}
 
+We begin with the shared protocol, because the later biological interpretation is only meaningful if model, data, and optimization choices are controlled consistently.
+
 \subsubsection{Model Set}
 
 We compare five architectures under the same \texttt{GCNConv} message-passing backbone:
@@ -20,22 +22,25 @@ This comparison isolates the effect of information-flow design while holding the
 
 \subsubsection{Dataset Scope}
 
-The main biological discussion still centers on the protein-oriented datasets introduced in Section~\ref{sec:datasets}, namely PROTEINS, DD, and ENZYMES. However, the final implementation study also evaluates the complete local benchmark suite:
+The revised topic-facing discussion centers on the unified biological package introduced in Section~\ref{sec:datasets}:
 \begin{itemize}
-    \item \textbf{Topic-facing datasets}: PROTEINS, DD, ENZYMES
+    \item \textbf{Main biological package}: PROTEINS, DD, ENZYMES
     \item \textbf{Supplementary biological or chemical datasets}: MUTAG, AIDS, Mutagenicity
-    \item \textbf{Out-of-scope control dataset}: MSRC\_9
 \end{itemize}
 
-This broader suite is used to characterize when cross-residual routing behaves like a genuine architectural advantage and when residual reuse remains preferable.
+This revised package separates the protein-oriented main narrative from supplementary robustness evidence and removes the earlier out-of-scope control dataset from the main text.
 
 \subsubsection{Data Protocol}
+
+With the benchmark scope fixed, we next define the common evaluation procedure applied to every completed run.
 
 All reported results use stratified 5-fold graph-level evaluation. Inside each training fold, we construct a stratified validation subset with validation ratio 0.1. Model selection is based on validation loss, and the best checkpoint is evaluated on the held-out test fold.
 
 This protocol replaces the earlier weaker contiguous fold slicing used during exploratory runs. The stratified design matters because it reduces majority-class collapse and exposes architectural differences more reliably.
 
 \subsubsection{Optimization}
+
+Once the split protocol is fixed, the remaining source of variation is the training configuration itself.
 
 All runs use Adam, validation-based early stopping, \texttt{ReduceLROnPlateau}, and gradient clipping. The shared defaults are:
 \begin{itemize}
@@ -67,18 +72,22 @@ Cross-residual models use the stronger cross-specific V3 protocol:
 
 \subsubsection{Reproducibility}
 
-All final runs were executed with the same V3 code path, stratified 5-fold evaluation, and deterministic seed control. The experiments were run on a single NVIDIA RTX 3090 GPU with 24GB memory. Each completed run writes a structured JSON summary to the project \texttt{logs/} directory, and optional TensorBoard traces are written to \texttt{runs/}. The repository also includes batch execution, summarization, and report-generation scripts so that the final tables in this paper can be regenerated directly from the stored experiment outputs.
+These settings are paired with a reproducible execution path so that the reported benchmark trends can be regenerated from stored artifacts rather than from hand-copied notes.
+
+All final runs were executed with the same V3 code path, stratified 5-fold evaluation, and deterministic seed control. The experiments were run on a single NVIDIA RTX 3090 GPU with 24GB memory. Each completed run writes a structured JSON summary to the project \texttt{logs/} directory, and optional TensorBoard traces are written to \texttt{runs/}. The repository also includes batch execution, dataset-statistics export, summarization, and report-generation scripts so that the final tables in this paper can be regenerated directly from the stored experiment outputs.
 
 \subsection{Full-Suite Results}
 
-Tables~\ref{tab:all_results_1}--\ref{tab:all_winners} summarize the final full-suite benchmark over all seven available datasets.
+With the protocol fixed, we first report the full benchmark picture before narrowing to the topic-facing biological interpretation.
+
+Tables~\ref{tab:all_results_1}--\ref{tab:all_winners} summarize the revised benchmark package over the active biological and supplementary datasets.
 
 \input{../md/all_exp_tables.tex}
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.98\linewidth]{figures/exp/fig1_full_suite_results.pdf}
-\caption{Full-suite benchmark over all seven datasets. Each bar reports mean 5-fold best test accuracy, and error bars show the fold-level standard deviation. The figure makes the winner pattern visually explicit: residual variants dominate on PROTEINS, DD, ENZYMES, and AIDS, while cross variants win on MUTAG, MSRC\_9, and Mutagenicity.}
+\caption{Benchmark over the active dataset package. Each bar reports mean best test accuracy, and error bars show the fold-level standard deviation. The current archive highlights the protein-oriented TU core together with the supplementary robustness pattern.}
 \label{fig:full_suite_results}
 \end{figure*}
 
@@ -89,29 +98,31 @@ Tables~\ref{tab:all_results_1}--\ref{tab:all_winners} summarize the final full-s
 \label{fig:cross_advantage_heatmap}
 \end{figure}
 
-The full-suite winner pattern is immediately informative. NodeCrossGNN wins on MUTAG and Mutagenicity, GraphCrossGNN wins on MSRC\_9, GraphResGNN wins on PROTEINS, ENZYMES, and AIDS, and NodeResGNN wins on DD. PlainGNN does not win any dataset in the final suite.
+The current winner pattern is immediately informative. NodeCrossGNN wins on MUTAG and Mutagenicity, GraphResGNN wins on PROTEINS, ENZYMES, and AIDS, and NodeResGNN wins on DD. PlainGNN does not win any completed dataset in the current archive.
 \FloatBarrier
 
 \subsection{Main Findings}
 
-\textbf{Residual reuse remains the strongest default family.} Residual variants win four of the seven datasets in the full suite: PROTEINS, DD, ENZYMES, and AIDS. This makes residual reuse the safest default baseline under the stabilized protocol. In particular, GraphResGNN is best on PROTEINS ($0.7223 \pm 0.0367$), ENZYMES ($0.3117 \pm 0.0746$), and AIDS ($0.9160 \pm 0.0121$), while NodeResGNN is best on DD ($0.7207 \pm 0.0259$).
+These aggregate results already suggest the central pattern, which can be stated more directly before examining the protein-oriented datasets one by one.
 
-\textbf{Cross-residual design is selectively strong, not universally dominant.} Cross variants still win three datasets in the full suite. NodeCrossGNN is best on MUTAG ($0.7397 \pm 0.0676$) and Mutagenicity ($0.8033 \pm 0.0159$), while GraphCrossGNN is best on MSRC\_9 ($0.9049 \pm 0.0334$). More importantly, the best cross variant beats PlainGNN on six of the seven datasets. Therefore, cross routing is clearly more than an implementation curiosity: it is a useful alternative information-flow mechanism. However, it beats the best residual baseline on only three datasets, so the final evidence does not support the stronger claim that cross universally outperforms residual reuse.
+\textbf{Residual reuse remains the strongest default family in the completed archive.} Residual variants win PROTEINS, DD, ENZYMES, and AIDS. This makes residual reuse the safest default baseline under the stabilized protocol. In particular, GraphResGNN is best on PROTEINS ($0.7223 \pm 0.0367$), ENZYMES ($0.3117 \pm 0.0746$), and AIDS ($0.9160 \pm 0.0121$), while NodeResGNN is best on DD ($0.7207 \pm 0.0259$).
 
-\textbf{Node-level cross is more reliable than graph-level cross.} Across the full suite, NodeCrossGNN outperforms NodeResGNN on five of the seven datasets, whereas GraphCrossGNN outperforms GraphResGNN on only three. This suggests that exchanging intermediate node-level states is the more robust cross-residual design in the present implementation, while graph-level cross routing is more dataset-sensitive.
+\textbf{Cross-residual design is selectively strong, not universally dominant.} Cross variants still win completed datasets such as MUTAG and Mutagenicity. More importantly, the best cross variant beats PlainGNN on most completed datasets. Therefore, cross routing is clearly more than an implementation curiosity: it is a useful alternative information-flow mechanism. However, it still does not consistently beat the best residual baseline, so the evidence does not support the stronger claim that cross universally outperforms residual reuse.
+
+\textbf{Node-level cross is more reliable than graph-level cross.} Across the completed datasets, NodeCrossGNN outperforms NodeResGNN more often than GraphCrossGNN outperforms GraphResGNN. This suggests that exchanging intermediate node-level states is the more robust cross-residual design in the present implementation, while graph-level cross routing is more dataset-sensitive.
 
 \textbf{Plain stacking is no longer a credible final baseline.} PlainGNN remains competitive on PROTEINS and DD, but it never wins a dataset in the final suite and is usually surpassed by either a residual or a cross-residual variant. This is important for the paper narrative: the meaningful comparison is no longer cross versus plain, but cross versus the stronger residual family.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.96\linewidth]{figures/exp/fig3_rank_winner_summary.pdf}
-\caption{Aggregate ranking signals across the complete suite. The left panel reports average rank, where smaller is better. The right panel reports dataset winner counts. NodeCrossGNN has the best average rank, but GraphResGNN has the largest number of outright wins, which explains why residual reuse remains the stronger default family in the final narrative.}
+\caption{Aggregate ranking signals across the completed active benchmark package. The left panel reports average rank, where smaller is better. The right panel reports dataset winner counts. NodeCrossGNN has the best average rank among the completed datasets, but GraphResGNN has the largest number of outright wins, which explains why residual reuse remains the stronger default family in the current narrative.}
 \label{fig:rank_winner_summary}
 \end{figure}
 
 \subsection{Topic-Facing Biological Interpretation}
 
-For the target venue, the most relevant evidence still comes from PROTEINS, DD, and ENZYMES.
+The full-suite pattern is still methodologically useful, but the topic-facing interpretation should be anchored in the protein-oriented core datasets. In that narrower sense, the strongest evidence comes from PROTEINS, DD, and ENZYMES, because they are the closest proxies in the current paper to protein- and enzyme-centered functional inference.
 
 On \textbf{PROTEINS}, GraphResGNN is clearly strongest, indicating that repeated graph-level residual refinement is the most effective way to preserve useful global structure. The best cross model here is NodeCrossGNN at $0.6972 \pm 0.0430$, which improves slightly over NodeResGNN but remains below both PlainGNN and GraphResGNN.
 
@@ -122,11 +133,13 @@ On \textbf{ENZYMES}, cross variants become more attractive. GraphCrossGNN reache
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.98\linewidth]{figures/exp/fig4_topic_focus_results.pdf}
-\caption{Focused comparison on the topic-facing datasets PROTEINS, DD, and ENZYMES. The pattern is mixed rather than one-sided: graph-level residual refinement is strongest on PROTEINS and ENZYMES, while DD favors node-level reuse, with NodeCrossGNN remaining competitive but not dominant.}
+\caption{Focused comparison on the completed topic-facing TU datasets. The pattern is mixed rather than one-sided: graph-level residual refinement is strongest on PROTEINS and ENZYMES, while DD favors node-level reuse, with NodeCrossGNN remaining competitive but not dominant.}
 \label{fig:topic_focus_results}
 \end{figure}
 
 \subsection{Ablation Conclusions}
+
+Taken together, these dataset-level observations can now be condensed into a single ablation message.
 
 The final ablation story is therefore precise:
 \begin{itemize}
@@ -138,6 +151,8 @@ The final ablation story is therefore precise:
 This is the strongest claim that the current evidence supports. Cross-residual design should be presented as a meaningful and reusable architectural design space, not as a universal winner over residual reuse.
 
 \subsection{Parameter Sensitivity}
+
+The next question is whether this ablation story is stable under moderate changes in the cross-model hyperparameters.
 
 To complement the structural ablation, we ran a focused parameter scan for the two cross-residual models on the topic-facing datasets PROTEINS, DD, and ENZYMES. The scan varies depth ($h \in \{3,4,5\}$), dropout ($\{0.2,0.3,0.5\}$), and learning rate ($\{0.002,0.003,0.005\}$) on fold 0 while keeping the stabilized V3 training protocol fixed. Figures~\ref{fig:depth_sensitivity}--\ref{fig:lr_sensitivity} summarize the resulting trends.
 
@@ -169,6 +184,8 @@ To verify whether the ENZYMES fold-0 hints were actionable, we ran a 5-fold tune
 
 \subsection{Analysis Assets}
 
+Beyond accuracy tables and sensitivity plots, the pipeline also records auxiliary evidence that helps interpret why certain runs succeed or fail.
+
 To support interpretation beyond scalar accuracy, the current V3 pipeline records:
 \begin{itemize}
     \item TensorBoard traces for loss, accuracy, learning rate, gradient norm, embedding norms, and logit statistics
@@ -180,4 +197,6 @@ These materials make it possible to distinguish genuine structural gains from ac
 
 \subsection{Current Limitations}
 
-The experiments remain structure-centric rather than fully omics-integrative. Accordingly, the strongest defensible claim of the paper is that CR-GNN is an effective biomolecular graph representation architecture with dataset-dependent cross-residual gains. The current evidence does not yet justify a broader claim about integrative omics prediction or direct discovery of novel genes, domains, or motifs.
+These analysis assets help bound the claims, but they do not remove the core scope limitations of the current study.
+
+The experiments remain structure-centric rather than fully omics-integrative. Accordingly, the strongest defensible claim of the paper is that CR-GNN is an effective biomolecular graph representation architecture with dataset-dependent cross-residual gains. The current evidence does not yet justify a broader claim about integrative omics prediction or direct discovery of novel genes, domains, or motifs, but the revised benchmark package still has a clear extension path toward plant-related graph inference settings.

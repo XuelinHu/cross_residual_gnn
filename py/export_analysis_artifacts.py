@@ -19,12 +19,15 @@ from geomatric.graph_classify_v3 import (
     build_model,
     dataset_statistics,
     evaluate,
+    evaluate_ogb,
+    graph_target,
     prepare_batch,
     set_seed,
     split_dataset,
     split_train_val_dataset,
     load_dataset,
 )
+from experiment_catalog import dataset_family
 
 try:
     import matplotlib.pyplot as plt
@@ -75,10 +78,14 @@ def pca_project(matrix: np.ndarray, n_components: int = 2) -> np.ndarray:
 
 
 def fit_model(args: argparse.Namespace) -> Tuple[torch.nn.Module, List[Dict[str, float]], object, object]:
-    set_seed(args.seed)
+    family = dataset_family(args.ds)
+    set_seed(args.seed + args.fold if family == "ogb_graphprop" else args.seed)
     dataset = load_dataset(args.ds)
-    train_dataset, test_dataset = split_dataset(dataset, args.fold)
-    train_dataset, val_dataset = split_train_val_dataset(train_dataset, args.val_ratio, seed=args.seed + args.fold)
+    train_dataset, test_dataset, official_val_dataset, _ = split_dataset(dataset, args.fold, args.ds)
+    if official_val_dataset is None:
+        train_dataset, val_dataset = split_train_val_dataset(train_dataset, args.val_ratio, seed=args.seed + args.fold)
+    else:
+        val_dataset = official_val_dataset
     train_loader = build_loader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = build_loader(val_dataset, batch_size=args.batch_size, shuffle=False) if val_dataset else None
     test_loader = build_loader(test_dataset, batch_size=args.batch_size, shuffle=False)
@@ -93,6 +100,10 @@ def fit_model(args: argparse.Namespace) -> Tuple[torch.nn.Module, List[Dict[str,
         min_lr=args.min_lr,
     )
     criterion = torch.nn.CrossEntropyLoss().to(DEVICE)
+    evaluator = None
+    if family == "ogb_graphprop":
+        from ogb.graphproppred import Evaluator
+        evaluator = Evaluator(name=args.ds)
 
     history: List[Dict[str, float]] = []
     best_state_dict = model.state_dict()
@@ -106,22 +117,26 @@ def fit_model(args: argparse.Namespace) -> Tuple[torch.nn.Module, List[Dict[str,
         total_graphs = 0
         for batch_data in train_loader:
             batch_data = prepare_batch(batch_data)
+            targets = graph_target(batch_data)
             optimizer.zero_grad()
             logits, _ = model(batch_data.x, batch_data.edge_index, batch_data.batch)
-            loss = criterion(logits, batch_data.y)
+            loss = criterion(logits, targets)
             loss.backward()
             if args.grad_clip > 0.0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.grad_clip)
             optimizer.step()
             predictions = logits.argmax(dim=1)
-            batch_size = batch_data.y.size(0)
+            batch_size = targets.size(0)
             total_loss += float(loss.item()) * batch_size
-            total_correct += int((predictions == batch_data.y).sum())
+            total_correct += int((predictions == targets).sum())
             total_graphs += batch_size
 
         train_loss = total_loss / max(total_graphs, 1)
         train_acc = total_correct / max(total_graphs, 1)
-        val_metrics = evaluate(model, val_loader, criterion) if val_loader is not None else {"loss": train_loss, "acc": train_acc}
+        if val_loader is not None:
+            val_metrics = evaluate_ogb(model, val_loader, criterion, evaluator) if evaluator is not None else evaluate(model, val_loader, criterion)
+        else:
+            val_metrics = {"loss": train_loss, "acc": train_acc}
         scheduler.step(val_metrics["loss"])
         current_lr = optimizer.param_groups[0]["lr"]
 
@@ -163,7 +178,7 @@ def collect_test_outputs(model: torch.nn.Module, test_loader) -> Dict[str, np.nd
             logits, graph_embedding = model(batch_data.x, batch_data.edge_index, batch_data.batch)
             embeddings.append(graph_embedding.detach().cpu().numpy())
             logits_list.append(logits.detach().cpu().numpy())
-            labels.append(batch_data.y.detach().cpu().numpy())
+            labels.append(graph_target(batch_data).detach().cpu().numpy())
             preds.append(logits.argmax(dim=1).detach().cpu().numpy())
     return {
         "embeddings": np.concatenate(embeddings, axis=0),
@@ -272,7 +287,7 @@ def main() -> None:
     }
     summary = {
         "config": vars(args),
-        "dataset_stats": dataset_statistics(dataset),
+        "dataset_stats": dataset_statistics(dataset, args.ds),
         "num_test_graphs": int(outputs["labels"].shape[0]),
         "embedding_dim": int(outputs["embeddings"].shape[1]),
         "plotting_available": bool(plt is not None and sns is not None),

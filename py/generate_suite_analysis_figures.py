@@ -3,6 +3,7 @@ from __future__ import annotations
 import glob
 import json
 import statistics as st
+import sys
 from pathlib import Path
 from typing import Dict, List
 
@@ -11,30 +12,21 @@ import numpy as np
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from experiment_catalog import ALL_ACTIVE_DATASETS, FOCUSED_MODELS, MAIN_BIOLOGICAL_DATASETS, MODEL_DISPLAY
+from py.plot_style import MODEL_COLORS, MODEL_MARKERS, apply_paper_style, style_axis
+
 LOG_DIR = ROOT / "logs"
 FIG_DIRS = [
     ROOT / "figures" / "exp",
     ROOT / "paper" / "figures" / "exp",
 ]
 
-DATASETS = ["MUTAG", "PROTEINS", "DD", "ENZYMES", "MSRC_9", "AIDS", "Mutagenicity"]
-TOPIC_DATASETS = ["PROTEINS", "DD", "ENZYMES"]
-MODELS = ["PlainGNN", "NodeResGNN", "NodeCrossGNN", "GraphResGNN", "GraphCrossGNN"]
-
-DISPLAY = {
-    "PlainGNN": "Plain",
-    "NodeResGNN": "NodeRes",
-    "NodeCrossGNN": "NodeCross",
-    "GraphResGNN": "GraphRes",
-    "GraphCrossGNN": "GraphCross",
-}
-COLORS = {
-    "PlainGNN": "#6b7280",
-    "NodeResGNN": "#2563eb",
-    "NodeCrossGNN": "#dc2626",
-    "GraphResGNN": "#059669",
-    "GraphCrossGNN": "#d97706",
-}
+DATASETS = ALL_ACTIVE_DATASETS
+TOPIC_DATASETS = MAIN_BIOLOGICAL_DATASETS
+MODELS = FOCUSED_MODELS
 
 
 def latest_matching_log(dataset: str, model: str, fold: int) -> Path:
@@ -50,7 +42,10 @@ def load_rows() -> List[Dict[str, object]]:
     for dataset in DATASETS:
         for model in MODELS:
             for fold in range(5):
-                payload = json.loads(latest_matching_log(dataset, model, fold).read_text(encoding="utf-8"))
+                try:
+                    payload = json.loads(latest_matching_log(dataset, model, fold).read_text(encoding="utf-8"))
+                except FileNotFoundError:
+                    continue
                 rows.append(
                     {
                         "dataset": dataset,
@@ -71,6 +66,9 @@ def summarize(rows: List[Dict[str, object]]) -> Dict[str, Dict[str, Dict[str, fl
         summary[dataset] = {}
         for model in MODELS:
             subset = [row for row in rows if row["dataset"] == dataset and row["model"] == model]
+            if not subset:
+                summary[dataset][model] = {"pending": True}
+                continue
             accs = [float(row["best_test_acc"]) for row in subset]
             losses = [float(row["test_loss"]) for row in subset]
             epochs = [int(row["best_epoch"]) for row in subset]
@@ -82,6 +80,14 @@ def summarize(rows: List[Dict[str, object]]) -> Dict[str, Dict[str, Dict[str, fl
                 "params": int(subset[0]["params"]),
             }
     return summary
+
+
+def completed_datasets(summary: Dict[str, Dict[str, Dict[str, float]]]) -> List[str]:
+    datasets: List[str] = []
+    for dataset in DATASETS:
+        if all(not summary[dataset][model].get("pending") for model in MODELS):
+            datasets.append(dataset)
+    return datasets
 
 
 def ensure_dirs() -> None:
@@ -96,31 +102,36 @@ def save(fig: plt.Figure, filename: str) -> None:
 
 
 def plot_full_suite(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
+    apply_paper_style()
+    datasets = completed_datasets(summary)
+    if not datasets:
+        return
     fig, ax = plt.subplots(figsize=(12.5, 5.8))
-    x = np.arange(len(DATASETS))
+    x = np.arange(len(datasets))
     width = 0.15
     offsets = np.linspace(-2, 2, len(MODELS)) * width
 
     for offset, model in zip(offsets, MODELS):
-        means = [summary[dataset][model]["mean_acc"] for dataset in DATASETS]
-        stds = [summary[dataset][model]["std_acc"] for dataset in DATASETS]
+        means = [summary[dataset][model]["mean_acc"] for dataset in datasets]
+        stds = [summary[dataset][model]["std_acc"] for dataset in datasets]
         ax.bar(
             x + offset,
             means,
             width=width,
-            color=COLORS[model],
-            label=DISPLAY[model],
+            color=MODEL_COLORS[model],
+            label=MODEL_DISPLAY[model],
             edgecolor="black",
-            linewidth=0.6,
+            linewidth=0.8,
             yerr=stds,
             capsize=3,
+            zorder=3,
         )
 
     ax.set_xticks(x)
-    ax.set_xticklabels(DATASETS, rotation=20)
-    ax.set_ylabel("Mean 5-fold best test accuracy")
-    ax.set_title("Full-suite benchmark across seven datasets")
-    ax.grid(axis="y", linestyle="--", alpha=0.25)
+    ax.set_xticklabels(datasets, rotation=20)
+    ax.set_ylabel("Mean best test accuracy")
+    ax.set_title("Benchmark across the active dataset package")
+    style_axis(ax)
     ax.legend(frameon=False, ncol=5, loc="upper center", bbox_to_anchor=(0.5, 1.18))
     fig.tight_layout()
     save(fig, "fig1_full_suite_results")
@@ -128,8 +139,12 @@ def plot_full_suite(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
 
 
 def plot_cross_heatmap(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
+    apply_paper_style()
+    datasets = completed_datasets(summary)
+    if not datasets:
+        return
     matrix = []
-    for dataset in DATASETS:
+    for dataset in datasets:
         plain = summary[dataset]["PlainGNN"]["mean_acc"]
         node_res = summary[dataset]["NodeResGNN"]["mean_acc"]
         node_cross = summary[dataset]["NodeCrossGNN"]["mean_acc"]
@@ -153,9 +168,9 @@ def plot_cross_heatmap(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
     im = ax.imshow(values, cmap="coolwarm", aspect="auto")
     ax.set_xticks(np.arange(len(labels)))
     ax.set_xticklabels(labels, rotation=20, ha="right")
-    ax.set_yticks(np.arange(len(DATASETS)))
-    ax.set_yticklabels(DATASETS)
-    ax.set_title("Accuracy deltas that define the cross-residual advantage")
+    ax.set_yticks(np.arange(len(datasets)))
+    ax.set_yticklabels(datasets)
+    ax.set_title("Accuracy deltas defining the cross-residual advantage")
     for i in range(values.shape[0]):
         for j in range(values.shape[1]):
             ax.text(j, i, f"{values[i, j]:+.3f}", ha="center", va="center", fontsize=8)
@@ -167,9 +182,13 @@ def plot_cross_heatmap(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
 
 
 def plot_rank_summary(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
+    apply_paper_style()
+    datasets = completed_datasets(summary)
+    if not datasets:
+        return
     rank_sum = {model: 0 for model in MODELS}
     win_count = {model: 0 for model in MODELS}
-    for dataset in DATASETS:
+    for dataset in datasets:
         rows = sorted(
             (
                 {"model": model, **summary[dataset][model]}
@@ -181,36 +200,36 @@ def plot_rank_summary(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
             rank_sum[row["model"]] += rank
         win_count[rows[0]["model"]] += 1
 
-    avg_rank = np.array([rank_sum[model] / len(DATASETS) for model in MODELS])
+    avg_rank = np.array([rank_sum[model] / len(datasets) for model in MODELS])
     wins = np.array([win_count[model] for model in MODELS])
 
     fig, axes = plt.subplots(1, 2, figsize=(10.8, 4.4))
     axes[0].bar(
         np.arange(len(MODELS)),
         avg_rank,
-        color=[COLORS[model] for model in MODELS],
+        color=[MODEL_COLORS[model] for model in MODELS],
         edgecolor="black",
-        linewidth=0.6,
+        linewidth=0.8,
     )
     axes[0].set_xticks(np.arange(len(MODELS)))
-    axes[0].set_xticklabels([DISPLAY[model] for model in MODELS], rotation=20)
+    axes[0].set_xticklabels([MODEL_DISPLAY[model] for model in MODELS], rotation=20)
     axes[0].set_ylabel("Average rank")
     axes[0].set_title("Average rank across datasets")
-    axes[0].grid(axis="y", linestyle="--", alpha=0.25)
+    style_axis(axes[0])
     axes[0].invert_yaxis()
 
     axes[1].bar(
         np.arange(len(MODELS)),
         wins,
-        color=[COLORS[model] for model in MODELS],
+        color=[MODEL_COLORS[model] for model in MODELS],
         edgecolor="black",
-        linewidth=0.6,
+        linewidth=0.8,
     )
     axes[1].set_xticks(np.arange(len(MODELS)))
-    axes[1].set_xticklabels([DISPLAY[model] for model in MODELS], rotation=20)
+    axes[1].set_xticklabels([MODEL_DISPLAY[model] for model in MODELS], rotation=20)
     axes[1].set_ylabel("Winner count")
     axes[1].set_title("Number of dataset wins")
-    axes[1].grid(axis="y", linestyle="--", alpha=0.25)
+    style_axis(axes[1])
 
     fig.tight_layout()
     save(fig, "fig3_rank_winner_summary")
@@ -218,24 +237,59 @@ def plot_rank_summary(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
 
 
 def plot_topic_focus(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
-    fig, axes = plt.subplots(1, len(TOPIC_DATASETS), figsize=(11.5, 4.1), sharey=True)
-    for ax, dataset in zip(axes, TOPIC_DATASETS):
+    apply_paper_style()
+    datasets = [dataset for dataset in TOPIC_DATASETS if dataset in completed_datasets(summary)]
+    if not datasets:
+        return
+    fig, axes = plt.subplots(1, len(datasets), figsize=(11.5, 4.1), sharey=True)
+    if len(datasets) == 1:
+        axes = [axes]
+    for ax, dataset in zip(axes, datasets):
         means = [summary[dataset][model]["mean_acc"] for model in MODELS]
         ax.bar(
             np.arange(len(MODELS)),
             means,
-            color=[COLORS[model] for model in MODELS],
+            color=[MODEL_COLORS[model] for model in MODELS],
             edgecolor="black",
-            linewidth=0.6,
+            linewidth=0.8,
+            zorder=3,
         )
         ax.set_title(dataset)
         ax.set_xticks(np.arange(len(MODELS)))
-        ax.set_xticklabels([DISPLAY[model] for model in MODELS], rotation=30, ha="right")
-        ax.grid(axis="y", linestyle="--", alpha=0.25)
+        ax.set_xticklabels([MODEL_DISPLAY[model] for model in MODELS], rotation=30, ha="right")
+        style_axis(ax)
     axes[0].set_ylabel("Mean 5-fold best test accuracy")
-    fig.suptitle("Topic-facing biological datasets", y=1.04)
+    fig.suptitle("Focused comparison on the main biological datasets", y=1.04)
     fig.tight_layout()
     save(fig, "fig4_topic_focus_results")
+    plt.close(fig)
+
+
+def plot_protein_package(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
+    apply_paper_style()
+    datasets = [dataset for dataset in TOPIC_DATASETS if dataset in completed_datasets(summary)]
+    if not datasets:
+        return
+    fig, ax = plt.subplots(figsize=(10.8, 4.8))
+    x = np.arange(len(datasets))
+    for idx, model in enumerate(MODELS):
+        ax.plot(
+            x,
+            [summary[dataset][model]["mean_acc"] for dataset in datasets],
+            color=MODEL_COLORS[model],
+            marker=MODEL_MARKERS[model],
+            linewidth=1.8,
+            markersize=5.5,
+            label=MODEL_DISPLAY[model],
+        )
+    ax.set_xticks(x)
+    ax.set_xticklabels(datasets)
+    ax.set_ylabel("Mean best test accuracy")
+    ax.set_title("Protein-oriented benchmark package")
+    style_axis(ax)
+    ax.legend(ncol=3, loc="upper center", bbox_to_anchor=(0.5, 1.22))
+    fig.tight_layout()
+    save(fig, "fig5_protein_package_summary")
     plt.close(fig)
 
 
@@ -247,11 +301,13 @@ def main() -> None:
     plot_cross_heatmap(summary)
     plot_rank_summary(summary)
     plot_topic_focus(summary)
+    plot_protein_package(summary)
     for name in [
         "fig1_full_suite_results.pdf",
         "fig2_cross_advantage_heatmap.pdf",
         "fig3_rank_winner_summary.pdf",
         "fig4_topic_focus_results.pdf",
+        "fig5_protein_package_summary.pdf",
     ]:
         print((ROOT / "paper" / "figures" / "exp" / name).as_posix())
 

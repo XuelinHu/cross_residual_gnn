@@ -3,17 +3,19 @@ import json
 import os
 import platform
 import random
+import sys
 import time
 from collections import Counter
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import Subset
 from torch_geometric.datasets import TUDataset
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import (
@@ -28,13 +30,24 @@ from torch_geometric.nn import (
 )
 
 try:
+    from ogb.graphproppred import Evaluator, PygGraphPropPredDataset
+except ImportError:
+    Evaluator = None
+    PygGraphPropPredDataset = None
+
+try:
     from torch.utils.tensorboard import SummaryWriter
 except ImportError:
     SummaryWriter = None
 
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from experiment_catalog import dataset_family
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DATA_ROOT = PROJECT_ROOT / "data"
 RECORD_ROOT = PROJECT_ROOT / "records"
 LOG_ROOT = PROJECT_ROOT / "logs"
@@ -85,7 +98,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--name", type=str, default="GCNConv", help="Message passing operator.")
     parser.add_argument("--gname", type=str, default="PlainGNN", help="Architecture name.")
-    parser.add_argument("--ds", type=str, default="MUTAG", help="TUDataset name.")
+    parser.add_argument("--ds", type=str, default="MUTAG", help="Dataset name (TU or OGB graph property prediction).")
     parser.add_argument("--ep", type=int, default=500, help="Training epochs.")
     parser.add_argument("--lr", type=float, default=1e-2, help="Learning rate.")
     parser.add_argument("--weight_decay", type=float, default=1e-2)
@@ -191,7 +204,7 @@ def save_lines(lines: List[str], prefix: str, debug: bool) -> Optional[Path]:
     return file_path
 
 
-def infer_input_dim(dataset: TUDataset) -> int:
+def infer_input_dim(dataset: object) -> int:
     return dataset.num_features if dataset.num_features > 0 else 1
 
 
@@ -201,13 +214,26 @@ def prepare_batch(data: torch.Tensor) -> torch.Tensor:
     return data.to(DEVICE)
 
 
-def load_dataset(dataset_name: str) -> TUDataset:
-    dataset = TUDataset(root=str(DATA_ROOT / "TUDataset"), name=dataset_name)
-    return dataset.shuffle()
+def load_dataset(dataset_name: str) -> object:
+    family = dataset_family(dataset_name)
+    if family == "tu":
+        dataset = TUDataset(root=str(DATA_ROOT / "TUDataset"), name=dataset_name)
+        return dataset.shuffle()
+    if family == "ogb_graphprop":
+        if PygGraphPropPredDataset is None:
+            raise ImportError(
+                "ogb is required for ogbg datasets. Install it with `pip install ogb`."
+            )
+        return PygGraphPropPredDataset(name=dataset_name, root=str(DATA_ROOT / "OGB"))
+    raise ValueError(f"Unsupported dataset family for {dataset_name}.")
+
+
+def graph_target(graph: torch.Tensor) -> torch.Tensor:
+    return graph.y.view(-1).long()
 
 
 def dataset_labels(dataset: Iterable[torch.Tensor]) -> List[int]:
-    return [int(graph.y.view(-1)[0]) for graph in dataset]
+    return [int(graph_target(graph)[0]) for graph in dataset]
 
 
 def stratified_kfold_indices(labels: List[int], n_splits: int, seed: int) -> List[Tuple[List[int], List[int]]]:
@@ -253,21 +279,43 @@ def stratified_train_val_indices(labels: List[int], val_ratio: float, seed: int)
     return sorted(train_indices), sorted(val_indices)
 
 
-def split_dataset(dataset: TUDataset, fold: int) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
-    graph_list = list(dataset)
-    labels = dataset_labels(graph_list)
-    folds = stratified_kfold_indices(labels, n_splits=5, seed=0)
-    train_indices, test_indices = folds[fold]
-    train_dataset = [graph_list[index] for index in train_indices]
-    test_dataset = [graph_list[index] for index in test_indices]
-    return train_dataset, test_dataset
+def split_dataset(
+    dataset: object,
+    fold: int,
+    dataset_name: str,
+) -> Tuple[Sequence[torch.Tensor], Sequence[torch.Tensor], Optional[Sequence[torch.Tensor]], Dict[str, object]]:
+    family = dataset_family(dataset_name)
+    if family == "tu":
+        graph_list = list(dataset)
+        labels = dataset_labels(graph_list)
+        folds = stratified_kfold_indices(labels, n_splits=5, seed=0)
+        train_indices, test_indices = folds[fold]
+        train_dataset = [graph_list[index] for index in train_indices]
+        test_dataset = [graph_list[index] for index in test_indices]
+        return train_dataset, test_dataset, None, {
+            "dataset_family": family,
+            "split_protocol": "stratified_5fold_cv",
+            "repeat_id": fold,
+            "official_split": False,
+        }
+
+    split_idx = dataset.get_idx_split()
+    train_dataset = Subset(dataset, split_idx["train"].tolist())
+    valid_dataset = Subset(dataset, split_idx["valid"].tolist())
+    test_dataset = Subset(dataset, split_idx["test"].tolist())
+    return train_dataset, test_dataset, valid_dataset, {
+        "dataset_family": family,
+        "split_protocol": "official_ogb_split",
+        "repeat_id": fold,
+        "official_split": True,
+    }
 
 
 def split_train_val_dataset(
-    train_dataset: List[torch.Tensor],
+    train_dataset: Sequence[torch.Tensor],
     val_ratio: float,
     seed: int,
-) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
+) -> Tuple[Sequence[torch.Tensor], Sequence[torch.Tensor]]:
     if not train_dataset:
         return [], []
     if val_ratio <= 0.0:
@@ -286,18 +334,30 @@ def split_train_val_dataset(
     return inner_train_dataset, val_dataset
 
 
-def build_loader(dataset_slice: List[torch.Tensor], batch_size: int, shuffle: bool) -> DataLoader:
+def build_loader(dataset_slice: Sequence[torch.Tensor], batch_size: int, shuffle: bool) -> DataLoader:
     return DataLoader(dataset_slice, batch_size=batch_size, shuffle=shuffle)
 
 
-def dataset_statistics(dataset: TUDataset) -> Dict[str, object]:
+def sampled_graph_iter(dataset: object, sample_cap: int = 2048) -> Iterable[torch.Tensor]:
+    total = len(dataset)
+    if total <= sample_cap:
+        for graph in dataset:
+            yield graph
+        return
+    indices = np.linspace(0, total - 1, num=sample_cap, dtype=int)
+    for index in indices.tolist():
+        yield dataset[index]
+
+
+def dataset_statistics(dataset: object, dataset_name: str) -> Dict[str, object]:
     node_counts: List[int] = []
     edge_counts: List[float] = []
     avg_degrees: List[float] = []
     densities: List[float] = []
     class_hist: Counter = Counter()
 
-    for graph in dataset:
+    sampled_graphs = 0
+    for graph in sampled_graph_iter(dataset):
         num_nodes = int(graph.num_nodes)
         directed_edges = int(graph.edge_index.size(1))
         undirected_edges = directed_edges / 2 if graph.is_undirected() else directed_edges
@@ -309,10 +369,12 @@ def dataset_statistics(dataset: TUDataset) -> Dict[str, object]:
         edge_counts.append(undirected_edges)
         avg_degrees.append(avg_degree)
         densities.append(density)
-        class_hist[int(graph.y.view(-1)[0])] += 1
+        class_hist[int(graph_target(graph)[0])] += 1
+        sampled_graphs += 1
 
     return {
-        "dataset": dataset.name,
+        "dataset": dataset_name,
+        "dataset_family": dataset_family(dataset_name),
         "graphs": len(dataset),
         "classes": dataset.num_classes,
         "num_features": infer_input_dim(dataset),
@@ -323,6 +385,7 @@ def dataset_statistics(dataset: TUDataset) -> Dict[str, object]:
         "avg_density": float(np.mean(densities)),
         "min_nodes": int(np.min(node_counts)),
         "max_nodes": int(np.max(node_counts)),
+        "sampled_graphs": sampled_graphs,
         "class_hist": dict(sorted(class_hist.items())),
     }
 
@@ -657,11 +720,12 @@ def evaluate(model: nn.Module, loader: DataLoader, criterion: nn.Module) -> Dict
     with torch.no_grad():
         for batch_data in loader:
             batch_data = prepare_batch(batch_data)
+            targets = graph_target(batch_data)
             logits, _ = model(batch_data.x, batch_data.edge_index, batch_data.batch)
-            loss = criterion(logits, batch_data.y)
+            loss = criterion(logits, targets)
             predictions = logits.argmax(dim=1)
-            batch_size = batch_data.y.size(0)
-            total_correct += int((predictions == batch_data.y).sum())
+            batch_size = targets.size(0)
+            total_correct += int((predictions == targets).sum())
             total_loss += float(loss.item()) * batch_size
             total_graphs += batch_size
 
@@ -671,10 +735,48 @@ def evaluate(model: nn.Module, loader: DataLoader, criterion: nn.Module) -> Dict
     }
 
 
+def evaluate_ogb(
+    model: nn.Module,
+    loader: DataLoader,
+    criterion: nn.Module,
+    evaluator: Evaluator,
+) -> Dict[str, float]:
+    model.eval()
+    total_loss = 0.0
+    total_graphs = 0
+    y_true_parts: List[torch.Tensor] = []
+    y_pred_parts: List[torch.Tensor] = []
+
+    with torch.no_grad():
+        for batch_data in loader:
+            batch_data = prepare_batch(batch_data)
+            targets = graph_target(batch_data)
+            logits, _ = model(batch_data.x, batch_data.edge_index, batch_data.batch)
+            loss = criterion(logits, targets)
+            predictions = logits.argmax(dim=1, keepdim=True)
+            batch_size = targets.size(0)
+            total_loss += float(loss.item()) * batch_size
+            total_graphs += batch_size
+            y_true_parts.append(targets.view(-1, 1).detach().cpu())
+            y_pred_parts.append(predictions.detach().cpu())
+
+    y_true = torch.cat(y_true_parts, dim=0).numpy()
+    y_pred = torch.cat(y_pred_parts, dim=0).numpy()
+    metric_name = evaluator.eval_metric
+    metric_value = float(evaluator.eval({"y_true": y_true, "y_pred": y_pred})[metric_name])
+    return {
+        "loss": total_loss / max(total_graphs, 1),
+        "acc": metric_value,
+        "metric_name": metric_name,
+    }
+
+
 def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
-    set_seed(args.seed)
+    family = dataset_family(args.ds)
+    effective_seed = args.seed + args.fold if family == "ogb_graphprop" else args.seed
+    set_seed(effective_seed)
     dataset = load_dataset(args.ds)
-    stats = dataset_statistics(dataset)
+    stats = dataset_statistics(dataset, args.ds)
 
     if args.report_dataset_stats:
         print(json.dumps(stats, indent=2))
@@ -683,11 +785,15 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
     if args.mode == "stats":
         return {"dataset_stats": stats}
 
-    train_dataset, test_dataset = split_dataset(dataset, args.fold)
-    train_dataset, val_dataset = split_train_val_dataset(train_dataset, args.val_ratio, seed=args.seed + args.fold)
+    train_dataset, test_dataset, official_val_dataset, split_context = split_dataset(dataset, args.fold, args.ds)
+    if official_val_dataset is None:
+        train_dataset, val_dataset = split_train_val_dataset(train_dataset, args.val_ratio, seed=args.seed + args.fold)
+    else:
+        val_dataset = official_val_dataset
     train_loader = build_loader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = build_loader(val_dataset, batch_size=args.batch_size, shuffle=False) if val_dataset else None
     test_loader = build_loader(test_dataset, batch_size=args.batch_size, shuffle=False)
+    evaluator = Evaluator(name=args.ds) if family == "ogb_graphprop" and Evaluator is not None else None
 
     model = build_model(args, dataset).to(DEVICE)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -707,6 +813,7 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
             operator=args.name,
             dataset=args.ds,
             fold=args.fold,
+            dataset_family=family,
             total_params=parameter_stats["total_params"],
             trainable_params=parameter_stats["trainable_params"],
         )
@@ -744,9 +851,10 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
 
         for batch_data in train_loader:
             batch_data = prepare_batch(batch_data)
+            targets = graph_target(batch_data)
             optimizer.zero_grad()
             logits, graph_embedding = model(batch_data.x, batch_data.edge_index, batch_data.batch)
-            loss = criterion(logits, batch_data.y)
+            loss = criterion(logits, targets)
             loss.backward()
             batch_grad_norm = gradient_norm(model)
             if args.grad_clip > 0.0:
@@ -754,8 +862,8 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
             optimizer.step()
 
             predictions = logits.argmax(dim=1)
-            batch_size = batch_data.y.size(0)
-            total_correct += int((predictions == batch_data.y).sum())
+            batch_size = targets.size(0)
+            total_correct += int((predictions == targets).sum())
             total_loss += float(loss.item()) * batch_size
             total_graphs += batch_size
             grad_norm_sum += batch_grad_norm
@@ -781,7 +889,13 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
             "logits_abs_mean": logits_abs_mean_sum / max(total_graphs, 1),
             "logits_abs_max": logits_abs_max,
         }
-        val_metrics = evaluate(model, val_loader, criterion) if val_loader is not None else train_metrics
+        if val_loader is not None:
+            if evaluator is not None:
+                val_metrics = evaluate_ogb(model, val_loader, criterion, evaluator)
+            else:
+                val_metrics = evaluate(model, val_loader, criterion)
+        else:
+            val_metrics = train_metrics
         scheduler.step(val_metrics["loss"])
         current_lr = optimizer.param_groups[0]["lr"]
 
@@ -854,18 +968,23 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
         writer.close()
 
     model.load_state_dict(best_state_dict)
-    test_metrics = evaluate(model, test_loader, criterion)
+    if evaluator is not None:
+        test_metrics = evaluate_ogb(model, test_loader, criterion, evaluator)
+    else:
+        test_metrics = evaluate(model, test_loader, criterion)
     best_test_acc = test_metrics["acc"]
 
     summary = {
         "config": vars(args),
         "dataset_stats": stats,
+        "split_context": split_context,
         "parameter_stats": parameter_stats,
         "best_epoch": best_epoch,
         "best_val_loss": best_val_loss,
         "best_val_acc": best_val_acc,
         "best_test_acc": best_test_acc,
         "test_loss": test_metrics["loss"],
+        "eval_metric": test_metrics.get("metric_name", "acc"),
         "history": history,
     }
     save_json(
