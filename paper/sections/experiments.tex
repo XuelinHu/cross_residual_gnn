@@ -54,21 +54,29 @@ Tables~\ref{tab:all_results_1}--\ref{tab:all_winners} summarize the revised benc
 
 \input{../md/all_exp_tables.tex}
 
-\begin{figure*}[t]
+Taken together, the three tables show a consistent hierarchy. Residual reuse is still the stronger default family in the protein-oriented core, cross-residual routing becomes selectively useful on supplementary molecular datasets, and the winner summary confirms that no single complexity trend explains the results by itself. This is exactly why the later analysis focuses on information-flow design rather than on model size alone.
+
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.98\linewidth]{figures/exp/fig1_full_suite_results.pdf}
-\caption{Benchmark over the active dataset package. Each bar reports mean best test accuracy, and error bars show the fold-level standard deviation. The current archive highlights the protein-oriented TU core together with the supplementary robustness pattern.}
+\caption{Benchmark over the active dataset package. Each bar reports mean best test accuracy, the numeric label above each bar gives the exact mean value, and error bars show the fold-level standard deviation. The current archive highlights the protein-oriented TU core together with the supplementary robustness pattern.}
 \label{fig:full_suite_results}
-\end{figure*}
+\end{figure}
 
-\begin{figure}[t]
+Figure~\ref{fig:full_suite_results} turns the table values into a direct model-by-model comparison. The bar labels make the ranking differences readable without repeatedly scanning the tables, and the error bars show that several margins are modest rather than overwhelming. More importantly, the figure makes the dataset split visually obvious: the residual family dominates the main biological package, whereas NodeCrossGNN becomes more competitive on MUTAG and Mutagenicity. The figure therefore supports a careful ranking argument rather than an exaggerated claim of universal separation.
+
+The winner pattern is already visible in Figure~\ref{fig:full_suite_results}. NodeCrossGNN wins on MUTAG and Mutagenicity, GraphResGNN wins on PROTEINS, ENZYMES, and AIDS, and NodeResGNN wins on DD. PlainGNN does not win any completed dataset in the reported suite. This ranking summary is the direct bridge to Figure~\ref{fig:cross_advantage_heatmap}, which explains why those wins emerge.
+
+\begin{figure}[H]
 \centering
-\includegraphics[width=0.98\linewidth]{figures/exp/fig2_cross_advantage_heatmap.pdf}
+\includegraphics[width=0.90\linewidth]{figures/exp/fig2_cross_advantage_heatmap.pdf}
 \caption{Accuracy deltas that define the practical value of cross-residual routing. Positive values indicate an advantage for the cross design, while negative values indicate that the corresponding plain or residual alternative remains stronger.}
 \label{fig:cross_advantage_heatmap}
 \end{figure}
 
-The winner pattern is immediately informative. NodeCrossGNN wins on MUTAG and Mutagenicity, GraphResGNN wins on PROTEINS, ENZYMES, and AIDS, and NodeResGNN wins on DD. PlainGNN does not win any completed dataset in the reported benchmark suite.
+Figure~\ref{fig:cross_advantage_heatmap} then explains where the cross design helps and where it does not. The heatmap makes the paper's central comparison clearer than the raw accuracies alone: cross-residual routing is usually better than plain stacking, but it is not consistently stronger than the best residual alternative. The largest positive cells appear on ENZYMES, MUTAG, AIDS, and Mutagenicity when cross models are compared against the plain baseline, while several comparisons against residual baselines remain negative. This is the visual evidence behind the paper's main claim that cross routing is useful but still conditional.
+
+Taken together, Tables~\ref{tab:all_results_1}--\ref{tab:all_winners} and Figures~\ref{fig:full_suite_results}--\ref{fig:cross_advantage_heatmap} lead to the same conclusion from different angles: cross-residual routing is useful, but the strongest default baseline is still residual reuse. This is the key transition into the next subsection, where the same pattern is interpreted in the narrower biological scope of PROTEINS, DD, and ENZYMES.
 \FloatBarrier
 
 \subsection{Main Findings}
@@ -93,12 +101,18 @@ On \textbf{DD}, NodeResGNN and NodeCrossGNN are nearly tied, with NodeResGNN ret
 
 On \textbf{ENZYMES}, cross variants become more attractive. GraphCrossGNN reaches $0.3017 \pm 0.0750$ and NodeCrossGNN reaches $0.3000 \pm 0.0580$, both clearly above PlainGNN at $0.2450 \pm 0.0407$. Even so, GraphResGNN still remains the best model. Therefore, ENZYMES is the cleanest topic-facing dataset for arguing that cross-residual pathways can recover useful information that plain stacking loses, but not for arguing that cross should replace residual baselines outright.
 
-\begin{figure}[t]
+Figure~\ref{fig:topic_focus_results} summarizes these three topic-facing datasets in one place so that the local ranking reversals can be read without cross-checking the tables.
+
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.98\linewidth]{figures/exp/fig4_topic_focus_results.pdf}
 \caption{Focused comparison on the completed topic-facing TU datasets. The pattern is mixed rather than one-sided: graph-level residual refinement is strongest on PROTEINS and ENZYMES, while DD favors node-level reuse, with NodeCrossGNN remaining competitive but not dominant.}
 \label{fig:topic_focus_results}
 \end{figure}
+
+\FloatBarrier
+
+Figure~\ref{fig:topic_focus_results} condenses the topic-facing evidence into a single view and makes the ranking differences easy to read directly from the bar labels. It supports the same interpretation as the dataset-by-dataset discussion above: PROTEINS and ENZYMES favor graph-level residual refinement, DD favors simpler node-level reuse, and cross-residual models remain useful but not dominant.
 
 \subsection{Ablation Conclusions}
 
@@ -113,36 +127,13 @@ The final ablation story is therefore precise:
 
 This is the strongest claim that the current evidence supports. Cross-residual design should be presented as a meaningful and reusable architectural design space, not as a universal winner over residual reuse.
 
-\subsection{Parameter Sensitivity}
+\subsection{Robustness Note}
 
-The next question is whether this ablation story is stable under moderate changes in the cross-model hyperparameters.
+The next question is whether the ablation story remains stable under moderate tuning changes for the cross-residual models.
 
-To complement the structural ablation, we ran a focused parameter-sensitivity study for the two cross-residual models on the topic-facing datasets PROTEINS, DD, and ENZYMES. We varied depth, dropout, and learning rate under the same general training setting. Figures~\ref{fig:depth_sensitivity}--\ref{fig:lr_sensitivity} summarize the resulting trends.
+We therefore ran auxiliary sensitivity checks over depth, dropout, and learning rate on PROTEINS, DD, and ENZYMES, but we do not keep those scans in the main paper because they add visual load without materially changing the central conclusion. Their role is only to test whether the topic-facing observations above are fragile.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.98\linewidth]{figures/exp/fig5_depth_sensitivity_v3.pdf}
-\caption{Depth sensitivity of the cross-residual models on the topic-facing datasets. NodeCrossGNN is most depth-sensitive on PROTEINS, while GraphCrossGNN on DD benefits strongly from the shallower three-layer setting.}
-\label{fig:depth_sensitivity}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.98\linewidth]{figures/exp/fig6_dropout_sensitivity_v3.pdf}
-\caption{Dropout sensitivity of the cross-residual models. PROTEINS favors lighter regularization for GraphCrossGNN, DD prefers moderate-to-strong regularization, and ENZYMES remains unstable across all tested dropout settings.}
-\label{fig:dropout_sensitivity}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.98\linewidth]{figures/exp/fig7_lr_sensitivity_v3.pdf}
-\caption{Learning-rate sensitivity of the cross-residual models. DD shows the clearest optimization dependence, with both cross variants improving under a more aggressive learning rate schedule.}
-\label{fig:lr_sensitivity}
-\end{figure}
-
-The sensitivity patterns are dataset-specific rather than uniform. On \textbf{PROTEINS}, NodeCrossGNN is most sensitive to depth, while GraphCrossGNN benefits from lighter regularization. On \textbf{DD}, both cross variants are more optimization-sensitive, and GraphCrossGNN reacts especially strongly to depth. On \textbf{ENZYMES}, however, the scan exposes a different regime: the validation signal is noticeably noisier, which makes local hyperparameter improvements less reliable.
-
-To check whether the ENZYMES local improvements were stable, we also ran a follow-up evaluation using the most promising settings suggested by the scan. The follow-up remained below the original full-suite ENZYMES cross results, so we do not replace the main table. Instead, the result supports a more careful interpretation: on the smallest dataset, validation noise can dominate local hyperparameter gains, and apparent improvements do not necessarily transfer to the 5-fold mean.
+The outcome is consistent with the main benchmark narrative. On PROTEINS and DD, moderate tuning changes affect the gap between the two cross variants, but they do not overturn the broader conclusion that residual baselines remain the stronger default reference. On ENZYMES, the validation signal is visibly noisier, and the most promising local settings did not reproduce the original full-suite cross results under the final 5-fold average. This is important for interpretation: on the smallest dataset, apparent local gains can be unstable, so the main paper should rely on the controlled benchmark tables rather than on isolated tuning peaks.
 \FloatBarrier
 
 \subsection{Current Limitations}

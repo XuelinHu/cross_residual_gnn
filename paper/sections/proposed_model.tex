@@ -86,31 +86,9 @@ All model variants use the same graph classification objective:
 \end{equation}
 with the same loss definition used for every architecture. The experiments in Section~\ref{sec:experiments} therefore isolate architectural differences rather than changes in objective or evaluation protocol.
 
-\subsection{Algorithmic View}
+\subsection{Model Flow Summary}
 
-Table~\ref{tab:crgnn_algorithm} summarizes the shared forward logic in a compact three-line format.
-
-\begin{table}[t]
-\centering
-\small
-\caption{Shared forward procedure of the CR-GNN family.}
-\label{tab:crgnn_algorithm}
-\begin{tabular}{p{0.10\linewidth} p{0.82\linewidth}}
-\toprule
-Step & Procedure \\
-\midrule
-1 & Input graph features $\mathbf{X}$ and structure $\mathbf{A}$, choose depth $L$, and select one architecture from \textsc{PlainGNN}, \textsc{NodeResGNN}, \textsc{NodeCrossGNN}, \textsc{GraphResGNN}, and \textsc{GraphCrossGNN}. \\
-2 & Apply the shared input projection to obtain initial hidden states. \\
-3 & If the model is \textsc{PlainGNN}, update one branch sequentially for $L$ layers without explicit state reuse. \\
-4 & If the model is \textsc{NodeResGNN}, add the cached previous hidden state before each layer update. \\
-5 & If the model is \textsc{NodeCrossGNN}, maintain two branches and inject the opposite branch's cached state at every depth. \\
-6 & If the model is \textsc{GraphResGNN}, execute sequential blocks and reuse the previous graph embedding as graph-level context. \\
-7 & If the model is \textsc{GraphCrossGNN}, compute paired graph embeddings and swap them before the next block stage. \\
-8 & Pool the final node representations to obtain $\mathbf{g}$, then apply the graph-level classifier to produce logits $\hat{\mathbf{y}}$. \\
-9 & Return the prediction $\hat{\mathbf{y}}$ and the final graph embedding $\mathbf{g}$. \\
-\bottomrule
-\end{tabular}
-\end{table}
+The shared computation can be summarized in four stages. First, every model maps the input graph to an initial hidden representation through the same input projection. Second, the hidden states are refined by stacked message-passing layers, where the five variants differ only in the way historical node states or graph-level summaries are reused. Third, the last-layer node features are pooled into a graph embedding. Finally, the pooled representation is passed to the same classifier to produce graph labels. This hierarchy is intentionally simple: the comparison focuses on where residual or cross-residual information is injected, rather than on changes to the prediction head or to the learning objective.
 
 \subsection{Design Implications}
 
