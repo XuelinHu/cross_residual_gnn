@@ -1,5 +1,7 @@
 # Cross-Residual Graph Neural Networks
 
+[中文说明 / Chinese README](./README-CN.md)
+
 <p align="center">
   <img height="20" src="https://img.shields.io/badge/PyTorch-2.x-red" />
   <img height="20" src="https://img.shields.io/badge/PyTorch_Geometric-2.x-blue" />
@@ -9,13 +11,11 @@
 
 Research code for Cross-Residual Graph Neural Networks (CR-GNN), a controlled graph-classification architecture family that compares plain stacking, residual reuse, and cross-residual information exchange under a unified training protocol.
 
-The current repository is centered on the stabilized `v3` graph-classification pipeline in [geomatric/graph_classify_v3.py](/ds1/workspace/ai/cross_residual_gnn/geomatric/graph_classify_v3.py). The active Python package is now the [`geomatric`](/ds1/workspace/ai/cross_residual_gnn/geomatric) directory, which also contains the shared dataset catalog, logger, and notification helpers used by the current workflow. The paper narrative is framed around a protein-oriented biological package, while the supplementary experiments retain a broader robustness evaluation. The current scope is still biomolecular graph learning rather than a completed integrative-omics system, but the revised manuscript also strengthens the logical bridge toward plant-related graph inference.
-
-- https://www.frontiersin.org/research-topics/73895/prediction-of-novel-domains-motifs-genes-and-proteins-through-integrative-omics-approaches
+The active training pipeline is centered on [geomatric/graph_classify_v3.py](./geomatric/graph_classify_v3.py). Shared dataset definitions, logging helpers, and DingTalk notification utilities now live under the [geomatric/](./geomatric) package.
 
 ## Overview
 
-The repository now supports five main architectures under a shared `GCNConv` backbone:
+The repository currently supports five main architectures under a shared `GCNConv` backbone:
 
 - `PlainGNN`
 - `NodeResGNN`
@@ -31,37 +31,27 @@ The current codebase also includes:
 - gradient clipping
 - TensorBoard logging
 - JSON result export
-- scripts for batch execution, summarization, and report generation
+- scripts for batch execution, summarization, plotting, and paper/report generation
 
-Older V2-era assets have been moved into [achivement_V2](/ds1/workspace/ai/cross_residual_gnn/achivement_V2) so that the repository root reflects the active `v3` workflow.
+Older V2-era assets have been moved into [achivement_V2/](./achivement_V2).
 
 ## Repository Layout
 
 ```text
 cross_residual_gnn/
 ├── achivement_V2/               # Archived V2-era code and notes
-├── geomatric/                   # Active package for training and shared helpers
-│   ├── __init__.py
-│   ├── experiment_catalog.py    # Dataset groups and metadata
-│   ├── graph_classify_v3.py     # Main V3 training entry
-│   ├── logging_config.py        # Shared logger setup
-│   └── dingtalk_util.py         # DingTalk notification helper
-├── py/                          # Batch runners and paper/report scripts
-│   ├── run_paper_experiments.py
-│   ├── summarize_paper_experiments.py
-│   ├── generate_all_result_reports.py
-│   ├── generate_suite_analysis_figures.py
-│   ├── generate_dataset_statistics_report.py
-│   ├── run_sensitivity_experiments.py
-│   ├── generate_sensitivity_reports.py
-│   ├── run_enzymes_tuned_cross.py
-│   ├── generate_exp_figures.py
-│   └── export_analysis_artifacts.py
-├── md/
-├── figures/
-├── paper/
-├── tmp/                         # Local scratch outputs, ignored by Git
-└── README.md
+├── data/                        # Local datasets (ignored by Git)
+├── figures/                     # Exported experiment figures
+├── geomatric/                   # Active Python package
+├── logs/                        # JSON experiment snapshots (ignored by Git)
+├── md/                          # Generated markdown / TeX summaries
+├── paper/                       # LaTeX manuscript and paper figures
+├── py/                          # Batch runners and analysis scripts
+├── records/                     # Text summaries and records (ignored by Git)
+├── runs/                        # TensorBoard runs (ignored by Git)
+├── tmp/                         # Local scratch outputs (ignored by Git)
+├── README.md
+└── README-CN.md
 ```
 
 ## Environment
@@ -69,7 +59,7 @@ cross_residual_gnn/
 Recommended environment:
 
 - Python `3.10+`
-- PyTorch with CUDA
+- PyTorch
 - PyTorch Geometric
 - `tensorboard`
 - `matplotlib`, `seaborn`, `pandas`, `openpyxl`
@@ -81,9 +71,131 @@ pip install -r requirements.txt
 pip install torch-geometric tensorboard
 ```
 
-If PyTorch Geometric wheels need to be installed manually, follow the official PyG installation instructions for your local PyTorch and CUDA version.
+If PyTorch Geometric wheels need manual installation, follow the official PyG instructions for your local PyTorch and CUDA version.
 
-## Main Entry Points
+## Path Index
+
+### Core package paths
+
+- [geomatric/__init__.py](./geomatric/__init__.py): package entry
+- [geomatric/graph_classify_v3.py](./geomatric/graph_classify_v3.py): main training / evaluation entry
+- [geomatric/experiment_catalog.py](./geomatric/experiment_catalog.py): dataset groups and metadata
+- [geomatric/logging_config.py](./geomatric/logging_config.py): shared logger
+- [geomatric/dingtalk_util.py](./geomatric/dingtalk_util.py): DingTalk markdown / actionCard notifications
+
+### Run script paths
+
+- [py/run_paper_experiments.py](./py/run_paper_experiments.py): full benchmark batch runner
+- [py/run_sensitivity_experiments.py](./py/run_sensitivity_experiments.py): sensitivity sweep runner
+- [py/run_enzymes_tuned_cross.py](./py/run_enzymes_tuned_cross.py): tuned ENZYMES cross-model runs
+- [py/summarize_paper_experiments.py](./py/summarize_paper_experiments.py): summarize latest logs
+- [py/generate_all_result_reports.py](./py/generate_all_result_reports.py): generate full report text / TeX
+- [py/generate_suite_analysis_figures.py](./py/generate_suite_analysis_figures.py): generate benchmark figures
+- [py/generate_dataset_statistics_report.py](./py/generate_dataset_statistics_report.py): export dataset statistics
+- [py/generate_sensitivity_reports.py](./py/generate_sensitivity_reports.py): summarize sensitivity logs and figures
+- [py/generate_exp_figures.py](./py/generate_exp_figures.py): generate record-based experiment figures
+- [py/generate_method_figure.py](./py/generate_method_figure.py): method figure helper
+- [py/generate_topic_tables.py](./py/generate_topic_tables.py): topic-facing TeX tables
+- [py/export_analysis_artifacts.py](./py/export_analysis_artifacts.py): per-run analysis artifacts
+- [py/organize_references_from_corpus.py](./py/organize_references_from_corpus.py): reference organization helper
+- [py/plot_style.py](./py/plot_style.py): plotting style utilities
+
+### Experiment snapshot and output paths
+
+These paths are important because they are the main "snapshots" of runtime results:
+
+- `logs/train_<dataset>_<model>_<operator>_fold<k>__<timestamp>.json`
+  Example output root: [logs/](./logs)
+- `logs/dataset_stats_<dataset>__<timestamp>.json`
+  Example output root: [logs/](./logs)
+- `records/suite_<suite_name>_<dataset>__<timestamp>.txt`
+  Example output root: [records/](./records)
+- `runs/<experiment_name>_<timestamp>/events.out.tfevents.*`
+  TensorBoard root: [runs/](./runs)
+- `figures/analysis/*`
+  Analysis artifact root: [figures/analysis/](./figures/analysis)
+- `figures/exp/*`
+  Exported benchmark figures: [figures/exp/](./figures/exp)
+- `paper/figures/exp/*`
+  Paper-ready figure copies: [paper/figures/exp/](./paper/figures/exp)
+
+### Generated summary file paths
+
+- [md/all_results_summary.txt](./md/all_results_summary.txt)
+- [md/all_exp_tables.tex](./md/all_exp_tables.tex)
+- [md/all_exp_tables_appendix.tex](./md/all_exp_tables_appendix.tex)
+- [md/all_ablation_analysis.md](./md/all_ablation_analysis.md)
+- [md/sensitivity_summary.md](./md/sensitivity_summary.md)
+- [md/parameter_sensitivity_analysis.md](./md/parameter_sensitivity_analysis.md)
+- [md/dataset_statistics_summary.md](./md/dataset_statistics_summary.md)
+- [md/dataset_statistics_summary.json](./md/dataset_statistics_summary.json)
+- [md/dataset_statistics_tables.tex](./md/dataset_statistics_tables.tex)
+- [md/topic_results_summary.txt](./md/topic_results_summary.txt)
+- [md/topic_exp_tables.tex](./md/topic_exp_tables.tex)
+- [md/cross_advantage_summary.md](./md/cross_advantage_summary.md)
+- [md/formal_experiment_protocol.md](./md/formal_experiment_protocol.md)
+- [md/final_implementation_todo.md](./md/final_implementation_todo.md)
+- [md/paper_gap_checklist.md](./md/paper_gap_checklist.md)
+- [md/reference_logic_map.md](./md/reference_logic_map.md)
+- [md/frontiers_topic_alignment.md](./md/frontiers_topic_alignment.md)
+- [md/topic_aligned_dataset_shortlist.md](./md/topic_aligned_dataset_shortlist.md)
+- [md/SESSION_RECORD.md](./md/SESSION_RECORD.md)
+
+### Figure file paths
+
+Current exported experiment figures:
+
+- [figures/exp/fig1_full_suite_results.png](./figures/exp/fig1_full_suite_results.png)
+- [figures/exp/fig1_full_suite_results.pdf](./figures/exp/fig1_full_suite_results.pdf)
+- [figures/exp/fig2_cross_advantage_heatmap.png](./figures/exp/fig2_cross_advantage_heatmap.png)
+- [figures/exp/fig2_cross_advantage_heatmap.pdf](./figures/exp/fig2_cross_advantage_heatmap.pdf)
+- [figures/exp/fig3_rank_winner_summary.png](./figures/exp/fig3_rank_winner_summary.png)
+- [figures/exp/fig3_rank_winner_summary.pdf](./figures/exp/fig3_rank_winner_summary.pdf)
+- [figures/exp/fig4_topic_focus_results.png](./figures/exp/fig4_topic_focus_results.png)
+- [figures/exp/fig4_topic_focus_results.pdf](./figures/exp/fig4_topic_focus_results.pdf)
+- [figures/exp/fig5_protein_package_summary.png](./figures/exp/fig5_protein_package_summary.png)
+- [figures/exp/fig5_protein_package_summary.pdf](./figures/exp/fig5_protein_package_summary.pdf)
+
+Paper figure roots:
+
+- [paper/figures/](./paper/figures)
+- [paper/figures/exp/](./paper/figures/exp)
+- [paper/figures/cr_gnn_schematic.png](./paper/figures/cr_gnn_schematic.png)
+- [paper/figures/task_model_comparison.png](./paper/figures/task_model_comparison.png)
+
+### Dataset paths
+
+The repository does not commit raw datasets. Local dataset roots are:
+
+- [data/](./data): local data root
+- `data/TUDataset/`: TU datasets downloaded by `torch_geometric.datasets.TUDataset`
+- `data/OGB/`: OGB graph-property datasets downloaded by `ogb.graphproppred.PygGraphPropPredDataset`
+- [data/.gitkeep](./data/.gitkeep): placeholder only
+
+Datasets currently grouped in [geomatric/experiment_catalog.py](./geomatric/experiment_catalog.py):
+
+- Main package: `PROTEINS`, `DD`, `ENZYMES`
+- Supplementary package: `MUTAG`, `AIDS`, `Mutagenicity`
+
+### Paper file paths
+
+- [paper/main.tex](./paper/main.tex)
+- [paper/main.pdf](./paper/main.pdf)
+- [paper/references.bib](./paper/references.bib)
+- [paper/compile.bat](./paper/compile.bat)
+- [paper/README.md](./paper/README.md)
+- [paper/paper_corpus_merged.json](./paper/paper_corpus_merged.json)
+- [paper/sections/abstract.tex](./paper/sections/abstract.tex)
+- [paper/sections/introduction.tex](./paper/sections/introduction.tex)
+- [paper/sections/related_work.tex](./paper/sections/related_work.tex)
+- [paper/sections/task_definition.tex](./paper/sections/task_definition.tex)
+- [paper/sections/proposed_model.tex](./paper/sections/proposed_model.tex)
+- [paper/sections/datasets.tex](./paper/sections/datasets.tex)
+- [paper/sections/experiments.tex](./paper/sections/experiments.tex)
+- [paper/sections/conclusion.tex](./paper/sections/conclusion.tex)
+- [paper/sections/appendix.tex](./paper/sections/appendix.tex)
+
+## Main Commands
 
 ### 1. Single experiment
 
@@ -105,7 +217,7 @@ python -m geomatric.graph_classify_v3 \
   --tensorboard
 ```
 
-Direct path execution also works:
+Direct script path also works:
 
 ```bash
 python geomatric/graph_classify_v3.py --mode single --ds PROTEINS
@@ -137,13 +249,6 @@ python py/generate_all_result_reports.py
 python py/generate_suite_analysis_figures.py
 ```
 
-This writes:
-
-- [md/all_results_summary.txt](/ds1/workspace/ai/cross_residual_gnn/md/all_results_summary.txt)
-- [md/all_exp_tables.tex](/ds1/workspace/ai/cross_residual_gnn/md/all_exp_tables.tex)
-- [md/all_ablation_analysis.md](/ds1/workspace/ai/cross_residual_gnn/md/all_ablation_analysis.md)
-- figures under [paper/figures/exp](/ds1/workspace/ai/cross_residual_gnn/paper/figures/exp)
-
 ### 5. Run parameter sensitivity scans
 
 ```bash
@@ -151,56 +256,17 @@ python py/run_sensitivity_experiments.py --fold 0 --max_workers 6
 python py/generate_sensitivity_reports.py
 ```
 
-This writes:
-
-- [md/sensitivity_summary.md](/ds1/workspace/ai/cross_residual_gnn/md/sensitivity_summary.md)
-- [md/parameter_sensitivity_analysis.md](/ds1/workspace/ai/cross_residual_gnn/md/parameter_sensitivity_analysis.md)
-- sensitivity figures under [paper/figures/exp](/ds1/workspace/ai/cross_residual_gnn/paper/figures/exp)
-
-### 6. TensorBoard
-
-```bash
-tensorboard --logdir runs --port 6006
-```
-
-When `--tensorboard` is enabled, the training loop logs:
-
-- train / validation loss
-- train / validation accuracy
-- learning rate
-- gradient norm
-- embedding statistics
-- logit statistics
-
-## Datasets
-
-Main biological package:
-
-- `PROTEINS`
-- `DD`
-- `ENZYMES`
-
-Supplementary robustness package:
-
-- `MUTAG`
-- `AIDS`
-- `Mutagenicity`
-
-The revised paper uses:
-
-- `PROTEINS`, `DD`, `ENZYMES` as the main biological benchmark package
-- `MUTAG`, `AIDS`, `Mutagenicity` as supplementary structural validation
-
-Generate unified dataset statistics and paper tables with:
+### 6. Export dataset statistics
 
 ```bash
 python py/generate_dataset_statistics_report.py
 ```
 
-This writes:
+### 7. TensorBoard
 
-- [md/dataset_statistics_summary.md](/ds1/workspace/ai/cross_residual_gnn/md/dataset_statistics_summary.md)
-- [md/dataset_statistics_tables.tex](/ds1/workspace/ai/cross_residual_gnn/md/dataset_statistics_tables.tex)
+```bash
+tensorboard --logdir runs --port 6006
+```
 
 ## Current Paper-Level Conclusions
 
@@ -220,25 +286,8 @@ So the current evidence supports a dataset-dependent advantage for cross-residua
 - `AIDS`: `GraphResGNN`
 - `Mutagenicity`: `NodeCrossGNN`
 
-## Paper Assets
-
-The LaTeX manuscript lives in [paper](/ds1/workspace/ai/cross_residual_gnn/paper). The most relevant generated assets are:
-
-- [paper/main.pdf](/ds1/workspace/ai/cross_residual_gnn/paper/main.pdf)
-- [md/all_exp_tables.tex](/ds1/workspace/ai/cross_residual_gnn/md/all_exp_tables.tex)
-- [md/all_ablation_analysis.md](/ds1/workspace/ai/cross_residual_gnn/md/all_ablation_analysis.md)
-- [figures/exp](/ds1/workspace/ai/cross_residual_gnn/figures/exp)
-
-Compile the paper with:
-
-```bash
-cd paper
-latexmk -pdf -interaction=nonstopmode main.tex
-```
-
 ## Notes
 
-- Large runtime outputs such as `logs/`, `runs/`, `data/`, intermediate `records/`, and local scratch files under `tmp/` are intentionally ignored by Git.
-- The `py/` analysis scripts now import shared dataset definitions from `geomatric.experiment_catalog`, so the active package path should be kept intact when moving files.
-- The codebase still does not implement a true integrative-omics benchmark. The current scope is biomolecular graph representation learning with a protein-oriented main evaluation and a clearer extension path toward plant-related graph inference.
-- The remaining paper-side manual work is mainly author metadata, final reference audit, and venue-specific submission materials.
+- Large runtime outputs such as `logs/`, `runs/`, `records/`, `data/`, and `tmp/` are intentionally ignored by Git.
+- The `py/` analysis scripts import shared dataset definitions from [geomatric/experiment_catalog.py](./geomatric/experiment_catalog.py), so the active package path should be kept intact.
+- The codebase does not commit the downloaded dataset content itself; only the expected local data roots are documented here.
