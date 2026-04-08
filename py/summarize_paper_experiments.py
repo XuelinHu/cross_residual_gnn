@@ -13,7 +13,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from experiment_catalog import ALL_ACTIVE_DATASETS, FOCUSED_MODELS, MAIN_BIOLOGICAL_DATASETS, SUPPLEMENTARY_DATASETS
+from geomatric.experiment_catalog import (
+    ALL_ACTIVE_DATASETS,
+    FOCUSED_MODELS,
+    MAIN_BIOLOGICAL_DATASETS,
+    SUPPLEMENTARY_DATASETS,
+)
 
 LOG_DIR = ROOT / "logs"
 

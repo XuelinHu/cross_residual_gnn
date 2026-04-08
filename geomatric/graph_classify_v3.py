@@ -1,3 +1,12 @@
+"""图分类 V3 主训练脚本。
+
+该文件承担四类职责：
+1. 解析训练参数，并规范化模型别名与默认超参数。
+2. 加载 TU / OGB 图数据集，完成分层划分与统计导出。
+3. 定义 Plain / Residual / Cross 以及外部 baseline 模型。
+4. 执行单配置训练、评估、日志落盘和预设实验套件。
+"""
+
 import argparse
 import json
 import os
@@ -45,7 +54,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from experiment_catalog import dataset_family
+from geomatric.experiment_catalog import dataset_family
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DATA_ROOT = PROJECT_ROOT / "data"
@@ -54,6 +63,7 @@ LOG_ROOT = PROJECT_ROOT / "logs"
 RUN_ROOT = PROJECT_ROOT / "runs"
 SEPARATOR = "__"
 
+# 历史实验脚本中使用过的别名，统一映射到当前命名。
 MODEL_ALIASES = {
     "BlockGNN": "PlainGNN",
     "ResBlockGnn": "NodeResGNN",
@@ -67,6 +77,7 @@ MODEL_ALIASES = {
     "APPNP": "APPNPBaseline",
 }
 
+# 本文提出的自定义模型家族。
 FAMILY_MODELS = [
     "PlainGNN",
     "NodeResGNN",
@@ -76,6 +87,7 @@ FAMILY_MODELS = [
     "GraphCrossGNN",
 ]
 
+# 论文中的外部基线模型。
 EXTERNAL_BASELINES = [
     "GraphSAGEBaseline",
     "GINBaseline",
@@ -83,6 +95,7 @@ EXTERNAL_BASELINES = [
     "APPNPBaseline",
 ]
 
+# 当前主线实验允许的消息传递算子。
 AVAILABLE_OPERATORS = [
     "GCNConv",
     "GATConv",
@@ -93,35 +106,47 @@ AVAILABLE_OPERATORS = [
 
 
 def parse_args() -> argparse.Namespace:
+    """解析命令行参数。
+
+    关键默认值：
+    - `--name=GCNConv`：默认图卷积算子
+    - `--gname=PlainGNN`：默认基线结构
+    - `--ds=MUTAG`：默认数据集
+    - `--ep=500`：默认训练 500 轮
+    - `--lr=1e-2`、`--weight_decay=1e-2`：默认优化器超参数
+    - `--dim=64`、`--h_layer=2`：默认隐藏维度与隐藏层数
+    - `--drop=0.6`：默认 dropout
+    """
+
     parser = argparse.ArgumentParser(
-        description="V3 graph classification benchmark with stronger external baselines."
+        description="V3 图分类训练入口，包含残差/交叉结构与外部基线。"
     )
-    parser.add_argument("--name", type=str, default="GCNConv", help="Message passing operator.")
-    parser.add_argument("--gname", type=str, default="PlainGNN", help="Architecture name.")
-    parser.add_argument("--ds", type=str, default="MUTAG", help="Dataset name (TU or OGB graph property prediction).")
-    parser.add_argument("--ep", type=int, default=500, help="Training epochs.")
-    parser.add_argument("--lr", type=float, default=1e-2, help="Learning rate.")
+    parser.add_argument("--name", type=str, default="GCNConv", help="消息传递算子，默认 GCNConv。")
+    parser.add_argument("--gname", type=str, default="PlainGNN", help="模型结构名称，默认 PlainGNN。")
+    parser.add_argument("--ds", type=str, default="MUTAG", help="数据集名称，可为 TU 或 OGB 图属性预测数据集。")
+    parser.add_argument("--ep", type=int, default=500, help="训练轮数，默认 500。")
+    parser.add_argument("--lr", type=float, default=1e-2, help="学习率，默认 1e-2。")
     parser.add_argument("--weight_decay", type=float, default=1e-2)
     parser.add_argument("--drop", type=float, default=0.6)
-    parser.add_argument("--dim", type=int, default=64, help="Hidden dimension.")
-    parser.add_argument("--h_layer", type=int, default=2, help="Number of hidden layers.")
+    parser.add_argument("--dim", type=int, default=64, help="隐藏层维度，默认 64。")
+    parser.add_argument("--h_layer", type=int, default=2, help="隐藏图卷积层数，默认 2。")
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--fold", type=int, default=0, help="Five-fold split index.")
+    parser.add_argument("--fold", type=int, default=0, help="五折交叉验证中的 fold 编号，默认 0。")
     parser.add_argument("--seed", type=int, default=1024)
-    parser.add_argument("--val_ratio", type=float, default=0.1, help="Validation ratio within the training split.")
-    parser.add_argument("--patience", type=int, default=20, help="Early stopping patience on validation loss.")
-    parser.add_argument("--min_delta", type=float, default=0.0, help="Minimum validation-loss improvement to reset patience.")
-    parser.add_argument("--grad_clip", type=float, default=2.0, help="Gradient clipping norm. Set <=0 to disable.")
-    parser.add_argument("--lr_factor", type=float, default=0.5, help="ReduceLROnPlateau decay factor.")
-    parser.add_argument("--lr_patience", type=int, default=15, help="ReduceLROnPlateau patience.")
-    parser.add_argument("--min_lr", type=float, default=1e-5, help="Minimum learning rate for scheduler.")
+    parser.add_argument("--val_ratio", type=float, default=0.1, help="训练集内部再切分验证集的比例，默认 0.1。")
+    parser.add_argument("--patience", type=int, default=20, help="基于验证损失的早停耐心轮数，默认 20。")
+    parser.add_argument("--min_delta", type=float, default=0.0, help="验证损失至少改善多少才重置早停计数。")
+    parser.add_argument("--grad_clip", type=float, default=2.0, help="梯度裁剪阈值；小于等于 0 表示关闭。")
+    parser.add_argument("--lr_factor", type=float, default=0.5, help="学习率衰减因子，默认 0.5。")
+    parser.add_argument("--lr_patience", type=int, default=15, help="学习率调度器耐心轮数，默认 15。")
+    parser.add_argument("--min_lr", type=float, default=1e-5, help="学习率下界，默认 1e-5。")
     parser.add_argument("--jk_mode", type=str, default="cat", choices=["cat", "max", "lstm"])
     parser.add_argument(
         "--mode",
         type=str,
         default="single",
         choices=["single", "suite", "stats"],
-        help="single=train one config, suite=run a preset ablation/baseline suite, stats=only export dataset stats",
+        help="single 训练单配置；suite 执行预设实验组；stats 仅导出数据集统计。",
     )
     parser.add_argument(
         "--suite_name",
@@ -138,10 +163,14 @@ def parse_args() -> argparse.Namespace:
 
 
 def resolve_model_name(model_name: str) -> str:
+    """把历史命名映射到当前统一的模型名。"""
+
     return MODEL_ALIASES.get(model_name, model_name)
 
 
 def canonical_args(args: argparse.Namespace) -> argparse.Namespace:
+    """规范化模型名与算子名，避免旧脚本参数与当前实现不一致。"""
+
     args.gname = resolve_model_name(args.gname)
     if args.name == "GraphSAGE":
         args.name = "SAGEConv"
@@ -151,11 +180,15 @@ def canonical_args(args: argparse.Namespace) -> argparse.Namespace:
 
 
 def ensure_dirs() -> None:
+    """确保训练输出所需的目录存在。"""
+
     for path in [DATA_ROOT, RECORD_ROOT, LOG_ROOT, RUN_ROOT]:
         path.mkdir(parents=True, exist_ok=True)
 
 
 def set_seed(seed: int) -> None:
+    """统一设置 CPU 与 CUDA 的随机种子，便于结果复现。"""
+
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
@@ -165,10 +198,14 @@ def set_seed(seed: int) -> None:
 
 
 def timestamp() -> str:
+    """生成用于文件名的时间戳。"""
+
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
 def format_metrics(**metrics: object) -> str:
+    """把一组指标格式化为便于日志打印的 `key=value` 字符串。"""
+
     parts = []
     for key, value in metrics.items():
         if isinstance(value, float):
@@ -179,12 +216,16 @@ def format_metrics(**metrics: object) -> str:
 
 
 def with_exp_tag(prefix: str, exp_tag: str) -> str:
+    """在输出前缀后拼接实验标签，便于区分多轮实验。"""
+
     if not exp_tag:
         return prefix
     return f"{prefix}_{exp_tag}"
 
 
 def save_json(payload: Dict[str, object], prefix: str, debug: bool) -> Optional[Path]:
+    """把结构化实验结果写入日志目录；debug 模式下只返回目标路径。"""
+
     file_path = LOG_ROOT / f"{prefix}{SEPARATOR}{timestamp()}.json"
     if debug:
         print(f"[debug] skip save_json -> {file_path}")
@@ -195,6 +236,8 @@ def save_json(payload: Dict[str, object], prefix: str, debug: bool) -> Optional[
 
 
 def save_lines(lines: List[str], prefix: str, debug: bool) -> Optional[Path]:
+    """把实验摘要按文本行写入记录目录。"""
+
     file_path = RECORD_ROOT / f"{prefix}{SEPARATOR}{timestamp()}.txt"
     if debug:
         print(f"[debug] skip save_lines -> {file_path}")
@@ -205,16 +248,22 @@ def save_lines(lines: List[str], prefix: str, debug: bool) -> Optional[Path]:
 
 
 def infer_input_dim(dataset: object) -> int:
+    """推断图节点特征维度；无特征数据集默认补成 1 维。"""
+
     return dataset.num_features if dataset.num_features > 0 else 1
 
 
 def prepare_batch(data: torch.Tensor) -> torch.Tensor:
+    """把 batch 补齐到可训练格式，并移动到当前设备。"""
+
     if data.x is None:
         data.x = torch.ones((data.num_nodes, 1), dtype=torch.float)
     return data.to(DEVICE)
 
 
 def load_dataset(dataset_name: str) -> object:
+    """按数据集家族加载 TU 或 OGB 图分类数据集。"""
+
     family = dataset_family(dataset_name)
     if family == "tu":
         dataset = TUDataset(root=str(DATA_ROOT / "TUDataset"), name=dataset_name)
@@ -229,14 +278,20 @@ def load_dataset(dataset_name: str) -> object:
 
 
 def graph_target(graph: torch.Tensor) -> torch.Tensor:
+    """把图标签压平成分类训练所需的一维 LongTensor。"""
+
     return graph.y.view(-1).long()
 
 
 def dataset_labels(dataset: Iterable[torch.Tensor]) -> List[int]:
+    """提取一组图样本的标签，用于分层划分。"""
+
     return [int(graph_target(graph)[0]) for graph in dataset]
 
 
 def stratified_kfold_indices(labels: List[int], n_splits: int, seed: int) -> List[Tuple[List[int], List[int]]]:
+    """手工构造分层 K 折索引，保证每个类别尽量均匀分布到各折。"""
+
     rng = random.Random(seed)
     label_to_indices: Dict[int, List[int]] = {}
     for index, label in enumerate(labels):
@@ -259,6 +314,8 @@ def stratified_kfold_indices(labels: List[int], n_splits: int, seed: int) -> Lis
 
 
 def stratified_train_val_indices(labels: List[int], val_ratio: float, seed: int) -> Tuple[List[int], List[int]]:
+    """在训练集内部继续做一次分层训练/验证切分。"""
+
     rng = random.Random(seed)
     label_to_indices: Dict[int, List[int]] = {}
     for index, label in enumerate(labels):
@@ -284,6 +341,8 @@ def split_dataset(
     fold: int,
     dataset_name: str,
 ) -> Tuple[Sequence[torch.Tensor], Sequence[torch.Tensor], Optional[Sequence[torch.Tensor]], Dict[str, object]]:
+    """根据数据集家族生成训练/测试/验证划分及其上下文说明。"""
+
     family = dataset_family(dataset_name)
     if family == "tu":
         graph_list = list(dataset)
@@ -316,6 +375,8 @@ def split_train_val_dataset(
     val_ratio: float,
     seed: int,
 ) -> Tuple[Sequence[torch.Tensor], Sequence[torch.Tensor]]:
+    """从训练集里再切一份验证集；不满足条件时直接返回空验证集。"""
+
     if not train_dataset:
         return [], []
     if val_ratio <= 0.0:
@@ -335,10 +396,14 @@ def split_train_val_dataset(
 
 
 def build_loader(dataset_slice: Sequence[torch.Tensor], batch_size: int, shuffle: bool) -> DataLoader:
+    """把数据切片封装为 PyG DataLoader。"""
+
     return DataLoader(dataset_slice, batch_size=batch_size, shuffle=shuffle)
 
 
 def sampled_graph_iter(dataset: object, sample_cap: int = 2048) -> Iterable[torch.Tensor]:
+    """为大数据集提供等间隔采样迭代器，避免统计阶段全量遍历过慢。"""
+
     total = len(dataset)
     if total <= sample_cap:
         for graph in dataset:
@@ -350,6 +415,8 @@ def sampled_graph_iter(dataset: object, sample_cap: int = 2048) -> Iterable[torc
 
 
 def dataset_statistics(dataset: object, dataset_name: str) -> Dict[str, object]:
+    """计算图数量、节点数、边数、密度和类别分布等摘要指标。"""
+
     node_counts: List[int] = []
     edge_counts: List[float] = []
     avg_degrees: List[float] = []
@@ -391,6 +458,8 @@ def dataset_statistics(dataset: object, dataset_name: str) -> Dict[str, object]:
 
 
 def build_mlp(input_dim: int, output_dim: int) -> nn.Sequential:
+    """为 GIN 算子构造一个两层感知机。"""
+
     return nn.Sequential(
         nn.Linear(input_dim, output_dim),
         nn.ReLU(),
@@ -399,6 +468,8 @@ def build_mlp(input_dim: int, output_dim: int) -> nn.Sequential:
 
 
 def build_operator(name: str, in_channels: int, out_channels: int) -> nn.Module:
+    """按名称创建消息传递算子。"""
+
     if name == "GCNConv":
         return GCNConv(in_channels, out_channels)
     if name == "GATConv":
@@ -413,6 +484,13 @@ def build_operator(name: str, in_channels: int, out_channels: int) -> nn.Module:
 
 
 class PlainBlock(nn.Module):
+    """最基础的图分类块。
+
+    结构为：
+    输入算子 -> 若干隐藏图卷积层 -> global mean pooling -> 分类器。
+    当 `res_graph=True` 时，会在每一层注入图级隐状态。
+    """
+
     def __init__(self, hidden_channels: int, dataset: TUDataset, hidden_layers: int, operator: str, dropout: float, res_graph: bool = False):
         super().__init__()
         input_dim = infer_input_dim(dataset)
@@ -425,9 +503,12 @@ class PlainBlock(nn.Module):
         self.res_graph = res_graph
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor, graph_hidden: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+        """执行单个 PlainBlock 前向传播，并返回 logits 与图嵌入。"""
+
         x = F.relu(self.input_layer(x, edge_index))
 
         for layer in self.hidden_layers:
+            # 关键路径：图级状态通过 batch 索引广播回节点表征。
             if self.res_graph and graph_hidden is not None:
                 x = x + graph_hidden[batch]
             x = F.relu(layer(x, edge_index))
@@ -441,6 +522,11 @@ class PlainBlock(nn.Module):
 
 
 class NodeResGNN(nn.Module):
+    """节点级残差模型。
+
+    当前层输入会显式叠加前一层缓存，从而缓解深层训练中的信息衰减。
+    """
+
     def __init__(self, hidden_channels: int, dataset: TUDataset, hidden_layers: int, operator: str, dropout: float):
         super().__init__()
         input_dim = infer_input_dim(dataset)
@@ -452,11 +538,14 @@ class NodeResGNN(nn.Module):
         self.dropout = dropout
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """前向时将 `current + previous` 送入下一层，形成节点级残差。"""
+
         current = F.relu(self.input_layer(x, edge_index))
         previous = torch.zeros_like(current)
 
         for layer in self.hidden_layers:
             cached = current
+            # 关键路径：上一层缓存 `previous` 作为残差支路参与卷积。
             current = F.relu(layer(current + previous, edge_index))
             current = F.dropout(current, p=self.dropout, training=self.training)
             previous = cached
@@ -467,6 +556,11 @@ class NodeResGNN(nn.Module):
 
 
 class NodeCrossGNN(nn.Module):
+    """节点级双分支交叉模型。
+
+    两个分支分别维护自己的历史状态，并在每一步交叉注入对方的上一轮表示。
+    """
+
     def __init__(self, hidden_channels: int, dataset: TUDataset, hidden_layers: int, operator: str, dropout: float):
         super().__init__()
         input_dim = infer_input_dim(dataset)
@@ -479,6 +573,8 @@ class NodeCrossGNN(nn.Module):
         self.dropout = dropout
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """双分支交替更新，并在图池化前把两个分支的结果相加。"""
+
         branch_1 = F.relu(self.input_layer_1(x, edge_index))
         branch_2 = F.relu(self.input_layer_2(x, edge_index))
         prev_1 = torch.zeros_like(branch_1)
@@ -488,6 +584,7 @@ class NodeCrossGNN(nn.Module):
         while layer_id < len(self.hidden_layers):
             cache_1 = branch_1
             cache_2 = branch_2
+            # 关键路径：branch_1 接收 prev_2，branch_2 接收 prev_1，形成交叉残差。
             branch_1 = F.relu(self.hidden_layers[layer_id](branch_1 + prev_2, edge_index))
             branch_1 = F.dropout(branch_1, p=self.dropout, training=self.training)
             branch_2 = F.relu(self.hidden_layers[layer_id + 1](branch_2 + prev_1, edge_index))
@@ -502,6 +599,11 @@ class NodeCrossGNN(nn.Module):
 
 
 class GraphCondGNN(nn.Module):
+    """图级条件模型。
+
+    第一段 block 先生成图隐状态，第二段 block 再以该图隐状态作为条件继续编码。
+    """
+
     def __init__(self, hidden_channels: int, dataset: TUDataset, hidden_layers: int, operator: str, dropout: float):
         super().__init__()
         self.block_1 = PlainBlock(hidden_channels, dataset, hidden_layers, operator, dropout, res_graph=False)
@@ -509,12 +611,19 @@ class GraphCondGNN(nn.Module):
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """先估计图级上下文，再进行二次编码。"""
+
         _, graph_hidden = self.block_1(x, edge_index, batch)
         _, graph_embedding = self.block_2(x, edge_index, batch, graph_hidden)
         return self.classifier(graph_embedding), graph_embedding
 
 
 class GraphResGNN(nn.Module):
+    """图级残差模型。
+
+    多个 PlainBlock 串联，后一个 block 接收前一个 block 的图嵌入作为残差条件。
+    """
+
     def __init__(self, hidden_channels: int, dataset: TUDataset, hidden_layers: int, operator: str, dropout: float):
         super().__init__()
         self.blocks = nn.ModuleList(
@@ -523,6 +632,8 @@ class GraphResGNN(nn.Module):
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """串联图级 block，并逐步更新图隐状态。"""
+
         graph_hidden = None
         graph_embedding = None
         for block in self.blocks:
@@ -532,6 +643,11 @@ class GraphResGNN(nn.Module):
 
 
 class GraphCrossGNN(nn.Module):
+    """图级双分支交叉模型。
+
+    以 block 为单位维护两条图级状态支路，并在相邻 block 间交叉交换图隐状态。
+    """
+
     def __init__(self, hidden_channels: int, dataset: TUDataset, hidden_layers: int, operator: str, dropout: float):
         super().__init__()
         self.blocks = nn.ModuleList(
@@ -540,6 +656,8 @@ class GraphCrossGNN(nn.Module):
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """每两个 block 为一组做交叉更新，最后融合两条图级状态。"""
+
         graph_hidden_1 = None
         graph_hidden_2 = None
         block_id = 0
@@ -547,6 +665,7 @@ class GraphCrossGNN(nn.Module):
         while block_id < len(self.blocks):
             _, current_1 = self.blocks[block_id](x, edge_index, batch, graph_hidden_1)
             _, current_2 = self.blocks[block_id + 1](x, edge_index, batch, graph_hidden_2)
+            # 关键路径：当前块产出的图表示被交换给另一条支路作为下一轮条件。
             graph_hidden_1 = current_2
             graph_hidden_2 = current_1
             block_id += 2
@@ -557,6 +676,8 @@ class GraphCrossGNN(nn.Module):
 
 
 class GraphSAGEBaseline(nn.Module):
+    """外部基线 1：标准 GraphSAGE 图分类模型。"""
+
     def __init__(self, hidden_channels: int, dataset: TUDataset, hidden_layers: int, dropout: float):
         super().__init__()
         input_dim = infer_input_dim(dataset)
@@ -568,6 +689,8 @@ class GraphSAGEBaseline(nn.Module):
         self.dropout = dropout
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """标准 GraphSAGE 前向传播。"""
+
         x = F.relu(self.input_layer(x, edge_index))
         for layer in self.hidden_layers:
             x = F.relu(layer(x, edge_index))
@@ -578,6 +701,8 @@ class GraphSAGEBaseline(nn.Module):
 
 
 class GINBaseline(nn.Module):
+    """外部基线 2：GIN 图分类模型。"""
+
     def __init__(self, hidden_channels: int, dataset: TUDataset, hidden_layers: int, dropout: float):
         super().__init__()
         input_dim = infer_input_dim(dataset)
@@ -589,6 +714,8 @@ class GINBaseline(nn.Module):
         self.dropout = dropout
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """标准 GIN 前向传播。"""
+
         x = F.relu(self.input_layer(x, edge_index))
         for layer in self.hidden_layers:
             x = F.relu(layer(x, edge_index))
@@ -599,6 +726,11 @@ class GINBaseline(nn.Module):
 
 
 class JKNetBaseline(nn.Module):
+    """外部基线 3：Jumping Knowledge Network。
+
+    `jk_mode` 默认是 `cat`，会把各层表征拼接后再做线性投影。
+    """
+
     def __init__(self, hidden_channels: int, dataset: TUDataset, hidden_layers: int, dropout: float, operator: str, jk_mode: str):
         super().__init__()
         input_dim = infer_input_dim(dataset)
@@ -614,6 +746,8 @@ class JKNetBaseline(nn.Module):
         self.dropout = dropout
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """收集各层输出后通过 JumpingKnowledge 汇聚。"""
+
         outputs = []
         x = F.relu(self.input_layer(x, edge_index))
         outputs.append(x)
@@ -629,6 +763,11 @@ class JKNetBaseline(nn.Module):
 
 
 class APPNPBaseline(nn.Module):
+    """外部基线 4：APPNP。
+
+    默认传播超参数固定为 `K=10`、`alpha=0.1`。
+    """
+
     def __init__(self, hidden_channels: int, dataset: TUDataset, dropout: float):
         super().__init__()
         input_dim = infer_input_dim(dataset)
@@ -639,6 +778,8 @@ class APPNPBaseline(nn.Module):
         self.dropout = dropout
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """先做两层 MLP，再执行 APPNP 传播。"""
+
         x = F.dropout(x, p=self.dropout, training=self.training)
         x = F.relu(self.lin_in(x))
         x = F.dropout(x, p=self.dropout, training=self.training)
@@ -650,6 +791,8 @@ class APPNPBaseline(nn.Module):
 
 
 def build_model(args: argparse.Namespace, dataset: TUDataset) -> nn.Module:
+    """根据参数构造具体模型实例。"""
+
     common_kwargs = {
         "hidden_channels": args.dim,
         "dataset": dataset,
@@ -681,6 +824,8 @@ def build_model(args: argparse.Namespace, dataset: TUDataset) -> nn.Module:
 
 
 def count_parameters(model: nn.Module) -> Dict[str, int]:
+    """统计总参数量、可训练参数量和冻结参数量。"""
+
     total_params = sum(param.numel() for param in model.parameters())
     trainable_params = sum(param.numel() for param in model.parameters() if param.requires_grad)
     return {
@@ -691,6 +836,8 @@ def count_parameters(model: nn.Module) -> Dict[str, int]:
 
 
 def gradient_norm(model: nn.Module) -> float:
+    """计算当前参数梯度的 L2 范数，用于训练诊断。"""
+
     squared_norm = 0.0
     for parameter in model.parameters():
         if parameter.grad is None:
@@ -701,6 +848,8 @@ def gradient_norm(model: nn.Module) -> float:
 
 
 def tensor_stats(tensor: torch.Tensor) -> Dict[str, float]:
+    """返回张量的均值、标准差和最大值，便于监控数值稳定性。"""
+
     if tensor.numel() == 0:
         return {"mean": 0.0, "std": 0.0, "max": 0.0}
     detached = tensor.detach()
@@ -712,6 +861,8 @@ def tensor_stats(tensor: torch.Tensor) -> Dict[str, float]:
 
 
 def evaluate(model: nn.Module, loader: DataLoader, criterion: nn.Module) -> Dict[str, float]:
+    """在普通分类任务上评估模型，返回损失与准确率。"""
+
     model.eval()
     total_correct = 0
     total_loss = 0.0
@@ -741,6 +892,8 @@ def evaluate_ogb(
     criterion: nn.Module,
     evaluator: Evaluator,
 ) -> Dict[str, float]:
+    """在 OGB 图属性预测数据集上评估模型。"""
+
     model.eval()
     total_loss = 0.0
     total_graphs = 0
@@ -772,6 +925,15 @@ def evaluate_ogb(
 
 
 def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
+    """执行单个配置的完整训练流程。
+
+    主要步骤：
+    1. 设定随机种子并加载数据集
+    2. 生成训练/验证/测试划分
+    3. 训练模型并记录早停、学习率与数值诊断
+    4. 在最佳权重上做最终测试并导出 JSON
+    """
+
     family = dataset_family(args.ds)
     effective_seed = args.seed + args.fold if family == "ogb_graphprop" else args.seed
     set_seed(effective_seed)
@@ -857,6 +1019,7 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
             loss = criterion(logits, targets)
             loss.backward()
             batch_grad_norm = gradient_norm(model)
+            # 关键步骤：梯度裁剪用于抑制深层/交叉结构训练中的梯度爆炸。
             if args.grad_clip > 0.0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.grad_clip)
             optimizer.step()
@@ -899,6 +1062,7 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
         scheduler.step(val_metrics["loss"])
         current_lr = optimizer.param_groups[0]["lr"]
 
+        # 以验证损失作为早停基准，`min_delta` 控制最小改进幅度。
         improved = val_metrics["loss"] < (best_val_loss - args.min_delta)
         if improved:
             best_val_loss = val_metrics["loss"]
@@ -996,6 +1160,8 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
 
 
 def suite_configs(base_args: argparse.Namespace) -> List[argparse.Namespace]:
+    """把一个 suite 名称展开成多组待运行配置。"""
+
     configs: List[argparse.Namespace] = []
 
     if base_args.suite_name == "external_baselines":
@@ -1040,6 +1206,8 @@ def suite_configs(base_args: argparse.Namespace) -> List[argparse.Namespace]:
 
 
 def run_suite(args: argparse.Namespace) -> List[Dict[str, object]]:
+    """顺序运行一组实验配置，并把结果汇总成简短文本。"""
+
     results: List[Dict[str, object]] = []
     lines: List[str] = []
 
@@ -1066,6 +1234,11 @@ def run_suite(args: argparse.Namespace) -> List[Dict[str, object]]:
 
 
 def main() -> None:
+    """脚本入口。
+
+    默认模式是 `single`，也就是只训练一个配置；`suite` 模式会跑预设实验组。
+    """
+
     ensure_dirs()
     args = canonical_args(parse_args())
 

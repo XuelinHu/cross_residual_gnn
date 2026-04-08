@@ -3,10 +3,13 @@ from __future__ import annotations
 from typing import Dict, List
 
 
+# 论文当前聚焦的主实验数据集，偏向生物图分类任务。
 MAIN_BIOLOGICAL_DATASETS: List[str] = ["PROTEINS", "DD", "ENZYMES"]
+# 作为补充稳健性实验的数据集。
 SUPPLEMENTARY_DATASETS: List[str] = ["MUTAG", "AIDS", "Mutagenicity"]
 ALL_ACTIVE_DATASETS: List[str] = [*MAIN_BIOLOGICAL_DATASETS, *SUPPLEMENTARY_DATASETS]
 
+# 当前图分类主线对比的模型集合。
 FOCUSED_MODELS: List[str] = [
     "PlainGNN",
     "NodeResGNN",
@@ -23,6 +26,7 @@ MODEL_DISPLAY: Dict[str, str] = {
     "GraphCrossGNN": "GraphCross",
 }
 
+# 数据集静态元信息，供训练脚本和分析脚本共用。
 DATASET_METADATA: Dict[str, Dict[str, str]] = {
     "PROTEINS": {
         "source": "PyG TUDataset",
@@ -70,6 +74,14 @@ DATASET_METADATA: Dict[str, Dict[str, str]] = {
 
 
 def dataset_family(dataset_name: str) -> str:
+    """返回数据集所属家族。
+
+    默认规则：
+    - 已登记的数据集按 `DATASET_METADATA` 返回
+    - 名称以 `ogbg-` 开头时视作 OGB graph property prediction
+    - 其他情况默认按 TU 数据集处理
+    """
+
     metadata = DATASET_METADATA.get(dataset_name)
     if metadata is not None:
         return metadata["family"]

@@ -9,7 +9,8 @@
 
 Research code for Cross-Residual Graph Neural Networks (CR-GNN), a controlled graph-classification architecture family that compares plain stacking, residual reuse, and cross-residual information exchange under a unified training protocol.
 
-The current repository is centered on the stabilized `v3` graph-classification pipeline in [geomatric/graph_classify_v3.py](/ds1/workspace/ai/cross_residual_gnn/geomatric/graph_classify_v3.py). The paper narrative is framed around a protein-oriented biological package, while the supplementary experiments retain a broader robustness evaluation. The current scope is still biomolecular graph learning rather than a completed integrative-omics system, but the revised manuscript also strengthens the logical bridge toward plant-related graph inference.
+The current repository is centered on the stabilized `v3` graph-classification pipeline in [geomatric/graph_classify_v3.py](/ds1/workspace/ai/cross_residual_gnn/geomatric/graph_classify_v3.py). The active Python package is now the [`geomatric`](/ds1/workspace/ai/cross_residual_gnn/geomatric) directory, which also contains the shared dataset catalog, logger, and notification helpers used by the current workflow. The paper narrative is framed around a protein-oriented biological package, while the supplementary experiments retain a broader robustness evaluation. The current scope is still biomolecular graph learning rather than a completed integrative-omics system, but the revised manuscript also strengthens the logical bridge toward plant-related graph inference.
+
 - https://www.frontiersin.org/research-topics/73895/prediction-of-novel-domains-motifs-genes-and-proteins-through-integrative-omics-approaches
 
 ## Overview
@@ -39,34 +40,27 @@ Older V2-era assets have been moved into [achivement_V2](/ds1/workspace/ai/cross
 ```text
 cross_residual_gnn/
 ├── achivement_V2/               # Archived V2-era code and notes
-├── geomatric/
-│   ├── graph_classify_v3.py
-├── py/
+├── geomatric/                   # Active package for training and shared helpers
+│   ├── __init__.py
+│   ├── experiment_catalog.py    # Dataset groups and metadata
+│   ├── graph_classify_v3.py     # Main V3 training entry
+│   ├── logging_config.py        # Shared logger setup
+│   └── dingtalk_util.py         # DingTalk notification helper
+├── py/                          # Batch runners and paper/report scripts
 │   ├── run_paper_experiments.py
 │   ├── summarize_paper_experiments.py
 │   ├── generate_all_result_reports.py
 │   ├── generate_suite_analysis_figures.py
+│   ├── generate_dataset_statistics_report.py
 │   ├── run_sensitivity_experiments.py
 │   ├── generate_sensitivity_reports.py
 │   ├── run_enzymes_tuned_cross.py
 │   ├── generate_exp_figures.py
 │   └── export_analysis_artifacts.py
 ├── md/
-│   ├── all_results_summary.txt
-│   ├── all_exp_tables.tex
-│   ├── all_ablation_analysis.md
-│   ├── sensitivity_summary.md
-│   ├── parameter_sensitivity_analysis.md
-│   ├── formal_experiment_protocol.md
-│   └── paper_gap_checklist.md
 ├── figures/
-│   └── exp/
 ├── paper/
-│   ├── main.tex
-│   ├── main.pdf
-│   ├── references.bib
-│   ├── figures/
-│   └── sections/
+├── tmp/                         # Local scratch outputs, ignored by Git
 └── README.md
 ```
 
@@ -94,7 +88,7 @@ If PyTorch Geometric wheels need to be installed manually, follow the official P
 ### 1. Single experiment
 
 ```bash
-python geomatric/graph_classify_v3.py \
+python -m geomatric.graph_classify_v3 \
   --mode single \
   --ds PROTEINS \
   --gname NodeCrossGNN \
@@ -109,6 +103,12 @@ python geomatric/graph_classify_v3.py \
   --batch_size 32 \
   --grad_clip 2.0 \
   --tensorboard
+```
+
+Direct path execution also works:
+
+```bash
+python geomatric/graph_classify_v3.py --mode single --ds PROTEINS
 ```
 
 ### 2. Full paper experiment batch
@@ -238,6 +238,7 @@ latexmk -pdf -interaction=nonstopmode main.tex
 
 ## Notes
 
-- Large runtime outputs such as `logs/`, `runs/`, `data/`, and intermediate `records/` are intentionally ignored by Git.
+- Large runtime outputs such as `logs/`, `runs/`, `data/`, intermediate `records/`, and local scratch files under `tmp/` are intentionally ignored by Git.
+- The `py/` analysis scripts now import shared dataset definitions from `geomatric.experiment_catalog`, so the active package path should be kept intact when moving files.
 - The codebase still does not implement a true integrative-omics benchmark. The current scope is biomolecular graph representation learning with a protein-oriented main evaluation and a clearer extension path toward plant-related graph inference.
 - The remaining paper-side manual work is mainly author metadata, final reference audit, and venue-specific submission materials.

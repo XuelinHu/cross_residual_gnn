@@ -27,7 +27,7 @@ from geomatric.graph_classify_v3 import (
     split_train_val_dataset,
     load_dataset,
 )
-from experiment_catalog import dataset_family
+from geomatric.experiment_catalog import dataset_family
 
 try:
     import matplotlib.pyplot as plt
