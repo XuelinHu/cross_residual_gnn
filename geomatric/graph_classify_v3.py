@@ -63,20 +63,6 @@ LOG_ROOT = PROJECT_ROOT / "logs"
 RUN_ROOT = PROJECT_ROOT / "runs"
 SEPARATOR = "__"
 
-# 历史实验脚本中使用过的别名，统一映射到当前命名。
-MODEL_ALIASES = {
-    "BlockGNN": "PlainGNN",
-    "ResBlockGnn": "NodeResGNN",
-    "CrossBlockGnn": "NodeCrossGNN",
-    "GraphBlockGnn": "GraphCondGNN",
-    "ResGraphBlockGnn": "GraphResGNN",
-    "CrossGraphBlockGnn": "GraphCrossGNN",
-    "GraphSAGE": "GraphSAGEBaseline",
-    "GIN": "GINBaseline",
-    "JKNet": "JKNetBaseline",
-    "APPNP": "APPNPBaseline",
-}
-
 # 本文提出的自定义模型家族。
 FAMILY_MODELS = [
     "PlainGNN",
@@ -162,16 +148,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def resolve_model_name(model_name: str) -> str:
-    """把历史命名映射到当前统一的模型名。"""
-
-    return MODEL_ALIASES.get(model_name, model_name)
-
-
 def canonical_args(args: argparse.Namespace) -> argparse.Namespace:
-    """规范化模型名与算子名，避免旧脚本参数与当前实现不一致。"""
+    """规范化算子名，避免命名差异导致当前实现不一致。"""
 
-    args.gname = resolve_model_name(args.gname)
     if args.name == "GraphSAGE":
         args.name = "SAGEConv"
     if args.name == "GIN":
@@ -984,7 +963,7 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
     writer = None
     if args.tensorboard and SummaryWriter is not None:
         tb_prefix = with_exp_tag(
-            f"{args.gname}_{args.name}_{args.ds}_{args.dim}_{args.h_layer}",
+            f"{args.gname}_{args.name}_{args.ds}_{args.dim}_fold{args.fold}_{args.h_layer}",
             args.exp_tag,
         )
         log_dir = RUN_ROOT / f"{tb_prefix}_{timestamp()}"
