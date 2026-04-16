@@ -28,6 +28,22 @@
 
 旧版 V2 相关内容已经归档到 [achivement_V2/](./achivement_V2)。
 
+## 当前补跑进度
+
+截至 `2026-04-15 10:33:31`，缺失实验补跑任务的最新状态为：
+
+- 总目标：`720`
+- 已完成：`677`
+- 剩余：`43`
+- baseline 覆盖：`120 / 120`
+- 非 `GCNConv` 算子覆盖：`557 / 600`
+
+实时状态文件：
+
+- [md/missing_experiment_completion.md](./md/missing_experiment_completion.md)
+- [records/missing_experiment_status.json](./records/missing_experiment_status.json)
+- [logs/missing_experiments_20260414_235657.log](./logs/missing_experiments_20260414_235657.log)
+
 ## 仓库路径总览
 
 ```text
@@ -37,6 +53,7 @@ cross_residual_gnn/
 ├── figures/                     # 导出的实验图片
 ├── geomatric/                   # 当前有效 Python 包
 ├── logs/                        # 训练 JSON 快照，Git 忽略
+│   └── missing_jobs/            # 补跑任务的单任务日志
 ├── md/                          # Markdown / TeX 汇总文件
 ├── paper/                       # 论文 LaTeX 与图片
 ├── py/                          # 批处理与分析脚本
@@ -60,6 +77,7 @@ cross_residual_gnn/
 ### 运行脚本路径
 
 - [py/run_paper_experiments.py](./py/run_paper_experiments.py)：全量论文实验批跑
+- [py/run_missing_experiments.py](./py/run_missing_experiments.py)：缺失 baseline / 算子实验的后台补跑脚本
 - [py/run_sensitivity_experiments.py](./py/run_sensitivity_experiments.py)：参数敏感性扫描
 - [py/run_enzymes_tuned_cross.py](./py/run_enzymes_tuned_cross.py)：ENZYMES 调优交叉模型实验
 - [py/summarize_paper_experiments.py](./py/summarize_paper_experiments.py)：读取最新日志并汇总
@@ -84,8 +102,14 @@ cross_residual_gnn/
   日志目录根路径：[logs/](./logs)
 - `records/suite_<suite_name>_<dataset>__<timestamp>.txt`
   记录目录根路径：[records/](./records)
-- `runs/<experiment_name>_<timestamp>/events.out.tfevents.*`
+- `records/missing_experiment_status.json`
+  补跑状态快照：[records/missing_experiment_status.json](./records/missing_experiment_status.json)
+- `runs/<model>_<operator>_<dataset>_<dim>_fold<k>_<h_layer>_<timestamp>/events.out.tfevents.*`
   TensorBoard 根路径：[runs/](./runs)
+- `logs/missing_experiments_<timestamp>.log`
+  后台调度主日志：[logs/](./logs)
+- `logs/missing_jobs/<job_slug>.log`
+  单任务训练日志：[logs/missing_jobs/](./logs/missing_jobs)
 - `figures/analysis/*`
   分析产物目录：[figures/analysis/](./figures/analysis)
 - `figures/exp/*`
@@ -109,6 +133,7 @@ cross_residual_gnn/
 - [md/cross_advantage_summary.md](./md/cross_advantage_summary.md)
 - [md/formal_experiment_protocol.md](./md/formal_experiment_protocol.md)
 - [md/final_implementation_todo.md](./md/final_implementation_todo.md)
+- [md/missing_experiment_completion.md](./md/missing_experiment_completion.md)
 - [md/paper_gap_checklist.md](./md/paper_gap_checklist.md)
 - [md/reference_logic_map.md](./md/reference_logic_map.md)
 - [md/frontiers_topic_alignment.md](./md/frontiers_topic_alignment.md)
@@ -216,27 +241,41 @@ python py/run_paper_experiments.py --dataset_group all --max_workers 6 --tensorb
 python py/summarize_paper_experiments.py --dataset_group all
 ```
 
-### 4. 生成总报告和图
+### 4. 补齐缺失 baseline / 算子实验
+
+```bash
+python py/run_missing_experiments.py --report_only
+python py/run_missing_experiments.py --max_parallel 8 --reserve_gb 4 --no_tensorboard
+```
+
+当前补跑脚本面向 `24GB` GPU：
+
+- 预留约 `4GB` 显存
+- 用剩余显存尽量并发跑多个任务
+- 显存充足时自动放大 batch size
+- OOM 时自动缩小 batch 并重试
+
+### 5. 生成总报告和图
 
 ```bash
 python py/generate_all_result_reports.py
 python py/generate_suite_analysis_figures.py
 ```
 
-### 5. 运行参数敏感性分析
+### 6. 运行参数敏感性分析
 
 ```bash
 python py/run_sensitivity_experiments.py --fold 0 --max_workers 6
 python py/generate_sensitivity_reports.py
 ```
 
-### 6. 生成数据集统计
+### 7. 生成数据集统计
 
 ```bash
 python py/generate_dataset_statistics_report.py
 ```
 
-### 7. 查看 TensorBoard
+### 8. 查看 TensorBoard
 
 ```bash
 tensorboard --logdir runs --port 6006

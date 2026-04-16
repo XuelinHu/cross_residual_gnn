@@ -35,6 +35,22 @@ The current codebase also includes:
 
 Older V2-era assets have been moved into [achivement_V2/](./achivement_V2).
 
+## Current Backfill Status
+
+As of `2026-04-15 10:33:31`, the missing-experiment backfill job has reached:
+
+- total target: `720`
+- completed: `677`
+- remaining: `43`
+- baseline coverage: `120 / 120`
+- non-`GCNConv` operator coverage: `557 / 600`
+
+Live status is maintained in:
+
+- [md/missing_experiment_completion.md](./md/missing_experiment_completion.md)
+- [records/missing_experiment_status.json](./records/missing_experiment_status.json)
+- [logs/missing_experiments_20260414_235657.log](./logs/missing_experiments_20260414_235657.log)
+
 ## Repository Layout
 
 ```text
@@ -44,6 +60,7 @@ cross_residual_gnn/
 ├── figures/                     # Exported experiment figures
 ├── geomatric/                   # Active Python package
 ├── logs/                        # JSON experiment snapshots (ignored by Git)
+│   └── missing_jobs/            # Per-job stdout/stderr for backfill runs
 ├── md/                          # Generated markdown / TeX summaries
 ├── paper/                       # LaTeX manuscript and paper figures
 ├── py/                          # Batch runners and analysis scripts
@@ -86,6 +103,7 @@ If PyTorch Geometric wheels need manual installation, follow the official PyG in
 ### Run script paths
 
 - [py/run_paper_experiments.py](./py/run_paper_experiments.py): full benchmark batch runner
+- [py/run_missing_experiments.py](./py/run_missing_experiments.py): background runner for missing baseline / operator jobs
 - [py/run_sensitivity_experiments.py](./py/run_sensitivity_experiments.py): sensitivity sweep runner
 - [py/run_enzymes_tuned_cross.py](./py/run_enzymes_tuned_cross.py): tuned ENZYMES cross-model runs
 - [py/summarize_paper_experiments.py](./py/summarize_paper_experiments.py): summarize latest logs
@@ -110,8 +128,14 @@ These paths are important because they are the main "snapshots" of runtime resul
   Example output root: [logs/](./logs)
 - `records/suite_<suite_name>_<dataset>__<timestamp>.txt`
   Example output root: [records/](./records)
-- `runs/<experiment_name>_<timestamp>/events.out.tfevents.*`
+- `records/missing_experiment_status.json`
+  Live backfill status snapshot: [records/missing_experiment_status.json](./records/missing_experiment_status.json)
+- `runs/<model>_<operator>_<dataset>_<dim>_fold<k>_<h_layer>_<timestamp>/events.out.tfevents.*`
   TensorBoard root: [runs/](./runs)
+- `logs/missing_experiments_<timestamp>.log`
+  Background scheduler log root: [logs/](./logs)
+- `logs/missing_jobs/<job_slug>.log`
+  Per-job training log root: [logs/missing_jobs/](./logs/missing_jobs)
 - `figures/analysis/*`
   Analysis artifact root: [figures/analysis/](./figures/analysis)
 - `figures/exp/*`
@@ -135,6 +159,7 @@ These paths are important because they are the main "snapshots" of runtime resul
 - [md/cross_advantage_summary.md](./md/cross_advantage_summary.md)
 - [md/formal_experiment_protocol.md](./md/formal_experiment_protocol.md)
 - [md/final_implementation_todo.md](./md/final_implementation_todo.md)
+- [md/missing_experiment_completion.md](./md/missing_experiment_completion.md)
 - [md/paper_gap_checklist.md](./md/paper_gap_checklist.md)
 - [md/reference_logic_map.md](./md/reference_logic_map.md)
 - [md/frontiers_topic_alignment.md](./md/frontiers_topic_alignment.md)
@@ -242,27 +267,41 @@ Supported dataset groups:
 python py/summarize_paper_experiments.py --dataset_group all
 ```
 
-### 4. Generate full-suite report files
+### 4. Backfill missing baseline / operator experiments
+
+```bash
+python py/run_missing_experiments.py --report_only
+python py/run_missing_experiments.py --max_parallel 8 --reserve_gb 4 --no_tensorboard
+```
+
+This runner is designed for the current `24GB` GPU setup:
+
+- reserves about `4GB` GPU memory
+- uses the remaining budget for concurrent jobs
+- increases batch size when memory is available
+- retries failed jobs with a smaller batch size on OOM
+
+### 5. Generate full-suite report files
 
 ```bash
 python py/generate_all_result_reports.py
 python py/generate_suite_analysis_figures.py
 ```
 
-### 5. Run parameter sensitivity scans
+### 6. Run parameter sensitivity scans
 
 ```bash
 python py/run_sensitivity_experiments.py --fold 0 --max_workers 6
 python py/generate_sensitivity_reports.py
 ```
 
-### 6. Export dataset statistics
+### 7. Export dataset statistics
 
 ```bash
 python py/generate_dataset_statistics_report.py
 ```
 
-### 7. TensorBoard
+### 8. TensorBoard
 
 ```bash
 tensorboard --logdir runs --port 6006
