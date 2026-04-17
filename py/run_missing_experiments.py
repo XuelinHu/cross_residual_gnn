@@ -14,15 +14,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from geomatric.experiment_catalog import ALL_ACTIVE_DATASETS, FOCUSED_MODELS
+from geomatric.experiment_paths import DEFAULT_EXPERIMENT_VERSION, ensure_version_manifest, log_dir, normalize_version, record_dir
 
 PYTHON = "/home/xuelin/miniconda3/envs/pyg/bin/python"
-LOG_DIR = ROOT / "logs"
-RUNNER_LOG_DIR = LOG_DIR / "missing_jobs"
-MD_REPORT = ROOT / "md" / "missing_experiment_completion.md"
-STATUS_JSON = ROOT / "records" / "missing_experiment_status.json"
-
 FOLDS = [0, 1, 2, 3, 4]
-MISSING_OPERATORS = ["GATConv", "TransformerConv", "SAGEConv", "GINConv"]
+MISSING_OPERATORS = ["GATConv", "SAGEConv", "GINConv"]
 EXTERNAL_BASELINES: List[Tuple[str, str]] = [
     ("GraphSAGEBaseline", "SAGEConv"),
     ("GINBaseline", "GINConv"),
@@ -158,6 +154,7 @@ DEFAULT_CROSS_PROTOCOL = {
 }
 
 COMMON_ARGS = {
+    "batch_size": 128,
     "grad_clip": 2.0,
     "lr_factor": 0.5,
     "lr_patience": 15,
@@ -211,9 +208,9 @@ def log_pattern_parse(file_name: str) -> Tuple[str, str, str, int] | None:
     return (dataset, model, operator, fold)
 
 
-def completed_log_keys() -> set[Tuple[str, str, str, int]]:
+def completed_log_keys(active_log_dir: Path) -> set[Tuple[str, str, str, int]]:
     seen: set[Tuple[str, str, str, int]] = set()
-    for path in LOG_DIR.iterdir():
+    for path in active_log_dir.iterdir():
         if not path.is_file():
             continue
         key = log_pattern_parse(path.name)
@@ -246,13 +243,13 @@ def all_target_jobs() -> List[Job]:
     return jobs
 
 
-def missing_jobs() -> List[Job]:
-    seen = completed_log_keys()
+def missing_jobs(active_log_dir: Path) -> List[Job]:
+    seen = completed_log_keys(active_log_dir)
     return [job for job in all_target_jobs() if job.key not in seen]
 
 
-def write_status_report() -> Dict[str, object]:
-    seen = completed_log_keys()
+def write_status_report(active_log_dir: Path, md_report: Path, status_json: Path, version: str) -> Dict[str, object]:
+    seen = completed_log_keys(active_log_dir)
     targets = all_target_jobs()
     missing = [job for job in targets if job.key not in seen]
 
@@ -292,6 +289,7 @@ def write_status_report() -> Dict[str, object]:
         "# Missing Experiment Completion",
         "",
         f"- Updated: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        f"- Version: {version}",
         f"- Target scope: {len(ALL_ACTIVE_DATASETS)} datasets, {len(FOLDS)} folds",
         f"- Baseline target: {len(baseline_targets)}, completed: {len(baseline_targets) - len(baseline_missing)}, missing: {len(baseline_missing)}",
         f"- Operator target: {len(operator_targets)}, completed: {len(operator_targets) - len(operator_missing)}, missing: {len(operator_missing)}",
@@ -315,7 +313,7 @@ def write_status_report() -> Dict[str, object]:
     else:
         lines.append("- none")
 
-    MD_REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    md_report.write_text("\n".join(lines) + "\n", encoding="utf-8")
     payload = {
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "baseline_target": len(baseline_targets),
@@ -328,7 +326,7 @@ def write_status_report() -> Dict[str, object]:
         "total_completed": len(targets) - len(missing),
         "total_missing": len(missing),
     }
-    STATUS_JSON.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    status_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return payload
 
 
@@ -354,9 +352,7 @@ def estimate_job_memory_gb(job: Job) -> float:
         memory_gb += 0.8
     elif "Graph" in job.model:
         memory_gb += 0.4
-    if job.operator == "TransformerConv":
-        memory_gb += 1.2
-    elif job.operator == "GATConv":
+    if job.operator == "GATConv":
         memory_gb += 0.8
     elif job.operator in {"SAGEConv", "GINConv"}:
         memory_gb += 0.3
@@ -375,28 +371,27 @@ def clamp_batch(value: int) -> int:
 def initial_batch_size(job: Job, reserve_gb: float, running_jobs: Sequence[RunningJob]) -> int:
     free_gb = current_gpu_free_gb()
     usable_gb = max(0.0, free_gb - reserve_gb)
-    batch = 32
-    if job.operator == "TransformerConv":
-        batch = 16
-    elif job.operator == "GATConv":
-        batch = 24
+    batch = 128
+    if job.operator == "GATConv":
+        batch = 64
     elif "Cross" in job.model:
-        batch = 32
-    else:
-        batch = 48
+        batch = 96
+
+    if job.dataset == "DD" and "Cross" in job.model:
+        batch = min(batch, 64)
 
     if job.dataset in {"MUTAG", "ENZYMES", "PROTEINS"}:
-        batch += 16
+        batch += 32
     if job.dataset == "Mutagenicity":
-        batch -= 16
+        batch -= 32
     if len(running_jobs) == 0 and usable_gb >= 18:
-        batch *= 2
-    elif usable_gb >= 12:
         batch = int(batch * 1.5)
+    elif usable_gb >= 12:
+        batch = int(batch * 1.25)
     return clamp_batch(batch)
 
 
-def build_command(job: Job, batch_size: int, tensorboard: bool) -> List[str]:
+def build_command(job: Job, batch_size: int, tensorboard: bool, version: str) -> List[str]:
     protocol = build_protocol(job.dataset, job.model, job.operator)
     protocol["batch_size"] = batch_size
     cmd = [
@@ -412,6 +407,8 @@ def build_command(job: Job, batch_size: int, tensorboard: bool) -> List[str]:
         job.operator,
         "--fold",
         str(job.fold),
+        "--version",
+        version,
     ]
     for key, value in protocol.items():
         cmd.extend([f"--{key}", str(value)])
@@ -420,10 +417,17 @@ def build_command(job: Job, batch_size: int, tensorboard: bool) -> List[str]:
     return cmd
 
 
-def launch_job(job: Job, reserve_gb: float, running_jobs: Sequence[RunningJob], tensorboard: bool) -> RunningJob:
+def launch_job(
+    job: Job,
+    reserve_gb: float,
+    running_jobs: Sequence[RunningJob],
+    tensorboard: bool,
+    version: str,
+    runner_log_dir: Path,
+) -> RunningJob:
     batch_size = initial_batch_size(job, reserve_gb=reserve_gb, running_jobs=running_jobs)
-    cmd = build_command(job, batch_size=batch_size, tensorboard=tensorboard)
-    log_path = RUNNER_LOG_DIR / f"{job.slug}_bs{batch_size}.log"
+    cmd = build_command(job, batch_size=batch_size, tensorboard=tensorboard, version=version)
+    log_path = runner_log_dir / f"{job.slug}_bs{batch_size}.log"
     handle = log_path.open("w", encoding="utf-8")
     handle.write("CMD: " + " ".join(cmd) + "\n")
     handle.flush()
@@ -455,10 +459,10 @@ def should_retry_with_smaller_batch(log_path: Path, batch_size: int) -> bool:
     return any(signal in text for signal in oom_signals)
 
 
-def rerun_with_smaller_batch(job: Job, previous_batch: int, tensorboard: bool) -> RunningJob:
+def rerun_with_smaller_batch(job: Job, previous_batch: int, tensorboard: bool, version: str, runner_log_dir: Path) -> RunningJob:
     next_batch = clamp_batch(max(4, previous_batch // 2))
-    cmd = build_command(job, batch_size=next_batch, tensorboard=tensorboard)
-    log_path = RUNNER_LOG_DIR / f"{job.slug}_retry_bs{next_batch}.log"
+    cmd = build_command(job, batch_size=next_batch, tensorboard=tensorboard, version=version)
+    log_path = runner_log_dir / f"{job.slug}_retry_bs{next_batch}.log"
     handle = log_path.open("w", encoding="utf-8")
     handle.write("CMD: " + " ".join(cmd) + "\n")
     handle.flush()
@@ -478,7 +482,7 @@ def rerun_with_smaller_batch(job: Job, previous_batch: int, tensorboard: bool) -
     )
 
 
-def drain_finished_jobs(running_jobs: List[RunningJob], tensorboard: bool) -> List[Job]:
+def drain_finished_jobs(running_jobs: List[RunningJob], tensorboard: bool, version: str, runner_log_dir: Path) -> List[Job]:
     retry_jobs: List[RunningJob] = []
     completed_failures: List[Job] = []
     active: List[RunningJob] = []
@@ -494,7 +498,13 @@ def drain_finished_jobs(running_jobs: List[RunningJob], tensorboard: bool) -> Li
             flush=True,
         )
         if rc != 0 and should_retry_with_smaller_batch(item.log_path, item.batch_size):
-            retry = rerun_with_smaller_batch(item.job, item.batch_size, tensorboard=tensorboard)
+            retry = rerun_with_smaller_batch(
+                item.job,
+                item.batch_size,
+                tensorboard=tensorboard,
+                version=version,
+                runner_log_dir=runner_log_dir,
+            )
             print(
                 f"[retry] ds={item.job.dataset} model={item.job.model} op={item.job.operator} "
                 f"fold={item.job.fold} bs={item.batch_size}->{retry.batch_size}",
@@ -507,18 +517,28 @@ def drain_finished_jobs(running_jobs: List[RunningJob], tensorboard: bool) -> Li
     return completed_failures
 
 
-def run_scheduler(max_parallel: int, reserve_gb: float, poll_seconds: float, tensorboard: bool) -> int:
-    pending = missing_jobs()
+def run_scheduler(
+    max_parallel: int,
+    reserve_gb: float,
+    poll_seconds: float,
+    tensorboard: bool,
+    version: str,
+    active_log_dir: Path,
+    runner_log_dir: Path,
+    md_report: Path,
+    status_json: Path,
+) -> int:
+    pending = missing_jobs(active_log_dir)
     running: List[RunningJob] = []
     failures: List[Job] = []
     print(
         f"pending_jobs={len(pending)} reserve_gb={reserve_gb:.1f} max_parallel={max_parallel} tensorboard={tensorboard}",
         flush=True,
     )
-    write_status_report()
+    write_status_report(active_log_dir, md_report, status_json, version)
     while pending or running:
-        failures.extend(drain_finished_jobs(running, tensorboard=tensorboard))
-        write_status_report()
+        failures.extend(drain_finished_jobs(running, tensorboard=tensorboard, version=version, runner_log_dir=runner_log_dir))
+        write_status_report(active_log_dir, md_report, status_json, version)
 
         launched = False
         while pending and len(running) < max_parallel:
@@ -526,7 +546,16 @@ def run_scheduler(max_parallel: int, reserve_gb: float, poll_seconds: float, ten
             free_gb = current_gpu_free_gb()
             if free_gb - reserve_gb < estimate_job_memory_gb(next_job):
                 break
-            running.append(launch_job(next_job, reserve_gb=reserve_gb, running_jobs=running, tensorboard=tensorboard))
+            running.append(
+                launch_job(
+                    next_job,
+                    reserve_gb=reserve_gb,
+                    running_jobs=running,
+                    tensorboard=tensorboard,
+                    version=version,
+                    runner_log_dir=runner_log_dir,
+                )
+            )
             pending.pop(0)
             launched = True
             time.sleep(2.0)
@@ -535,7 +564,7 @@ def run_scheduler(max_parallel: int, reserve_gb: float, poll_seconds: float, ten
             continue
         time.sleep(poll_seconds)
 
-    write_status_report()
+    write_status_report(active_log_dir, md_report, status_json, version)
     if failures:
         print(f"failed_jobs={len(failures)}", flush=True)
         for job in failures[:20]:
@@ -547,17 +576,25 @@ def run_scheduler(max_parallel: int, reserve_gb: float, poll_seconds: float, ten
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run only the missing baseline/operator experiments.")
-    parser.add_argument("--max_parallel", type=int, default=8)
+    parser.add_argument("--max_parallel", type=int, default=6)
     parser.add_argument("--reserve_gb", type=float, default=4.0)
     parser.add_argument("--poll_seconds", type=float, default=20.0)
     parser.add_argument("--report_only", action="store_true")
     parser.add_argument("--no_tensorboard", action="store_true")
+    parser.add_argument("--version", default=DEFAULT_EXPERIMENT_VERSION)
     args = parser.parse_args()
+    ensure_version_manifest(ROOT)
+    version = normalize_version(args.version)
+    active_log_dir = log_dir(ROOT, version)
+    runner_log_dir = active_log_dir / "missing_jobs"
+    md_report = ROOT / "md" / f"missing_experiment_completion_{version}.md"
+    status_json = record_dir(ROOT, version) / "missing_experiment_status.json"
 
-    RUNNER_LOG_DIR.mkdir(parents=True, exist_ok=True)
-    STATUS_JSON.parent.mkdir(parents=True, exist_ok=True)
+    active_log_dir.mkdir(parents=True, exist_ok=True)
+    runner_log_dir.mkdir(parents=True, exist_ok=True)
+    status_json.parent.mkdir(parents=True, exist_ok=True)
 
-    status = write_status_report()
+    status = write_status_report(active_log_dir, md_report, status_json, version)
     print(json.dumps(status, indent=2), flush=True)
     if args.report_only:
         return
@@ -568,6 +605,11 @@ def main() -> None:
             reserve_gb=args.reserve_gb,
             poll_seconds=args.poll_seconds,
             tensorboard=not args.no_tensorboard,
+            version=version,
+            active_log_dir=active_log_dir,
+            runner_log_dir=runner_log_dir,
+            md_report=md_report,
+            status_json=status_json,
         )
     )
 

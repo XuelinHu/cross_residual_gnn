@@ -96,20 +96,20 @@ cross_residual_gnn/
 
 这里的“快照”主要指训练过程和实验汇总生成的结果文件：
 
-- `logs/train_<dataset>_<model>_<operator>_fold<k>__<timestamp>.json`
-  日志目录根路径：[logs/](./logs)
-- `logs/dataset_stats_<dataset>__<timestamp>.json`
-  日志目录根路径：[logs/](./logs)
-- `records/suite_<suite_name>_<dataset>__<timestamp>.txt`
-  记录目录根路径：[records/](./records)
-- `records/missing_experiment_status.json`
-  补跑状态快照：[records/missing_experiment_status.json](./records/missing_experiment_status.json)
-- `runs/<model>_<operator>_<dataset>_<dim>_fold<k>_<h_layer>_<timestamp>/events.out.tfevents.*`
-  TensorBoard 根路径：[runs/](./runs)
-- `logs/missing_experiments_<timestamp>.log`
-  后台调度主日志：[logs/](./logs)
-- `logs/missing_jobs/<job_slug>.log`
-  单任务训练日志：[logs/missing_jobs/](./logs/missing_jobs)
+- `logs/V2/train_<dataset>_<model>_<operator>_fold<k>__<timestamp>.json`
+  当前重跑日志目录：[logs/V2](./logs/V2)
+- `logs/V2/dataset_stats_<dataset>__<timestamp>.json`
+  数据集统计日志目录：[logs/V2](./logs/V2)
+- `records/V2/suite_<suite_name>_<dataset>__<timestamp>.txt`
+  当前重跑记录目录：[records/V2](./records/V2)
+- `records/V2/missing_experiment_status.json`
+  当前补跑状态快照：[records/V2](./records/V2)
+- `runs/V2/<model>_<operator>_<dataset>_<dim>_fold<k>_<h_layer>_<timestamp>/events.out.tfevents.*`
+  TensorBoard 根路径：[runs/V2](./runs/V2)
+- `logs/V2/missing_jobs/<job_slug>.log`
+  单任务训练日志：[logs/V2/missing_jobs](./logs/V2/missing_jobs)
+- `records/experiment_versions.json`
+  `V1` / `V2` 统一版本索引：[records/experiment_versions.json](./records/experiment_versions.json)
 - `figures/analysis/*`
   分析产物目录：[figures/analysis/](./figures/analysis)
 - `figures/exp/*`
@@ -225,7 +225,7 @@ python geomatric/graph_classify_v3.py --mode single --ds PROTEINS
 ### 2. 全量实验批跑
 
 ```bash
-python py/run_paper_experiments.py --dataset_group all --max_workers 6 --tensorboard
+python py/run_paper_experiments.py --dataset_group all --max_workers 6 --tensorboard --version V2
 ```
 
 支持的数据集分组：
@@ -238,15 +238,17 @@ python py/run_paper_experiments.py --dataset_group all --max_workers 6 --tensorb
 ### 3. 汇总最新实验日志
 
 ```bash
-python py/summarize_paper_experiments.py --dataset_group all
+python py/summarize_paper_experiments.py --dataset_group all --version V2
 ```
 
 ### 4. 补齐缺失 baseline / 算子实验
 
 ```bash
-python py/run_missing_experiments.py --report_only
-python py/run_missing_experiments.py --max_parallel 8 --reserve_gb 4 --no_tensorboard
+python py/run_missing_experiments.py --report_only --version V2
+python py/run_missing_experiments.py --max_parallel 8 --reserve_gb 4 --no_tensorboard --version V2
 ```
+
+这次重跑会去掉 `TransformerConv` 算子，不再纳入补跑集合。
 
 当前补跑脚本面向 `24GB` GPU：
 
@@ -258,8 +260,8 @@ python py/run_missing_experiments.py --max_parallel 8 --reserve_gb 4 --no_tensor
 ### 5. 生成总报告和图
 
 ```bash
-python py/generate_all_result_reports.py
-python py/generate_suite_analysis_figures.py
+python py/generate_all_result_reports.py --version V2
+python py/generate_suite_analysis_figures.py --version V2
 ```
 
 ### 6. 运行参数敏感性分析

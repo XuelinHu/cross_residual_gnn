@@ -18,8 +18,8 @@ from geomatric.experiment_catalog import (
     MAIN_BIOLOGICAL_DATASETS,
     SUPPLEMENTARY_DATASETS,
 )
+from geomatric.experiment_paths import DEFAULT_EXPERIMENT_VERSION, ensure_version_manifest, log_dir, normalize_version
 
-LOG_DIR = ROOT / "logs"
 MD_DIR = ROOT / "md"
 
 DATASETS = ALL_ACTIVE_DATASETS
@@ -36,22 +36,22 @@ def tex_escape(text: str) -> str:
     return text.replace("_", r"\_")
 
 
-def latest_matching_log(dataset: str, model: str, fold: int) -> Path:
-    pattern = str(LOG_DIR / f"train_{dataset}_{model}_GCNConv_fold{fold}__*.json")
+def latest_matching_log(dataset: str, model: str, fold: int, active_log_dir: Path) -> Path:
+    pattern = str(active_log_dir / f"train_{dataset}_{model}_GCNConv_fold{fold}__*.json")
     matches = sorted(glob.glob(pattern))
     if not matches:
         raise FileNotFoundError(pattern)
     return Path(matches[-1])
 
 
-def load_result(dataset: str, model: str, fold: int) -> Dict[str, object]:
-    path = latest_matching_log(dataset, model, fold)
+def load_result(dataset: str, model: str, fold: int, active_log_dir: Path) -> Dict[str, object]:
+    path = latest_matching_log(dataset, model, fold, active_log_dir)
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def summarize_model(dataset: str, model: str) -> Dict[str, object]:
+def summarize_model(dataset: str, model: str, active_log_dir: Path) -> Dict[str, object]:
     try:
-        rows = [load_result(dataset, model, fold) for fold in range(5)]
+        rows = [load_result(dataset, model, fold, active_log_dir) for fold in range(5)]
     except FileNotFoundError:
         return {
             "dataset": dataset,
@@ -75,12 +75,12 @@ def summarize_model(dataset: str, model: str) -> Dict[str, object]:
     }
 
 
-def collect_summary() -> Dict[str, Dict[str, Dict[str, object]]]:
+def collect_summary(active_log_dir: Path) -> Dict[str, Dict[str, Dict[str, object]]]:
     summary: Dict[str, Dict[str, Dict[str, object]]] = {}
     for dataset in DATASETS:
         summary[dataset] = {}
         for model in MODELS:
-            summary[dataset][model] = summarize_model(dataset, model)
+            summary[dataset][model] = summarize_model(dataset, model, active_log_dir)
     return summary
 
 
@@ -311,13 +311,26 @@ def build_analysis(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
 
 
 def main() -> None:
-    summary = collect_summary()
-    TXT_OUT.write_text(build_text_summary(summary), encoding="utf-8")
-    TEX_OUT.write_text(build_tex_tables(summary), encoding="utf-8")
-    ANALYSIS_OUT.write_text(build_analysis(summary), encoding="utf-8")
-    print(TXT_OUT)
-    print(TEX_OUT)
-    print(ANALYSIS_OUT)
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Generate aggregate result reports from versioned logs.")
+    parser.add_argument("--version", default=DEFAULT_EXPERIMENT_VERSION)
+    args = parser.parse_args()
+
+    ensure_version_manifest(ROOT)
+    version = normalize_version(args.version)
+    active_log_dir = log_dir(ROOT, version)
+    txt_out = MD_DIR / f"all_results_summary_{version}.txt"
+    tex_out = MD_DIR / f"all_exp_tables_{version}.tex"
+    analysis_out = MD_DIR / f"all_ablation_analysis_{version}.md"
+
+    summary = collect_summary(active_log_dir)
+    txt_out.write_text(build_text_summary(summary), encoding="utf-8")
+    tex_out.write_text(build_tex_tables(summary), encoding="utf-8")
+    analysis_out.write_text(build_analysis(summary), encoding="utf-8")
+    print(txt_out)
+    print(tex_out)
+    print(analysis_out)
 
 
 if __name__ == "__main__":

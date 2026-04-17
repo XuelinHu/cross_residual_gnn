@@ -19,8 +19,7 @@ from geomatric.experiment_catalog import (
     MAIN_BIOLOGICAL_DATASETS,
     SUPPLEMENTARY_DATASETS,
 )
-
-LOG_DIR = ROOT / "logs"
+from geomatric.experiment_paths import DEFAULT_EXPERIMENT_VERSION, ensure_version_manifest, log_dir, normalize_version
 
 MAIN_DATASETS = MAIN_BIOLOGICAL_DATASETS
 TOPIC_DATASETS = MAIN_BIOLOGICAL_DATASETS
@@ -28,22 +27,22 @@ EXTENDED_DATASETS = SUPPLEMENTARY_DATASETS
 ALL_DATASETS = ALL_ACTIVE_DATASETS
 
 
-def latest_matching_log(dataset: str, model: str, fold: int) -> Path:
-    pattern = str(LOG_DIR / f"train_{dataset}_{model}_GCNConv_fold{fold}__*.json")
+def latest_matching_log(dataset: str, model: str, fold: int, active_log_dir: Path) -> Path:
+    pattern = str(active_log_dir / f"train_{dataset}_{model}_GCNConv_fold{fold}__*.json")
     matches = sorted(glob.glob(pattern))
     if not matches:
         raise FileNotFoundError(pattern)
     return Path(matches[-1])
 
 
-def load_result(dataset: str, model: str, fold: int) -> Dict[str, object]:
-    path = latest_matching_log(dataset, model, fold)
+def load_result(dataset: str, model: str, fold: int, active_log_dir: Path) -> Dict[str, object]:
+    path = latest_matching_log(dataset, model, fold, active_log_dir)
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def summarize_model(dataset: str, model: str) -> Dict[str, object]:
+def summarize_model(dataset: str, model: str, active_log_dir: Path) -> Dict[str, object]:
     try:
-        rows = [load_result(dataset, model, fold) for fold in range(5)]
+        rows = [load_result(dataset, model, fold, active_log_dir) for fold in range(5)]
     except FileNotFoundError:
         return {
             "dataset": dataset,
@@ -65,11 +64,11 @@ def summarize_model(dataset: str, model: str) -> Dict[str, object]:
     }
 
 
-def format_table(datasets: Iterable[str], models: Iterable[str]) -> str:
+def format_table(datasets: Iterable[str], models: Iterable[str], active_log_dir: Path) -> str:
     lines: List[str] = []
     for dataset in datasets:
         lines.append(f"## {dataset}")
-        summaries = [summarize_model(dataset, model) for model in models]
+        summaries = [summarize_model(dataset, model, active_log_dir) for model in models]
         ready = [row for row in summaries if not row.get("pending")]
         pending = [row for row in summaries if row.get("pending")]
         ready.sort(key=lambda row: (-row["mean_acc"], row["mean_loss"]))
@@ -95,7 +94,10 @@ def main() -> None:
         default="main",
     )
     parser.add_argument("--models", nargs="+", default=FOCUSED_MODELS)
+    parser.add_argument("--version", default=DEFAULT_EXPERIMENT_VERSION)
     args = parser.parse_args()
+    ensure_version_manifest(ROOT)
+    active_log_dir = log_dir(ROOT, normalize_version(args.version))
 
     if args.dataset_group == "main":
         datasets = MAIN_DATASETS
@@ -106,7 +108,7 @@ def main() -> None:
     else:
         datasets = ALL_DATASETS
 
-    print(format_table(datasets, args.models))
+    print(format_table(datasets, args.models, active_log_dir))
 
 
 if __name__ == "__main__":

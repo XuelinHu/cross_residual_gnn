@@ -55,12 +55,17 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from geomatric.experiment_catalog import dataset_family
+from geomatric.experiment_paths import (
+    DEFAULT_EXPERIMENT_VERSION,
+    ensure_version_manifest,
+    log_dir,
+    normalize_version,
+    record_dir,
+    run_dir,
+)
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DATA_ROOT = PROJECT_ROOT / "data"
-RECORD_ROOT = PROJECT_ROOT / "records"
-LOG_ROOT = PROJECT_ROOT / "logs"
-RUN_ROOT = PROJECT_ROOT / "runs"
 SEPARATOR = "__"
 
 # 本文提出的自定义模型家族。
@@ -85,10 +90,30 @@ EXTERNAL_BASELINES = [
 AVAILABLE_OPERATORS = [
     "GCNConv",
     "GATConv",
-    "TransformerConv",
     "SAGEConv",
     "GINConv",
 ]
+
+
+def gate_logit_from_probability(probability: float) -> float:
+    """把 [0,1] 区间内的初值映射到 logit 空间，便于用 sigmoid 学习门限。"""
+
+    clipped = min(max(probability, 1e-4), 1.0 - 1e-4)
+    return float(np.log(clipped / (1.0 - clipped)))
+
+
+class LearnableGate(nn.Module):
+    """可学习门限。
+
+    内部参数存储在 logit 空间，前向时通过 sigmoid 投影到 (0,1)。
+    """
+
+    def __init__(self, init_probability: float = 1.0):
+        super().__init__()
+        self.logit = nn.Parameter(torch.tensor(gate_logit_from_probability(init_probability), dtype=torch.float))
+
+    def forward(self) -> torch.Tensor:
+        return torch.sigmoid(self.logit)
 
 
 def parse_args() -> argparse.Namespace:
@@ -116,7 +141,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--drop", type=float, default=0.6)
     parser.add_argument("--dim", type=int, default=64, help="隐藏层维度，默认 64。")
     parser.add_argument("--h_layer", type=int, default=2, help="隐藏图卷积层数，默认 2。")
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--batch_size", type=int, default=256)
+    parser.add_argument(
+        "--version",
+        type=str,
+        default=DEFAULT_EXPERIMENT_VERSION,
+        help="实验输出版本目录，默认写入 V2；旧结果统一归档在 V1。",
+    )
     parser.add_argument("--fold", type=int, default=0, help="五折交叉验证中的 fold 编号，默认 0。")
     parser.add_argument("--seed", type=int, default=1024)
     parser.add_argument("--val_ratio", type=float, default=0.1, help="训练集内部再切分验证集的比例，默认 0.1。")
@@ -126,6 +157,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lr_factor", type=float, default=0.5, help="学习率衰减因子，默认 0.5。")
     parser.add_argument("--lr_patience", type=int, default=15, help="学习率调度器耐心轮数，默认 15。")
     parser.add_argument("--min_lr", type=float, default=1e-5, help="学习率下界，默认 1e-5。")
+    parser.add_argument(
+        "--gate_init",
+        type=float,
+        default=0.8,
+        help="残差/交叉门限的初始值，训练时会作为可学习参数更新，取值建议在 0 到 1 之间。",
+    )
     parser.add_argument("--jk_mode", type=str, default="cat", choices=["cat", "max", "lstm"])
     parser.add_argument(
         "--mode",
@@ -161,8 +198,20 @@ def canonical_args(args: argparse.Namespace) -> argparse.Namespace:
 def ensure_dirs() -> None:
     """确保训练输出所需的目录存在。"""
 
-    for path in [DATA_ROOT, RECORD_ROOT, LOG_ROOT, RUN_ROOT]:
+    for path in [
+        DATA_ROOT,
+        PROJECT_ROOT / "logs",
+        PROJECT_ROOT / "records",
+        PROJECT_ROOT / "runs",
+        log_dir(PROJECT_ROOT, DEFAULT_EXPERIMENT_VERSION),
+        record_dir(PROJECT_ROOT, DEFAULT_EXPERIMENT_VERSION),
+        run_dir(PROJECT_ROOT, DEFAULT_EXPERIMENT_VERSION),
+        log_dir(PROJECT_ROOT, "V1"),
+        record_dir(PROJECT_ROOT, "V1"),
+        run_dir(PROJECT_ROOT, "V1"),
+    ]:
         path.mkdir(parents=True, exist_ok=True)
+    ensure_version_manifest(PROJECT_ROOT)
 
 
 def set_seed(seed: int) -> None:
@@ -202,10 +251,10 @@ def with_exp_tag(prefix: str, exp_tag: str) -> str:
     return f"{prefix}_{exp_tag}"
 
 
-def save_json(payload: Dict[str, object], prefix: str, debug: bool) -> Optional[Path]:
+def save_json(payload: Dict[str, object], prefix: str, debug: bool, output_dir: Path) -> Optional[Path]:
     """把结构化实验结果写入日志目录；debug 模式下只返回目标路径。"""
 
-    file_path = LOG_ROOT / f"{prefix}{SEPARATOR}{timestamp()}.json"
+    file_path = output_dir / f"{prefix}{SEPARATOR}{timestamp()}.json"
     if debug:
         print(f"[debug] skip save_json -> {file_path}")
         return file_path
@@ -214,10 +263,10 @@ def save_json(payload: Dict[str, object], prefix: str, debug: bool) -> Optional[
     return file_path
 
 
-def save_lines(lines: List[str], prefix: str, debug: bool) -> Optional[Path]:
+def save_lines(lines: List[str], prefix: str, debug: bool, output_dir: Path) -> Optional[Path]:
     """把实验摘要按文本行写入记录目录。"""
 
-    file_path = RECORD_ROOT / f"{prefix}{SEPARATOR}{timestamp()}.txt"
+    file_path = output_dir / f"{prefix}{SEPARATOR}{timestamp()}.txt"
     if debug:
         print(f"[debug] skip save_lines -> {file_path}")
         return file_path
@@ -470,7 +519,16 @@ class PlainBlock(nn.Module):
     当 `res_graph=True` 时，会在每一层注入图级隐状态。
     """
 
-    def __init__(self, hidden_channels: int, dataset: TUDataset, hidden_layers: int, operator: str, dropout: float, res_graph: bool = False):
+    def __init__(
+        self,
+        hidden_channels: int,
+        dataset: TUDataset,
+        hidden_layers: int,
+        operator: str,
+        dropout: float,
+        res_graph: bool = False,
+        gate_init: float = 0.8,
+    ):
         super().__init__()
         input_dim = infer_input_dim(dataset)
         self.input_layer = build_operator(operator, input_dim, hidden_channels)
@@ -480,22 +538,24 @@ class PlainBlock(nn.Module):
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
         self.dropout = dropout
         self.res_graph = res_graph
+        self.graph_gate = LearnableGate(init_probability=gate_init)
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor, graph_hidden: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
         """执行单个 PlainBlock 前向传播，并返回 logits 与图嵌入。"""
 
         x = F.relu(self.input_layer(x, edge_index))
+        gate = self.graph_gate()
 
         for layer in self.hidden_layers:
             # 关键路径：图级状态通过 batch 索引广播回节点表征。
             if self.res_graph and graph_hidden is not None:
-                x = x + graph_hidden[batch]
+                x = x + gate * graph_hidden[batch]
             x = F.relu(layer(x, edge_index))
             x = F.dropout(x, p=self.dropout, training=self.training)
 
         graph_embedding = global_mean_pool(x, batch)
         if graph_hidden is not None:
-            graph_embedding = graph_embedding + graph_hidden
+            graph_embedding = graph_embedding + gate * graph_hidden
         logits = self.classifier(F.dropout(graph_embedding, p=self.dropout, training=self.training))
         return logits, graph_embedding
 
@@ -506,7 +566,15 @@ class NodeResGNN(nn.Module):
     当前层输入会显式叠加前一层缓存，从而缓解深层训练中的信息衰减。
     """
 
-    def __init__(self, hidden_channels: int, dataset: TUDataset, hidden_layers: int, operator: str, dropout: float):
+    def __init__(
+        self,
+        hidden_channels: int,
+        dataset: TUDataset,
+        hidden_layers: int,
+        operator: str,
+        dropout: float,
+        gate_init: float = 0.8,
+    ):
         super().__init__()
         input_dim = infer_input_dim(dataset)
         self.input_layer = build_operator(operator, input_dim, hidden_channels)
@@ -515,17 +583,19 @@ class NodeResGNN(nn.Module):
         )
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
         self.dropout = dropout
+        self.residual_gate = LearnableGate(init_probability=gate_init)
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """前向时将 `current + previous` 送入下一层，形成节点级残差。"""
 
         current = F.relu(self.input_layer(x, edge_index))
         previous = torch.zeros_like(current)
+        gate = self.residual_gate()
 
         for layer in self.hidden_layers:
             cached = current
             # 关键路径：上一层缓存 `previous` 作为残差支路参与卷积。
-            current = F.relu(layer(current + previous, edge_index))
+            current = F.relu(layer(current + gate * previous, edge_index))
             current = F.dropout(current, p=self.dropout, training=self.training)
             previous = cached
 
@@ -540,7 +610,15 @@ class NodeCrossGNN(nn.Module):
     两个分支分别维护自己的历史状态，并在每一步交叉注入对方的上一轮表示。
     """
 
-    def __init__(self, hidden_channels: int, dataset: TUDataset, hidden_layers: int, operator: str, dropout: float):
+    def __init__(
+        self,
+        hidden_channels: int,
+        dataset: TUDataset,
+        hidden_layers: int,
+        operator: str,
+        dropout: float,
+        gate_init: float = 0.8,
+    ):
         super().__init__()
         input_dim = infer_input_dim(dataset)
         self.input_layer_1 = build_operator(operator, input_dim, hidden_channels)
@@ -550,6 +628,7 @@ class NodeCrossGNN(nn.Module):
         )
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
         self.dropout = dropout
+        self.cross_gate = LearnableGate(init_probability=gate_init)
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """双分支交替更新，并在图池化前把两个分支的结果相加。"""
@@ -558,15 +637,16 @@ class NodeCrossGNN(nn.Module):
         branch_2 = F.relu(self.input_layer_2(x, edge_index))
         prev_1 = torch.zeros_like(branch_1)
         prev_2 = torch.zeros_like(branch_2)
+        gate = self.cross_gate()
 
         layer_id = 0
         while layer_id < len(self.hidden_layers):
             cache_1 = branch_1
             cache_2 = branch_2
             # 关键路径：branch_1 接收 prev_2，branch_2 接收 prev_1，形成交叉残差。
-            branch_1 = F.relu(self.hidden_layers[layer_id](branch_1 + prev_2, edge_index))
+            branch_1 = F.relu(self.hidden_layers[layer_id](branch_1 + gate * prev_2, edge_index))
             branch_1 = F.dropout(branch_1, p=self.dropout, training=self.training)
-            branch_2 = F.relu(self.hidden_layers[layer_id + 1](branch_2 + prev_1, edge_index))
+            branch_2 = F.relu(self.hidden_layers[layer_id + 1](branch_2 + gate * prev_1, edge_index))
             branch_2 = F.dropout(branch_2, p=self.dropout, training=self.training)
             prev_1 = cache_1
             prev_2 = cache_2
@@ -583,10 +663,34 @@ class GraphCondGNN(nn.Module):
     第一段 block 先生成图隐状态，第二段 block 再以该图隐状态作为条件继续编码。
     """
 
-    def __init__(self, hidden_channels: int, dataset: TUDataset, hidden_layers: int, operator: str, dropout: float):
+    def __init__(
+        self,
+        hidden_channels: int,
+        dataset: TUDataset,
+        hidden_layers: int,
+        operator: str,
+        dropout: float,
+        gate_init: float = 0.8,
+    ):
         super().__init__()
-        self.block_1 = PlainBlock(hidden_channels, dataset, hidden_layers, operator, dropout, res_graph=False)
-        self.block_2 = PlainBlock(hidden_channels, dataset, hidden_layers, operator, dropout, res_graph=False)
+        self.block_1 = PlainBlock(
+            hidden_channels,
+            dataset,
+            hidden_layers,
+            operator,
+            dropout,
+            res_graph=False,
+            gate_init=gate_init,
+        )
+        self.block_2 = PlainBlock(
+            hidden_channels,
+            dataset,
+            hidden_layers,
+            operator,
+            dropout,
+            res_graph=False,
+            gate_init=gate_init,
+        )
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -603,10 +707,29 @@ class GraphResGNN(nn.Module):
     多个 PlainBlock 串联，后一个 block 接收前一个 block 的图嵌入作为残差条件。
     """
 
-    def __init__(self, hidden_channels: int, dataset: TUDataset, hidden_layers: int, operator: str, dropout: float):
+    def __init__(
+        self,
+        hidden_channels: int,
+        dataset: TUDataset,
+        hidden_layers: int,
+        operator: str,
+        dropout: float,
+        gate_init: float = 0.8,
+    ):
         super().__init__()
         self.blocks = nn.ModuleList(
-            [PlainBlock(hidden_channels, dataset, hidden_layers, operator, dropout, res_graph=True) for _ in range(3)]
+            [
+                PlainBlock(
+                    hidden_channels,
+                    dataset,
+                    hidden_layers,
+                    operator,
+                    dropout,
+                    res_graph=True,
+                    gate_init=gate_init,
+                )
+                for _ in range(3)
+            ]
         )
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
 
@@ -627,10 +750,29 @@ class GraphCrossGNN(nn.Module):
     以 block 为单位维护两条图级状态支路，并在相邻 block 间交叉交换图隐状态。
     """
 
-    def __init__(self, hidden_channels: int, dataset: TUDataset, hidden_layers: int, operator: str, dropout: float):
+    def __init__(
+        self,
+        hidden_channels: int,
+        dataset: TUDataset,
+        hidden_layers: int,
+        operator: str,
+        dropout: float,
+        gate_init: float = 0.8,
+    ):
         super().__init__()
         self.blocks = nn.ModuleList(
-            [PlainBlock(hidden_channels, dataset, hidden_layers, operator, dropout, res_graph=False) for _ in range(4)]
+            [
+                PlainBlock(
+                    hidden_channels,
+                    dataset,
+                    hidden_layers,
+                    operator,
+                    dropout,
+                    res_graph=False,
+                    gate_init=gate_init,
+                )
+                for _ in range(4)
+            ]
         )
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
 
@@ -778,19 +920,20 @@ def build_model(args: argparse.Namespace, dataset: TUDataset) -> nn.Module:
         "hidden_layers": args.h_layer,
         "dropout": args.drop,
     }
+    gated_kwargs = {**common_kwargs, "gate_init": args.gate_init}
 
     if args.gname == "PlainGNN":
-        return PlainBlock(operator=args.name, res_graph=False, **common_kwargs)
+        return PlainBlock(operator=args.name, res_graph=False, **gated_kwargs)
     if args.gname == "NodeResGNN":
-        return NodeResGNN(operator=args.name, **common_kwargs)
+        return NodeResGNN(operator=args.name, **gated_kwargs)
     if args.gname == "NodeCrossGNN":
-        return NodeCrossGNN(operator=args.name, **common_kwargs)
+        return NodeCrossGNN(operator=args.name, **gated_kwargs)
     if args.gname == "GraphCondGNN":
-        return GraphCondGNN(operator=args.name, **common_kwargs)
+        return GraphCondGNN(operator=args.name, **gated_kwargs)
     if args.gname == "GraphResGNN":
-        return GraphResGNN(operator=args.name, **common_kwargs)
+        return GraphResGNN(operator=args.name, **gated_kwargs)
     if args.gname == "GraphCrossGNN":
-        return GraphCrossGNN(operator=args.name, **common_kwargs)
+        return GraphCrossGNN(operator=args.name, **gated_kwargs)
     if args.gname == "GraphSAGEBaseline":
         return GraphSAGEBaseline(**common_kwargs)
     if args.gname == "GINBaseline":
@@ -837,6 +980,16 @@ def tensor_stats(tensor: torch.Tensor) -> Dict[str, float]:
         "std": float(detached.std(unbiased=False).item()) if detached.numel() > 1 else 0.0,
         "max": float(detached.max().item()),
     }
+
+
+def collect_gate_values(model: nn.Module) -> Dict[str, float]:
+    """提取当前模型中所有可学习门限的 sigmoid 值。"""
+
+    gate_values: Dict[str, float] = {}
+    for module_name, module in model.named_modules():
+        if isinstance(module, LearnableGate):
+            gate_values[module_name] = float(module().detach().item())
+    return gate_values
 
 
 def evaluate(model: nn.Module, loader: DataLoader, criterion: nn.Module) -> Dict[str, float]:
@@ -914,6 +1067,9 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
     """
 
     family = dataset_family(args.ds)
+    version = normalize_version(args.version)
+    version_log_dir = log_dir(PROJECT_ROOT, version)
+    version_run_dir = run_dir(PROJECT_ROOT, version)
     effective_seed = args.seed + args.fold if family == "ogb_graphprop" else args.seed
     set_seed(effective_seed)
     dataset = load_dataset(args.ds)
@@ -922,7 +1078,7 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
     if args.report_dataset_stats:
         print(json.dumps(stats, indent=2))
     if args.save_dataset_stats:
-        save_json(stats, prefix=f"dataset_stats_{args.ds}", debug=args.debug)
+        save_json(stats, prefix=f"dataset_stats_{args.ds}", debug=args.debug, output_dir=version_log_dir)
     if args.mode == "stats":
         return {"dataset_stats": stats}
 
@@ -953,10 +1109,12 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
             model=args.gname,
             operator=args.name,
             dataset=args.ds,
+            version=version,
             fold=args.fold,
             dataset_family=family,
             total_params=parameter_stats["total_params"],
             trainable_params=parameter_stats["trainable_params"],
+            gate_init=args.gate_init,
         )
     )
 
@@ -966,8 +1124,8 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
             f"{args.gname}_{args.name}_{args.ds}_{args.dim}_fold{args.fold}_{args.h_layer}",
             args.exp_tag,
         )
-        log_dir = RUN_ROOT / f"{tb_prefix}_{timestamp()}"
-        writer = SummaryWriter(str(log_dir))
+        tb_log_dir = version_run_dir / f"{tb_prefix}_{timestamp()}"
+        writer = SummaryWriter(str(tb_log_dir))
 
     history: List[Dict[str, float]] = []
     best_epoch = -1
@@ -1040,6 +1198,7 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
             val_metrics = train_metrics
         scheduler.step(val_metrics["loss"])
         current_lr = optimizer.param_groups[0]["lr"]
+        gate_values = collect_gate_values(model)
 
         # 以验证损失作为早停基准，`min_delta` 控制最小改进幅度。
         improved = val_metrics["loss"] < (best_val_loss - args.min_delta)
@@ -1066,6 +1225,7 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
             "logits_abs_max": train_diagnostics["logits_abs_max"],
             "lr": current_lr,
             "patience_counter": patience_counter,
+            "gate_values": gate_values,
         }
         history.append(epoch_record)
 
@@ -1083,6 +1243,8 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
             writer.add_scalar("embedding/abs_max", train_diagnostics["embedding_abs_max"], epoch)
             writer.add_scalar("logits/abs_mean", train_diagnostics["logits_abs_mean"], epoch)
             writer.add_scalar("logits/abs_max", train_diagnostics["logits_abs_max"], epoch)
+            for gate_name, gate_value in gate_values.items():
+                writer.add_scalar(f"gates/{gate_name}", gate_value, epoch)
             if epoch == 0 or (epoch + 1) % 25 == 0 or epoch == args.ep - 1:
                 writer.add_histogram("embedding/graph_embedding", graph_embedding.detach().cpu(), epoch)
                 writer.add_histogram("logits/logits", logits.detach().cpu(), epoch)
@@ -1097,6 +1259,7 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
                     val_acc=val_metrics["acc"],
                     lr=current_lr,
                     patience=patience_counter,
+                    **gate_values,
                 )
             )
 
@@ -1119,6 +1282,7 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
 
     summary = {
         "config": vars(args),
+        "version": version,
         "dataset_stats": stats,
         "split_context": split_context,
         "parameter_stats": parameter_stats,
@@ -1134,6 +1298,7 @@ def train_one_config(args: argparse.Namespace) -> Dict[str, object]:
         summary,
         prefix=with_exp_tag(f"train_{args.ds}_{args.gname}_{args.name}_fold{args.fold}", args.exp_tag),
         debug=args.debug,
+        output_dir=version_log_dir,
     )
     return summary
 
@@ -1189,6 +1354,7 @@ def run_suite(args: argparse.Namespace) -> List[Dict[str, object]]:
 
     results: List[Dict[str, object]] = []
     lines: List[str] = []
+    version_record_dir = record_dir(PROJECT_ROOT, normalize_version(args.version))
 
     for config in suite_configs(args):
         config = canonical_args(config)
@@ -1208,7 +1374,7 @@ def run_suite(args: argparse.Namespace) -> List[Dict[str, object]]:
                 )
             )
 
-    save_lines(lines, prefix=f"suite_{args.suite_name}_{args.ds}", debug=args.debug)
+    save_lines(lines, prefix=f"suite_{args.suite_name}_{args.ds}", debug=args.debug, output_dir=version_record_dir)
     return results
 
 
@@ -1220,6 +1386,13 @@ def main() -> None:
 
     ensure_dirs()
     args = canonical_args(parse_args())
+    args.version = normalize_version(args.version)
+    for path in [
+        log_dir(PROJECT_ROOT, args.version),
+        record_dir(PROJECT_ROOT, args.version),
+        run_dir(PROJECT_ROOT, args.version),
+    ]:
+        path.mkdir(parents=True, exist_ok=True)
 
     if args.gname in FAMILY_MODELS and args.name not in AVAILABLE_OPERATORS:
         raise ValueError(f"{args.name} is not available. Choose from {AVAILABLE_OPERATORS}.")

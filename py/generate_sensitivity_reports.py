@@ -14,8 +14,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from py.plot_style import MODEL_COLORS, MODEL_MARKERS, apply_paper_style, style_axis
+from geomatric.experiment_paths import DEFAULT_EXPERIMENT_VERSION, ensure_version_manifest, log_dir, normalize_version
 
-LOG_DIR = ROOT / "logs"
 MD_DIR = ROOT / "md"
 FIG_DIR = ROOT / "paper" / "figures" / "exp"
 
@@ -33,11 +33,12 @@ BASE_CONFIGS: Dict[Tuple[str, str], Dict[str, float]] = {
 }
 
 DISPLAY = {"NodeCrossGNN": "NodeCross", "GraphCrossGNN": "GraphCross"}
+OUTPUT_SUFFIX = ""
 
 
-def load_rows() -> List[Dict[str, object]]:
+def load_rows(active_log_dir: Path) -> List[Dict[str, object]]:
     rows = []
-    for path in glob.glob(str(LOG_DIR / "train_*_sensitivity_*__*.json")):
+    for path in glob.glob(str(active_log_dir / "train_*_sensitivity_*__*.json")):
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
         cfg = payload["config"]
         rows.append(
@@ -135,23 +136,34 @@ def plot_sweep(rows: List[Dict[str, object]], sweep: str, filename: str, ylabel:
         ax.legend(frameon=False, ncol=2)
     axes[-1].set_xlabel(sweep)
     fig.tight_layout()
-    fig.savefig(FIG_DIR / f"{filename}.pdf", dpi=300, bbox_inches="tight")
-    fig.savefig(FIG_DIR / f"{filename}.png", dpi=300, bbox_inches="tight")
+    actual_name = f"{filename}_{OUTPUT_SUFFIX}" if OUTPUT_SUFFIX else filename
+    fig.savefig(FIG_DIR / f"{actual_name}.pdf", dpi=300, bbox_inches="tight")
+    fig.savefig(FIG_DIR / f"{actual_name}.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
 def main() -> None:
-    rows = load_rows()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Generate sensitivity reports from versioned logs.")
+    parser.add_argument("--version", default=DEFAULT_EXPERIMENT_VERSION)
+    args = parser.parse_args()
+
+    ensure_version_manifest(ROOT)
+    version = normalize_version(args.version)
+    global OUTPUT_SUFFIX
+    OUTPUT_SUFFIX = version
+    rows = load_rows(log_dir(ROOT, version))
     rows = build_frame(rows)
     MD_DIR.mkdir(parents=True, exist_ok=True)
-    (MD_DIR / "sensitivity_summary.md").write_text(build_markdown(rows), encoding="utf-8")
+    (MD_DIR / f"sensitivity_summary_{version}.md").write_text(build_markdown(rows), encoding="utf-8")
     plot_sweep(rows, "h_layer", "fig5_depth_sensitivity_v3")
     plot_sweep(rows, "drop", "fig6_dropout_sensitivity_v3")
     plot_sweep(rows, "lr", "fig7_lr_sensitivity_v3")
-    print(MD_DIR / "sensitivity_summary.md")
-    print(FIG_DIR / "fig5_depth_sensitivity_v3.pdf")
-    print(FIG_DIR / "fig6_dropout_sensitivity_v3.pdf")
-    print(FIG_DIR / "fig7_lr_sensitivity_v3.pdf")
+    print(MD_DIR / f"sensitivity_summary_{version}.md")
+    print(FIG_DIR / f"fig5_depth_sensitivity_v3_{version}.pdf")
+    print(FIG_DIR / f"fig6_dropout_sensitivity_v3_{version}.pdf")
+    print(FIG_DIR / f"fig7_lr_sensitivity_v3_{version}.pdf")
 
 
 if __name__ == "__main__":

@@ -18,6 +18,22 @@ FOCUSED_MODELS: List[str] = [
     "GraphCrossGNN",
 ]
 
+# 当前 V2 全口径实验包含的算子集合。
+ACTIVE_OPERATORS: List[str] = [
+    "GCNConv",
+    "GATConv",
+    "SAGEConv",
+    "GINConv",
+]
+
+# 外部 baseline 与对应固定算子。
+EXTERNAL_BASELINES: List[tuple[str, str]] = [
+    ("GraphSAGEBaseline", "SAGEConv"),
+    ("GINBaseline", "GINConv"),
+    ("JKNetBaseline", "GCNConv"),
+    ("APPNPBaseline", "GCNConv"),
+]
+
 MODEL_DISPLAY: Dict[str, str] = {
     "PlainGNN": "Plain",
     "NodeResGNN": "NodeRes",

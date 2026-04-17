@@ -21,9 +21,9 @@ from geomatric.experiment_catalog import (
     MAIN_BIOLOGICAL_DATASETS,
     MODEL_DISPLAY,
 )
+from geomatric.experiment_paths import DEFAULT_EXPERIMENT_VERSION, ensure_version_manifest, log_dir, normalize_version
 from py.plot_style import MODEL_COLORS, MODEL_MARKERS, apply_paper_style, style_axis
 
-LOG_DIR = ROOT / "logs"
 FIG_DIRS = [
     ROOT / "figures" / "exp",
     ROOT / "paper" / "figures" / "exp",
@@ -32,23 +32,24 @@ FIG_DIRS = [
 DATASETS = ALL_ACTIVE_DATASETS
 TOPIC_DATASETS = MAIN_BIOLOGICAL_DATASETS
 MODELS = FOCUSED_MODELS
+OUTPUT_SUFFIX = ""
 
 
-def latest_matching_log(dataset: str, model: str, fold: int) -> Path:
-    pattern = str(LOG_DIR / f"train_{dataset}_{model}_GCNConv_fold{fold}__*.json")
+def latest_matching_log(dataset: str, model: str, fold: int, active_log_dir: Path) -> Path:
+    pattern = str(active_log_dir / f"train_{dataset}_{model}_GCNConv_fold{fold}__*.json")
     matches = sorted(glob.glob(pattern))
     if not matches:
         raise FileNotFoundError(pattern)
     return Path(matches[-1])
 
 
-def load_rows() -> List[Dict[str, object]]:
+def load_rows(active_log_dir: Path) -> List[Dict[str, object]]:
     rows: List[Dict[str, object]] = []
     for dataset in DATASETS:
         for model in MODELS:
             for fold in range(5):
                 try:
-                    payload = json.loads(latest_matching_log(dataset, model, fold).read_text(encoding="utf-8"))
+                    payload = json.loads(latest_matching_log(dataset, model, fold, active_log_dir).read_text(encoding="utf-8"))
                 except FileNotFoundError:
                     continue
                 rows.append(
@@ -101,9 +102,10 @@ def ensure_dirs() -> None:
 
 
 def save(fig: plt.Figure, filename: str) -> None:
+    actual_name = f"{filename}_{OUTPUT_SUFFIX}" if OUTPUT_SUFFIX else filename
     for out_dir in FIG_DIRS:
-        fig.savefig(out_dir / f"{filename}.pdf", dpi=300, bbox_inches="tight")
-        fig.savefig(out_dir / f"{filename}.png", dpi=300, bbox_inches="tight")
+        fig.savefig(out_dir / f"{actual_name}.pdf", dpi=300, bbox_inches="tight")
+        fig.savefig(out_dir / f"{actual_name}.png", dpi=300, bbox_inches="tight")
 
 
 def add_bar_labels(
@@ -349,8 +351,19 @@ def plot_protein_package(summary: Dict[str, Dict[str, Dict[str, float]]]) -> Non
 
 
 def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Generate benchmark figures from versioned logs.")
+    parser.add_argument("--version", default=DEFAULT_EXPERIMENT_VERSION)
+    args = parser.parse_args()
+
+    ensure_version_manifest(ROOT)
+    version = normalize_version(args.version)
+    active_log_dir = log_dir(ROOT, version)
+    global OUTPUT_SUFFIX
+    OUTPUT_SUFFIX = version
     ensure_dirs()
-    rows = load_rows()
+    rows = load_rows(active_log_dir)
     summary = summarize(rows)
     plot_full_suite(summary)
     plot_cross_heatmap(summary)
