@@ -116,6 +116,26 @@ class LearnableGate(nn.Module):
         return torch.sigmoid(self.logit)
 
 
+class FixedGate(nn.Module):
+    """固定门限，用于可学习门限的对照消融。"""
+
+    def __init__(self, value: float):
+        super().__init__()
+        clipped = min(max(value, 0.0), 1.0)
+        self.register_buffer("value", torch.tensor(float(clipped), dtype=torch.float))
+
+    def forward(self) -> torch.Tensor:
+        return self.value
+
+
+def build_gate(init_probability: float, gate_mode: str, fixed_gate_value: float) -> nn.Module:
+    """根据参数构建门控模块。"""
+
+    if gate_mode == "fixed":
+        return FixedGate(fixed_gate_value)
+    return LearnableGate(init_probability=init_probability)
+
+
 def parse_args() -> argparse.Namespace:
     """解析命令行参数。
 
@@ -163,6 +183,14 @@ def parse_args() -> argparse.Namespace:
         default=0.8,
         help="残差/交叉门限的初始值，训练时会作为可学习参数更新，取值建议在 0 到 1 之间。",
     )
+    parser.add_argument(
+        "--gate_mode",
+        type=str,
+        default="learnable",
+        choices=["learnable", "fixed"],
+        help="门控模式：learnable 为可学习门控，fixed 为固定门控消融。",
+    )
+    parser.add_argument("--fixed_gate_value", type=float, default=0.8, help="固定门控模式下使用的门控值。")
     parser.add_argument("--jk_mode", type=str, default="cat", choices=["cat", "max", "lstm"])
     parser.add_argument(
         "--mode",
@@ -528,6 +556,8 @@ class PlainBlock(nn.Module):
         dropout: float,
         res_graph: bool = False,
         gate_init: float = 0.8,
+        gate_mode: str = "learnable",
+        fixed_gate_value: float = 0.8,
     ):
         super().__init__()
         input_dim = infer_input_dim(dataset)
@@ -538,7 +568,7 @@ class PlainBlock(nn.Module):
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
         self.dropout = dropout
         self.res_graph = res_graph
-        self.graph_gate = LearnableGate(init_probability=gate_init)
+        self.graph_gate = build_gate(gate_init, gate_mode=gate_mode, fixed_gate_value=fixed_gate_value)
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor, graph_hidden: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
         """执行单个 PlainBlock 前向传播，并返回 logits 与图嵌入。"""
@@ -574,6 +604,8 @@ class NodeResGNN(nn.Module):
         operator: str,
         dropout: float,
         gate_init: float = 0.8,
+        gate_mode: str = "learnable",
+        fixed_gate_value: float = 0.8,
     ):
         super().__init__()
         input_dim = infer_input_dim(dataset)
@@ -583,7 +615,7 @@ class NodeResGNN(nn.Module):
         )
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
         self.dropout = dropout
-        self.residual_gate = LearnableGate(init_probability=gate_init)
+        self.residual_gate = build_gate(gate_init, gate_mode=gate_mode, fixed_gate_value=fixed_gate_value)
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """前向时将 `current + previous` 送入下一层，形成节点级残差。"""
@@ -618,6 +650,8 @@ class NodeCrossGNN(nn.Module):
         operator: str,
         dropout: float,
         gate_init: float = 0.8,
+        gate_mode: str = "learnable",
+        fixed_gate_value: float = 0.8,
     ):
         super().__init__()
         input_dim = infer_input_dim(dataset)
@@ -628,7 +662,7 @@ class NodeCrossGNN(nn.Module):
         )
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
         self.dropout = dropout
-        self.cross_gate = LearnableGate(init_probability=gate_init)
+        self.cross_gate = build_gate(gate_init, gate_mode=gate_mode, fixed_gate_value=fixed_gate_value)
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """双分支交替更新，并在图池化前把两个分支的结果相加。"""
@@ -671,6 +705,8 @@ class GraphCondGNN(nn.Module):
         operator: str,
         dropout: float,
         gate_init: float = 0.8,
+        gate_mode: str = "learnable",
+        fixed_gate_value: float = 0.8,
     ):
         super().__init__()
         self.block_1 = PlainBlock(
@@ -681,6 +717,8 @@ class GraphCondGNN(nn.Module):
             dropout,
             res_graph=False,
             gate_init=gate_init,
+            gate_mode=gate_mode,
+            fixed_gate_value=fixed_gate_value,
         )
         self.block_2 = PlainBlock(
             hidden_channels,
@@ -690,6 +728,8 @@ class GraphCondGNN(nn.Module):
             dropout,
             res_graph=False,
             gate_init=gate_init,
+            gate_mode=gate_mode,
+            fixed_gate_value=fixed_gate_value,
         )
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
 
@@ -715,6 +755,8 @@ class GraphResGNN(nn.Module):
         operator: str,
         dropout: float,
         gate_init: float = 0.8,
+        gate_mode: str = "learnable",
+        fixed_gate_value: float = 0.8,
     ):
         super().__init__()
         self.blocks = nn.ModuleList(
@@ -727,6 +769,8 @@ class GraphResGNN(nn.Module):
                     dropout,
                     res_graph=True,
                     gate_init=gate_init,
+                    gate_mode=gate_mode,
+                    fixed_gate_value=fixed_gate_value,
                 )
                 for _ in range(3)
             ]
@@ -758,6 +802,8 @@ class GraphCrossGNN(nn.Module):
         operator: str,
         dropout: float,
         gate_init: float = 0.8,
+        gate_mode: str = "learnable",
+        fixed_gate_value: float = 0.8,
     ):
         super().__init__()
         self.blocks = nn.ModuleList(
@@ -770,6 +816,8 @@ class GraphCrossGNN(nn.Module):
                     dropout,
                     res_graph=False,
                     gate_init=gate_init,
+                    gate_mode=gate_mode,
+                    fixed_gate_value=fixed_gate_value,
                 )
                 for _ in range(4)
             ]
@@ -920,7 +968,12 @@ def build_model(args: argparse.Namespace, dataset: TUDataset) -> nn.Module:
         "hidden_layers": args.h_layer,
         "dropout": args.drop,
     }
-    gated_kwargs = {**common_kwargs, "gate_init": args.gate_init}
+    gated_kwargs = {
+        **common_kwargs,
+        "gate_init": args.gate_init,
+        "gate_mode": args.gate_mode,
+        "fixed_gate_value": args.fixed_gate_value,
+    }
 
     if args.gname == "PlainGNN":
         return PlainBlock(operator=args.name, res_graph=False, **gated_kwargs)
@@ -987,7 +1040,7 @@ def collect_gate_values(model: nn.Module) -> Dict[str, float]:
 
     gate_values: Dict[str, float] = {}
     for module_name, module in model.named_modules():
-        if isinstance(module, LearnableGate):
+        if isinstance(module, (LearnableGate, FixedGate)):
             gate_values[module_name] = float(module().detach().item())
     return gate_values
 
