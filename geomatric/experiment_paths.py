@@ -5,8 +5,9 @@ from pathlib import Path
 from typing import Dict
 
 
-DEFAULT_EXPERIMENT_VERSION = "V2"
+DEFAULT_EXPERIMENT_VERSION = "V3"
 LEGACY_EXPERIMENT_VERSION = "V1"
+PREVIOUS_EXPERIMENT_VERSION = "V2"
 
 
 def normalize_version(version: str | None) -> str:
@@ -46,8 +47,14 @@ def manifest_payload(project_root: Path) -> Dict[str, object]:
                 "records_dir": str(record_dir(project_root, LEGACY_EXPERIMENT_VERSION).relative_to(project_root)),
                 "runs_dir": str(run_dir(project_root, LEGACY_EXPERIMENT_VERSION).relative_to(project_root)),
             },
+            PREVIOUS_EXPERIMENT_VERSION: {
+                "description": "Second formal version with full-suite reruns, supplementary gate ablations, and cross-gate studies.",
+                "logs_dir": str(log_dir(project_root, PREVIOUS_EXPERIMENT_VERSION).relative_to(project_root)),
+                "records_dir": str(record_dir(project_root, PREVIOUS_EXPERIMENT_VERSION).relative_to(project_root)),
+                "runs_dir": str(run_dir(project_root, PREVIOUS_EXPERIMENT_VERSION).relative_to(project_root)),
+            },
             DEFAULT_EXPERIMENT_VERSION: {
-                "description": "Current rerun outputs with version-isolated logs, records, and TensorBoard runs.",
+                "description": "Current paper-facing consolidated version for new residual-mode ablations and final reruns.",
                 "logs_dir": str(log_dir(project_root, DEFAULT_EXPERIMENT_VERSION).relative_to(project_root)),
                 "records_dir": str(record_dir(project_root, DEFAULT_EXPERIMENT_VERSION).relative_to(project_root)),
                 "runs_dir": str(run_dir(project_root, DEFAULT_EXPERIMENT_VERSION).relative_to(project_root)),

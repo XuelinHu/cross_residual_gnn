@@ -136,6 +136,39 @@ def build_gate(init_probability: float, gate_mode: str, fixed_gate_value: float)
     return LearnableGate(init_probability=init_probability)
 
 
+def topk_mask(tensor: torch.Tensor, ratio: float) -> torch.Tensor:
+    """按最后一维保留 top-k 幅值分量，返回 0/1 mask。"""
+
+    if tensor.numel() == 0:
+        return torch.zeros_like(tensor)
+    keep_ratio = min(max(ratio, 1e-4), 1.0)
+    last_dim = tensor.size(-1)
+    k = max(1, min(last_dim, int(np.ceil(last_dim * keep_ratio))))
+    if k >= last_dim:
+        return torch.ones_like(tensor)
+    values, indices = torch.topk(tensor.abs(), k=k, dim=-1)
+    del values
+    mask = torch.zeros_like(tensor)
+    mask.scatter_(-1, indices, 1.0)
+    return mask
+
+
+def apply_residual_mode(
+    residual: torch.Tensor,
+    residual_mode: str,
+    topk_ratio: float,
+    sparse_lambda: float,
+) -> torch.Tensor:
+    """根据残差模式对残差支路做筛选或稀疏化。"""
+
+    if residual_mode == "topk":
+        return residual * topk_mask(residual, ratio=topk_ratio)
+    if residual_mode == "sparse":
+        # softshrink 会把小幅值残差压成 0，形成可微的稀疏残差。
+        return F.softshrink(residual, lambd=max(sparse_lambda, 0.0))
+    return residual
+
+
 def parse_args() -> argparse.Namespace:
     """解析命令行参数。
 
@@ -191,6 +224,15 @@ def parse_args() -> argparse.Namespace:
         help="门控模式：learnable 为可学习门控，fixed 为固定门控消融。",
     )
     parser.add_argument("--fixed_gate_value", type=float, default=0.8, help="固定门控模式下使用的门控值。")
+    parser.add_argument(
+        "--residual_mode",
+        type=str,
+        default="learnable",
+        choices=["learnable", "topk", "sparse"],
+        help="残差支路模式：learnable 为原始可学习门控残差，topk 为 top-k 残差，sparse 为软稀疏残差。",
+    )
+    parser.add_argument("--topk_ratio", type=float, default=0.5, help="top-k 残差保留比例，按最后一维计算。")
+    parser.add_argument("--sparse_lambda", type=float, default=0.05, help="稀疏残差的 softshrink 强度。")
     parser.add_argument("--jk_mode", type=str, default="cat", choices=["cat", "max", "lstm"])
     parser.add_argument(
         "--mode",
@@ -558,6 +600,9 @@ class PlainBlock(nn.Module):
         gate_init: float = 0.8,
         gate_mode: str = "learnable",
         fixed_gate_value: float = 0.8,
+        residual_mode: str = "learnable",
+        topk_ratio: float = 0.5,
+        sparse_lambda: float = 0.05,
     ):
         super().__init__()
         input_dim = infer_input_dim(dataset)
@@ -569,6 +614,9 @@ class PlainBlock(nn.Module):
         self.dropout = dropout
         self.res_graph = res_graph
         self.graph_gate = build_gate(gate_init, gate_mode=gate_mode, fixed_gate_value=fixed_gate_value)
+        self.residual_mode = residual_mode
+        self.topk_ratio = topk_ratio
+        self.sparse_lambda = sparse_lambda
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor, graph_hidden: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
         """执行单个 PlainBlock 前向传播，并返回 logits 与图嵌入。"""
@@ -579,13 +627,25 @@ class PlainBlock(nn.Module):
         for layer in self.hidden_layers:
             # 关键路径：图级状态通过 batch 索引广播回节点表征。
             if self.res_graph and graph_hidden is not None:
-                x = x + gate * graph_hidden[batch]
+                residual = apply_residual_mode(
+                    graph_hidden[batch],
+                    residual_mode=self.residual_mode,
+                    topk_ratio=self.topk_ratio,
+                    sparse_lambda=self.sparse_lambda,
+                )
+                x = x + gate * residual
             x = F.relu(layer(x, edge_index))
             x = F.dropout(x, p=self.dropout, training=self.training)
 
         graph_embedding = global_mean_pool(x, batch)
         if graph_hidden is not None:
-            graph_embedding = graph_embedding + gate * graph_hidden
+            residual = apply_residual_mode(
+                graph_hidden,
+                residual_mode=self.residual_mode,
+                topk_ratio=self.topk_ratio,
+                sparse_lambda=self.sparse_lambda,
+            )
+            graph_embedding = graph_embedding + gate * residual
         logits = self.classifier(F.dropout(graph_embedding, p=self.dropout, training=self.training))
         return logits, graph_embedding
 
@@ -606,6 +666,9 @@ class NodeResGNN(nn.Module):
         gate_init: float = 0.8,
         gate_mode: str = "learnable",
         fixed_gate_value: float = 0.8,
+        residual_mode: str = "learnable",
+        topk_ratio: float = 0.5,
+        sparse_lambda: float = 0.05,
     ):
         super().__init__()
         input_dim = infer_input_dim(dataset)
@@ -616,6 +679,9 @@ class NodeResGNN(nn.Module):
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
         self.dropout = dropout
         self.residual_gate = build_gate(gate_init, gate_mode=gate_mode, fixed_gate_value=fixed_gate_value)
+        self.residual_mode = residual_mode
+        self.topk_ratio = topk_ratio
+        self.sparse_lambda = sparse_lambda
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """前向时将 `current + previous` 送入下一层，形成节点级残差。"""
@@ -627,7 +693,13 @@ class NodeResGNN(nn.Module):
         for layer in self.hidden_layers:
             cached = current
             # 关键路径：上一层缓存 `previous` 作为残差支路参与卷积。
-            current = F.relu(layer(current + gate * previous, edge_index))
+            residual = apply_residual_mode(
+                previous,
+                residual_mode=self.residual_mode,
+                topk_ratio=self.topk_ratio,
+                sparse_lambda=self.sparse_lambda,
+            )
+            current = F.relu(layer(current + gate * residual, edge_index))
             current = F.dropout(current, p=self.dropout, training=self.training)
             previous = cached
 
@@ -652,6 +724,9 @@ class NodeCrossGNN(nn.Module):
         gate_init: float = 0.8,
         gate_mode: str = "learnable",
         fixed_gate_value: float = 0.8,
+        residual_mode: str = "learnable",
+        topk_ratio: float = 0.5,
+        sparse_lambda: float = 0.05,
     ):
         super().__init__()
         input_dim = infer_input_dim(dataset)
@@ -663,6 +738,9 @@ class NodeCrossGNN(nn.Module):
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
         self.dropout = dropout
         self.cross_gate = build_gate(gate_init, gate_mode=gate_mode, fixed_gate_value=fixed_gate_value)
+        self.residual_mode = residual_mode
+        self.topk_ratio = topk_ratio
+        self.sparse_lambda = sparse_lambda
 
     def forward(self, x: torch.Tensor, edge_index: torch.Tensor, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """双分支交替更新，并在图池化前把两个分支的结果相加。"""
@@ -678,9 +756,21 @@ class NodeCrossGNN(nn.Module):
             cache_1 = branch_1
             cache_2 = branch_2
             # 关键路径：branch_1 接收 prev_2，branch_2 接收 prev_1，形成交叉残差。
-            branch_1 = F.relu(self.hidden_layers[layer_id](branch_1 + gate * prev_2, edge_index))
+            residual_12 = apply_residual_mode(
+                prev_2,
+                residual_mode=self.residual_mode,
+                topk_ratio=self.topk_ratio,
+                sparse_lambda=self.sparse_lambda,
+            )
+            residual_21 = apply_residual_mode(
+                prev_1,
+                residual_mode=self.residual_mode,
+                topk_ratio=self.topk_ratio,
+                sparse_lambda=self.sparse_lambda,
+            )
+            branch_1 = F.relu(self.hidden_layers[layer_id](branch_1 + gate * residual_12, edge_index))
             branch_1 = F.dropout(branch_1, p=self.dropout, training=self.training)
-            branch_2 = F.relu(self.hidden_layers[layer_id + 1](branch_2 + gate * prev_1, edge_index))
+            branch_2 = F.relu(self.hidden_layers[layer_id + 1](branch_2 + gate * residual_21, edge_index))
             branch_2 = F.dropout(branch_2, p=self.dropout, training=self.training)
             prev_1 = cache_1
             prev_2 = cache_2
@@ -707,6 +797,9 @@ class GraphCondGNN(nn.Module):
         gate_init: float = 0.8,
         gate_mode: str = "learnable",
         fixed_gate_value: float = 0.8,
+        residual_mode: str = "learnable",
+        topk_ratio: float = 0.5,
+        sparse_lambda: float = 0.05,
     ):
         super().__init__()
         self.block_1 = PlainBlock(
@@ -719,6 +812,9 @@ class GraphCondGNN(nn.Module):
             gate_init=gate_init,
             gate_mode=gate_mode,
             fixed_gate_value=fixed_gate_value,
+            residual_mode=residual_mode,
+            topk_ratio=topk_ratio,
+            sparse_lambda=sparse_lambda,
         )
         self.block_2 = PlainBlock(
             hidden_channels,
@@ -730,6 +826,9 @@ class GraphCondGNN(nn.Module):
             gate_init=gate_init,
             gate_mode=gate_mode,
             fixed_gate_value=fixed_gate_value,
+            residual_mode=residual_mode,
+            topk_ratio=topk_ratio,
+            sparse_lambda=sparse_lambda,
         )
         self.classifier = nn.Linear(hidden_channels, dataset.num_classes)
 
@@ -757,6 +856,9 @@ class GraphResGNN(nn.Module):
         gate_init: float = 0.8,
         gate_mode: str = "learnable",
         fixed_gate_value: float = 0.8,
+        residual_mode: str = "learnable",
+        topk_ratio: float = 0.5,
+        sparse_lambda: float = 0.05,
     ):
         super().__init__()
         self.blocks = nn.ModuleList(
@@ -771,6 +873,9 @@ class GraphResGNN(nn.Module):
                     gate_init=gate_init,
                     gate_mode=gate_mode,
                     fixed_gate_value=fixed_gate_value,
+                    residual_mode=residual_mode,
+                    topk_ratio=topk_ratio,
+                    sparse_lambda=sparse_lambda,
                 )
                 for _ in range(3)
             ]
@@ -804,6 +909,9 @@ class GraphCrossGNN(nn.Module):
         gate_init: float = 0.8,
         gate_mode: str = "learnable",
         fixed_gate_value: float = 0.8,
+        residual_mode: str = "learnable",
+        topk_ratio: float = 0.5,
+        sparse_lambda: float = 0.05,
     ):
         super().__init__()
         self.blocks = nn.ModuleList(
@@ -818,6 +926,9 @@ class GraphCrossGNN(nn.Module):
                     gate_init=gate_init,
                     gate_mode=gate_mode,
                     fixed_gate_value=fixed_gate_value,
+                    residual_mode=residual_mode,
+                    topk_ratio=topk_ratio,
+                    sparse_lambda=sparse_lambda,
                 )
                 for _ in range(4)
             ]
@@ -973,6 +1084,9 @@ def build_model(args: argparse.Namespace, dataset: TUDataset) -> nn.Module:
         "gate_init": args.gate_init,
         "gate_mode": args.gate_mode,
         "fixed_gate_value": args.fixed_gate_value,
+        "residual_mode": args.residual_mode,
+        "topk_ratio": args.topk_ratio,
+        "sparse_lambda": args.sparse_lambda,
     }
 
     if args.gname == "PlainGNN":
