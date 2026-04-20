@@ -1,0 +1,60 @@
+\section*{Results}
+\label{sec:results}
+\label{sec:experiments}
+
+This section answers two questions. First, does cross-residual information flow improve graph classification beyond plain stacking? Second, when compared against simpler residual reuse, where does the cross design help and where does it remain weaker?
+
+\subsection*{Full-suite benchmark results}
+
+Tables~\ref{tab:all_results_1}--\ref{tab:all_winners} summarize the revised benchmark package over the active biological and supplementary datasets.
+
+\input{../md/all_exp_tables.tex}
+
+Taken together, the three tables show a consistent hierarchy. Residual reuse is still the stronger default family in the protein-oriented core, cross-residual routing becomes selectively useful on supplementary molecular datasets, and the winner summary confirms that no single complexity trend explains the results by itself.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/exp/fig1_full_suite_results.pdf}
+\caption{Benchmark over the active dataset package. Each bar reports mean best test accuracy, the numeric label above each bar gives the exact mean value, and error bars show the fold-level standard deviation.}
+\label{fig:full_suite_results}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.90\linewidth]{figures/exp/fig2_cross_advantage_heatmap.pdf}
+\caption{Accuracy deltas that define the practical value of cross-residual routing. Positive values indicate an advantage for the cross design, while negative values indicate that the corresponding plain or residual alternative remains stronger.}
+\label{fig:cross_advantage_heatmap}
+\end{figure}
+
+Figure~\ref{fig:full_suite_results} and Figure~\ref{fig:cross_advantage_heatmap} make the same point from complementary angles: cross-residual routing is usually better than plain stacking, but it is not consistently stronger than the best residual alternative.
+
+\subsection*{Main findings on the protein-oriented benchmark core}
+
+\textbf{Residual reuse remains the strongest default family in the reported suite.} Residual variants win PROTEINS, DD, ENZYMES, and AIDS. In particular, GraphResGNN is best on PROTEINS ($0.7223 \pm 0.0367$), ENZYMES ($0.3117 \pm 0.0746$), and AIDS ($0.9160 \pm 0.0121$), while NodeResGNN is best on DD ($0.7207 \pm 0.0259$).
+
+\textbf{Cross-residual design is selectively strong, not universally dominant.} Cross variants still win completed datasets such as MUTAG and Mutagenicity. More importantly, the best cross variant beats PlainGNN on most completed datasets. Therefore, cross routing is clearly more than a design curiosity, but the evidence does not support the stronger claim that cross universally outperforms residual reuse.
+
+\textbf{Node-level cross is more reliable than graph-level cross.} Across the completed datasets, NodeCrossGNN outperforms NodeResGNN more often than GraphCrossGNN outperforms GraphResGNN. This suggests that exchanging intermediate node-level states is the more robust cross-residual design in the present study, while graph-level cross routing is more dataset-sensitive.
+
+\textbf{Plain stacking is no longer a credible final baseline.} PlainGNN remains competitive on PROTEINS and DD, but it never wins a dataset in the final suite and is usually surpassed by either a residual or a cross-residual variant.
+
+\subsection*{Topic-focused results for PROTEINS, DD, and ENZYMES}
+
+The topic-facing interpretation is anchored in the protein-oriented core datasets.
+
+On \textbf{PROTEINS}, GraphResGNN is clearly strongest, indicating that repeated graph-level residual refinement is the most effective way to preserve useful global structure. The best cross model here is NodeCrossGNN at $0.6963 \pm 0.0433$, which improves slightly over NodeResGNN but remains below both PlainGNN and GraphResGNN.
+
+On \textbf{DD}, NodeResGNN and NodeCrossGNN are nearly tied, with NodeResGNN retaining a narrow lead. This indicates that node-level hidden-state reuse is important on large sparse protein graphs, but cross exchange does not produce a decisive improvement over simpler residual reuse.
+
+On \textbf{ENZYMES}, cross variants become more attractive. GraphCrossGNN reaches $0.3017 \pm 0.0750$ and NodeCrossGNN reaches $0.3000 \pm 0.0580$, both clearly above PlainGNN at $0.2450 \pm 0.0407$. Even so, GraphResGNN still remains the best model.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/exp/fig4_topic_focus_results.pdf}
+\caption{Focused comparison on the completed topic-facing TU datasets. The pattern is mixed rather than one-sided: graph-level residual refinement is strongest on PROTEINS and ENZYMES, while DD favors node-level reuse, with NodeCrossGNN remaining competitive but not dominant.}
+\label{fig:topic_focus_results}
+\end{figure}
+
+\subsection*{Robustness observations}
+
+Auxiliary sensitivity checks over depth, dropout, and learning rate on PROTEINS, DD, and ENZYMES do not materially change the main conclusion. On PROTEINS and DD, moderate tuning changes affect the gap between the two cross variants, but they do not overturn the broader conclusion that residual baselines remain the stronger default reference. On ENZYMES, the validation signal is visibly noisier, and promising local settings did not reproduce the original full-suite cross results under the final 5-fold average.
