@@ -5,9 +5,8 @@ from pathlib import Path
 from typing import Dict
 
 
-DEFAULT_EXPERIMENT_VERSION = "V3"
-LEGACY_EXPERIMENT_VERSION = "V1"
-PREVIOUS_EXPERIMENT_VERSION = "V2"
+DEFAULT_EXPERIMENT_VERSION = "LATEST"
+ARCHIVED_EXPERIMENT_VERSIONS = ("V1", "V2", "V3")
 
 
 def normalize_version(version: str | None) -> str:
@@ -38,28 +37,35 @@ def version_manifest_path(project_root: Path) -> Path:
 
 
 def manifest_payload(project_root: Path) -> Dict[str, object]:
+    versions = {
+        "V1": {
+            "description": "Archived pre-versioned experiment outputs moved from top-level runtime directories.",
+            "logs_dir": str(log_dir(project_root, "V1").relative_to(project_root)),
+            "records_dir": str(record_dir(project_root, "V1").relative_to(project_root)),
+            "runs_dir": str(run_dir(project_root, "V1").relative_to(project_root)),
+        },
+        "V2": {
+            "description": "Archived formal reruns with supplementary gate ablations and cross-gate studies.",
+            "logs_dir": str(log_dir(project_root, "V2").relative_to(project_root)),
+            "records_dir": str(record_dir(project_root, "V2").relative_to(project_root)),
+            "runs_dir": str(run_dir(project_root, "V2").relative_to(project_root)),
+        },
+        "V3": {
+            "description": "Archived pre-latest consolidation stage kept for historical comparison.",
+            "logs_dir": str(log_dir(project_root, "V3").relative_to(project_root)),
+            "records_dir": str(record_dir(project_root, "V3").relative_to(project_root)),
+            "runs_dir": str(run_dir(project_root, "V3").relative_to(project_root)),
+        },
+        DEFAULT_EXPERIMENT_VERSION: {
+            "description": "Current paper-facing latest version for training, reports, and consolidated artifacts.",
+            "logs_dir": str(log_dir(project_root, DEFAULT_EXPERIMENT_VERSION).relative_to(project_root)),
+            "records_dir": str(record_dir(project_root, DEFAULT_EXPERIMENT_VERSION).relative_to(project_root)),
+            "runs_dir": str(run_dir(project_root, DEFAULT_EXPERIMENT_VERSION).relative_to(project_root)),
+        },
+    }
     return {
         "default_version": DEFAULT_EXPERIMENT_VERSION,
-        "versions": {
-            LEGACY_EXPERIMENT_VERSION: {
-                "description": "Archived pre-versioned experiment outputs moved from top-level runtime directories.",
-                "logs_dir": str(log_dir(project_root, LEGACY_EXPERIMENT_VERSION).relative_to(project_root)),
-                "records_dir": str(record_dir(project_root, LEGACY_EXPERIMENT_VERSION).relative_to(project_root)),
-                "runs_dir": str(run_dir(project_root, LEGACY_EXPERIMENT_VERSION).relative_to(project_root)),
-            },
-            PREVIOUS_EXPERIMENT_VERSION: {
-                "description": "Second formal version with full-suite reruns, supplementary gate ablations, and cross-gate studies.",
-                "logs_dir": str(log_dir(project_root, PREVIOUS_EXPERIMENT_VERSION).relative_to(project_root)),
-                "records_dir": str(record_dir(project_root, PREVIOUS_EXPERIMENT_VERSION).relative_to(project_root)),
-                "runs_dir": str(run_dir(project_root, PREVIOUS_EXPERIMENT_VERSION).relative_to(project_root)),
-            },
-            DEFAULT_EXPERIMENT_VERSION: {
-                "description": "Current paper-facing consolidated version for new residual-mode ablations and final reruns.",
-                "logs_dir": str(log_dir(project_root, DEFAULT_EXPERIMENT_VERSION).relative_to(project_root)),
-                "records_dir": str(record_dir(project_root, DEFAULT_EXPERIMENT_VERSION).relative_to(project_root)),
-                "runs_dir": str(run_dir(project_root, DEFAULT_EXPERIMENT_VERSION).relative_to(project_root)),
-            },
-        },
+        "versions": versions,
     }
 
 

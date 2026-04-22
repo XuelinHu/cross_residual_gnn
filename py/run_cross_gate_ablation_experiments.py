@@ -131,7 +131,7 @@ def run_jobs(jobs: Iterable[Tuple[str, List[str]]], max_workers: int) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run gate ablations on cross-winning V2 configurations.")
+    parser = argparse.ArgumentParser(description="Run gate ablations on archived cross-winning configurations.")
     parser.add_argument("--version", type=str, default=DEFAULT_EXPERIMENT_VERSION)
     parser.add_argument("--max_workers", type=int, default=4)
     parser.add_argument("--list_only", action="store_true")

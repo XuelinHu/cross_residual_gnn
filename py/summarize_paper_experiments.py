@@ -87,7 +87,7 @@ def format_table(datasets: Iterable[str], models: Iterable[str], active_log_dir:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Summarize paper-ready V3 experiments from logs.")
+    parser = argparse.ArgumentParser(description="Summarize paper-ready latest experiments from logs.")
     parser.add_argument(
         "--dataset_group",
         choices=["main", "topic", "extended", "all"],
