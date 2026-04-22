@@ -14,7 +14,7 @@
 
 \graphicspath{{figures/}{../figures/}}
 
-\title{Cross-Residual Graph Neural Networks for Biomolecular Graph Representation Learning}
+\title{Cross-Residual Graph Neural Networks for Biomolecular Graph Classification: An Empirical Study of Residual Routing}
 
 \author[1]{Jingchao Wang}
 \author[1]{Wei Huang}
@@ -27,7 +27,13 @@
 \corrauthor[1]{Xuelin Hu}{huxuelinai@gmail.com}
 
 \begin{abstract}
-Graph neural networks are increasingly used in biomolecular and plant-related graph learning, yet deep message passing can blur local structural cues while simple skip connections do not test richer information reuse. This limitation is especially relevant for biological graph classification, where predictive signals often depend on both local motifs and graph-level context. We therefore study Cross-Residual Graph Neural Networks (CR-GNN), a compact model family that compares five information-flow patterns under a shared backbone: PlainGNN, NodeResGNN, NodeCrossGNN, GraphResGNN, and GraphCrossGNN. Experiments on a protein-oriented benchmark centered on PROTEINS, DD, and ENZYMES, with MUTAG, AIDS, and Mutagenicity as supplementary robustness checks, show a consistent picture. Residual reuse is the strongest default strategy, while cross-residual routing usually improves over plain stacking and delivers dataset-dependent gains on selected graphs. These results position CR-GNN as a practical biomolecular graph representation framework and clarify when cross-path interaction is useful in biologically motivated graph learning.
+\textbf{Background.} Graph neural networks are widely used for graph classification on proteins and molecules, but deeper message passing can blur discriminative local structure, and standard skip connections do not test whether cross-branch historical exchange offers a better trade-off than ordinary residual reuse. This issue is especially relevant in biomolecular graph classification, where useful evidence may depend on both local motifs and graph-level context.
+
+\textbf{Methods.} We study Cross-Residual Graph Neural Networks (CR-GNN), a controlled model family that compares plain stacking, node-level residual reuse, node-level cross-residual exchange, graph-level residual propagation, and graph-level cross-summary exchange under shared graph-classification backbones. The final benchmark uses six datasets, nine methods, four message-passing operators, and stratified five-fold evaluation. We further organize targeted experiments on gate control, residual routing modes, residual-parameter sweeps, and exploratory sensitivity scans.
+
+\textbf{Results.} The final results show that residual reuse remains the stronger default family across the biomolecular benchmark package, while cross-residual routing usually improves over plain stacking and yields selective gains on specific datasets. The strongest graph-level residual line remains best on several core settings, but residual routing design materially affects the outcome: mild sparse routing is often competitive and is the strongest family on three of four representative residual-routing targets.
+
+\textbf{Conclusions.} CR-GNN is best interpreted as a biomolecular graph-classification design space rather than a universally dominant architecture. The empirical evidence supports a constrained conclusion: cross-residual interaction is useful but conditional, and residual routing strategy is an important determinant of performance.
 \end{abstract}
 
 \begin{document}
@@ -37,7 +43,9 @@ Graph neural networks are increasingly used in biomolecular and plant-related gr
 \thispagestyle{empty}
 
 \input{sections/introduction_peerj.tex}
+\input{sections/background_peerj.tex}
 \input{sections/methods_peerj.tex}
+\input{sections/experimental_design_peerj.tex}
 \input{sections/results_peerj.tex}
 \input{sections/discussion_peerj.tex}
 \input{sections/conclusions_peerj.tex}

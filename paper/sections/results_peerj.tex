@@ -2,11 +2,11 @@
 \label{sec:results}
 \label{sec:experiments}
 
-This section answers two questions. First, does cross-residual information flow improve graph classification beyond plain stacking? Second, when compared against simpler residual reuse, where does the cross design help and where does it remain weaker?
+This section reports the final empirical evidence in three layers: the full benchmark, the targeted gate and residual-routing studies, and the exploratory sensitivity analyses. The main benchmark and the targeted ablations use the paper-facing \texttt{V3} five-fold results, whereas the older sensitivity scans are retained only as supporting trend analyses.
 
-\subsection*{Full-suite benchmark results}
+\subsection*{Overall benchmark performance}
 
-Tables~\ref{tab:all_results_1}--\ref{tab:all_winners} summarize the revised benchmark package over the active biological and supplementary datasets.
+The final benchmark evaluates six datasets, nine methods, four operators, and five outer folds under one unified protocol. For readability, the main text reports compressed summary tables over the active biological and supplementary datasets, while the complete matrix is reproduced in the appendix.
 
 \input{../md/all_exp_tables.tex}
 
@@ -28,7 +28,7 @@ Taken together, the three tables show a consistent hierarchy. Residual reuse is 
 
 Figure~\ref{fig:full_suite_results} and Figure~\ref{fig:cross_advantage_heatmap} make the same point from complementary angles: cross-residual routing is usually better than plain stacking, but it is not consistently stronger than the best residual alternative.
 
-\subsection*{Main findings on the protein-oriented benchmark core}
+\subsection*{Results on the biological core datasets}
 
 \textbf{Residual reuse remains the strongest default family in the reported suite.} Residual variants win PROTEINS, DD, ENZYMES, and AIDS. In particular, GraphResGNN is best on PROTEINS ($0.7223 \pm 0.0367$), ENZYMES ($0.3117 \pm 0.0746$), and AIDS ($0.9160 \pm 0.0121$), while NodeResGNN is best on DD ($0.7207 \pm 0.0259$).
 
@@ -55,6 +55,30 @@ On \textbf{ENZYMES}, cross variants become more attractive. GraphCrossGNN reache
 \label{fig:topic_focus_results}
 \end{figure}
 
-\subsection*{Robustness observations}
+\subsection*{Results on the supplementary robustness datasets}
+
+The supplementary package broadens the scope beyond the biological core without changing the main conclusion. NodeCrossGNN is strongest on MUTAG and Mutagenicity, whereas GraphResGNN remains strongest on AIDS. This pattern preserves the paper's main boundary claim: cross-residual interaction has selective practical value, but the residual family remains the more reliable default reference across the full suite.
+
+\subsection*{Gate ablation results}
+
+\input{../md/peerj_gate_tables.tex}
+
+The gate ablations are designed to test whether adaptive control of residual injection is useful once the main benchmark has identified strong target configurations. On the strongest graph-level residual line, \texttt{AIDS + GraphResGNN + GINConv}, the comparison among learnable and fixed gates is the cleanest direct test of adaptive graph-level reuse. Table~\ref{tab:aids_gate_ablation} shows that the learnable gate is the strongest setting, although the fixed coefficient \texttt{0.5} remains very close. The cross-gate ablation extends the same comparison to six settings where a cross architecture is already locally favored.
+
+The intended interpretation is constrained. The gate study does not need to show that learnable gating is best on every target. Instead, the relevant question is whether adaptive control is generally more robust than fixed injection strengths across the selected residual and cross-residual settings. Table~\ref{tab:cross_gate_ablation} shows a mixed result: learnable gating is best on three of the six cross-favored targets, while fixed gates remain competitive and can even be superior on the other three targets. This supports a robustness claim, not a universal-optimum claim.
+
+\subsection*{Residual-routing results}
+
+\input{../md/peerj_residual_tables.tex}
+
+The residual-routing analysis is the main mechanism extension of the paper. Four representative targets compare learnable, top-k, and sparse routing modes under the same five-fold protocol. The clearest overall signal is that there is no universal winner. Table~\ref{tab:residual_routing_full} shows that \texttt{learnable} remains best on the strongest graph-level residual line (\texttt{AIDS + GraphResGNN + GINConv}), but sparse routing is strongest on three of the four representative targets, with \texttt{sparse\_0p05} emerging as the most consistent sparse setting.
+
+This pattern supports a more precise conclusion than the architecture-only benchmark alone. The important question is not only whether historical information is reused, but also how aggressively that information is filtered before reuse. Table~\ref{tab:residual_routing_family} compresses the same result by routing family: the sparse family is strongest on three of the four representative targets, while the learnable family remains strongest on the best graph-level residual line.
+
+\subsection*{Residual-parameter sweep results}
+
+The additional routing settings \texttt{topk\_0p75} and \texttt{sparse\_0p1} refine the previous result rather than changing it. Table~\ref{tab:residual_routing_full} shows that the strongest top-k ratio varies by target, which indicates that top-k routing is not governed by one globally optimal retention level. The sparse sweep also shows a clear failure mode: aggressive sparsity can damage otherwise strong residual lines, especially on the strongest graph-level residual target, where \texttt{sparse\_0p1} drops to \texttt{0.8315 $\pm$ 0.0549}.
+
+\subsection*{Exploratory sensitivity analysis}
 
 Auxiliary sensitivity checks over depth, dropout, and learning rate on PROTEINS, DD, and ENZYMES do not materially change the main conclusion. On PROTEINS and DD, moderate tuning changes affect the gap between the two cross variants, but they do not overturn the broader conclusion that residual baselines remain the stronger default reference. On ENZYMES, the validation signal is visibly noisier, and promising local settings did not reproduce the original full-suite cross results under the final 5-fold average.

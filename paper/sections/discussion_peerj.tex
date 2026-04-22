@@ -1,9 +1,23 @@
 \section*{Discussion}
 
-The main experimental message is precise. Cross-residual routing is usually beneficial relative to plain stacking, but the gain over residual baselines is conditional and dataset-dependent. The present evidence therefore supports CR-GNN as a meaningful architectural design space rather than a universal winner.
+The main empirical message is now more precise than in the earlier draft. Cross-residual routing is usually beneficial relative to plain stacking, but the gain over residual baselines is conditional and dataset-dependent. The present evidence therefore supports CR-GNN as a meaningful biomolecular graph-classification design space rather than as a universally dominant model family.
 
-The distinction between node-level and graph-level information reuse is also practically important. Node-level cross-residual exchange is more stable across datasets, whereas graph-level cross routing achieves stronger gains only on selected tasks. This suggests that the place where information is reused matters at least as much as the existence of additional reuse paths.
+\subsection*{Cross-residual gains are conditional}
 
-From a biological-application perspective, the strongest evidence still comes from PROTEINS, DD, and ENZYMES. These datasets support the claim that CR-GNN is useful for biomolecular graph representation learning, but they do not yet justify stronger claims about direct biological discovery or fully integrative omics prediction. The current study remains structure-centric rather than omics-integrative.
+The benchmark results do not support the strongest possible claim that cross-residual interaction should replace residual reuse as the default choice. Instead, they support a narrower statement: cross-residual design is often better than plain stacking and can be distinctly useful on selected datasets, but ordinary residual reuse remains the stronger default family across the full biomolecular package.
 
-This limitation also clarifies the next research step. The architecture-level findings should be tested with richer biological inputs, such as sequence-derived embeddings, ontology annotations, or expression-related signals. In parallel, the same information-flow designs can be extended toward more explicit plant-oriented graph inference tasks so that the methodological motivation in the introduction is examined under domain-specific supervision instead of benchmark transfer alone.
+\subsection*{Node-level and graph-level reuse behave differently}
+
+The distinction between node-level and graph-level information reuse is also practically important. Node-level cross exchange is the more stable cross-oriented design, whereas graph-level cross routing is more sensitive to dataset regime and does not consistently match the strongest graph-level residual lines. This suggests that the location of reuse is at least as important as the existence of an additional reuse path.
+
+\subsection*{Residual routing is part of the mechanism story}
+
+The residual-routing ablations add an important qualification to the main architecture comparison. The question is not only whether residual information should be reused, but also whether it should be reused densely, sparsified, or filtered by top-k selection. The current results show that routing strategy is target-dependent: learnable dense routing remains strongest on the best graph-level residual line, while mild sparse routing is frequently advantageous on cross-oriented settings. This turns the paper into a mechanism study rather than a pure architecture ranking exercise.
+
+\subsection*{Evidence hierarchy and study limitations}
+
+The strongest evidence in the paper comes from the five-fold \texttt{V3} benchmark and the five-fold targeted ablations. By contrast, the older single-fold sensitivity scans are useful only for optimization interpretation. They should not be treated as the same class of quantitative evidence. A second limitation is domain scope: although the datasets are biomolecular or molecular and the biological core is meaningful, the study remains benchmark-centered and structure-centric. It does not yet justify broader claims about direct biological discovery, omics integration, or task-specific biological interpretation.
+
+\subsection*{Future directions}
+
+The next research step is to test the same information-flow ideas with richer biological inputs, such as sequence-derived embeddings, ontology annotations, or expression-related signals. In parallel, the residual-routing perspective introduced here could be extended to broader biomolecular graph tasks where graph topology must be combined with stronger domain supervision rather than benchmark-only evaluation.

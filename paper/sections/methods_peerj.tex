@@ -108,7 +108,17 @@ The final graph embedding is
 \mathbf{g}_{\mathrm{final}} = \mathbf{g}^{(T)}_{1} + \mathbf{g}^{(T)}_{2}.
 \end{equation}
 
-\subsection*{Datasets and evaluation protocol}
+\subsection*{Residual routing mechanisms}
+
+Beyond the architecture family itself, this study evaluates how residual information is injected. Three routing modes are used in the targeted ablations:
+\begin{itemize}
+    \item \textbf{Learnable routing}: dense residual injection modulated by an adaptive gate.
+    \item \textbf{Top-k routing}: only the strongest residual channels are retained before injection.
+    \item \textbf{Sparse routing}: weak residual coefficients are suppressed, leaving a filtered residual path.
+\end{itemize}
+These routing modes are not used to redefine the core architecture family. Instead, they form a mechanism layer on top of selected residual and cross-residual targets in the experimental design.
+
+\subsection*{Datasets}
 \label{sec:datasets}
 
 To test the proposed architecture in a biologically meaningful setting, the benchmarks are organized into a unified two-layer package.
@@ -147,6 +157,22 @@ and the corresponding standard deviation
 \sigma_{\mathrm{Acc}} = \sqrt{\frac{1}{5}\sum_{k=1}^{5}\left(\mathrm{Acc}_k-\overline{\mathrm{Acc}}\right)^2 }.
 \end{equation}
 
-\subsection*{Experimental settings}
+\subsection*{Compared methods and backbone operators}
 
-We compare the five architectures under the same GCN-style message-passing backbone, the same dataset protocol, and the same validation-based model-selection rule. All reported runs follow the same reproducible evaluation policy. The important point for the paper is that every architecture is tested under the same data protocol, the same operator backbone, and the same model-selection criterion, so the comparison isolates the effect of information-flow design rather than changes in optimization or preprocessing.
+The full paper-facing benchmark compares nine methods. The CR-GNN family contains five models: PlainGNN, NodeResGNN, NodeCrossGNN, GraphResGNN, and GraphCrossGNN. Four external baselines are also included in the benchmark package: GraphSAGEBaseline, GINBaseline, JKNetBaseline, and APPNPBaseline.
+
+Each method is evaluated under four message-passing operators:
+\begin{itemize}
+    \item \textbf{GCNConv}
+    \item \textbf{GATConv}
+    \item \textbf{GINConv}
+    \item \textbf{SAGEConv}
+\end{itemize}
+
+\subsection*{Training configuration and implementation details}
+
+All reported runs follow the same versioned experimental workflow, with \texttt{V3} as the active paper-facing source. The recommended workflow entry is \texttt{py/run\_final\_v3\_pipeline.py}, and the associated outputs are stored in \texttt{logs/V3}, \texttt{records/V3}, and \texttt{runs/V3}. Preprocessing is intentionally light, and the final protocol does not add task-specific feature engineering, graph augmentation, or custom edge redesign.
+
+\subsection*{Evaluation metrics and statistical reporting}
+
+The primary metric is graph classification accuracy on the held-out test fold. Main benchmark and targeted ablation results are reported as five-fold mean accuracy with standard deviation. In the final paper, the five-fold \texttt{V3} experiments are treated as the main confirmatory evidence, while older single-fold parameter scans are used only as supporting exploratory analyses.

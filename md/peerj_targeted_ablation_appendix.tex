@@ -1,0 +1,77 @@
+\begin{table}[t]
+\centering
+\small
+\caption{Fold-level AIDS gate ablation on \texttt{AIDS + GraphResGNN + GINConv}.}
+\label{tab:appendix_aids_gate_folds}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{lcccccc}
+\toprule
+Gate setting & Fold 0 & Fold 1 & Fold 2 & Fold 3 & Fold 4 & Mean $\pm$ Std \\
+\midrule
+Learnable & 0.9500 & 0.9700 & 0.9700 & 0.9675 & 0.9525 & \textbf{0.9620 $\pm$ 0.0089} \\
+Fixed 0.0 & 0.9225 & 0.9025 & 0.9125 & 0.9000 & 0.9375 & 0.9150 $\pm$ 0.0138 \\
+Fixed 0.5 & 0.9325 & 0.9625 & 0.9675 & 0.9675 & 0.9725 & 0.9605 $\pm$ 0.0144 \\
+Fixed 1.0 & 0.8925 & 0.9450 & 0.9700 & 0.9775 & 0.9550 & 0.9480 $\pm$ 0.0300 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Cross-gate ablation on six cross-favored targets. Numbers are five-fold mean accuracy $\pm$ standard deviation.}
+\label{tab:appendix_cross_gate}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{llcccc}
+\toprule
+Dataset & Target model/operator & Learnable & Fixed 0.0 & Fixed 0.5 & Fixed 1.0 \\
+\midrule
+AIDS & NodeCrossGNN + GATConv & 0.9045 $\pm$ 0.0165 & 0.9075 $\pm$ 0.0065 & \textbf{0.9195 $\pm$ 0.0114} & 0.9105 $\pm$ 0.0241 \\
+DD & NodeCrossGNN + GATConv & \textbf{0.7173 $\pm$ 0.0271} & 0.7053 $\pm$ 0.0361 & 0.7156 $\pm$ 0.0225 & 0.7147 $\pm$ 0.0288 \\
+DD & NodeCrossGNN + GINConv & 0.7071 $\pm$ 0.0306 & 0.7012 $\pm$ 0.0198 & \textbf{0.7232 $\pm$ 0.0207} & 0.7113 $\pm$ 0.0277 \\
+ENZYMES & NodeCrossGNN + GATConv & 0.2800 $\pm$ 0.0629 & \textbf{0.2850 $\pm$ 0.0627} & 0.2550 $\pm$ 0.0674 & 0.2650 $\pm$ 0.0690 \\
+MUTAG & GraphCrossGNN + GATConv & \textbf{0.7558 $\pm$ 0.0495} & 0.7451 $\pm$ 0.0407 & 0.7450 $\pm$ 0.0416 & 0.7504 $\pm$ 0.0779 \\
+Mutagenicity & NodeCrossGNN + GATConv & \textbf{0.8114 $\pm$ 0.0110} & 0.8033 $\pm$ 0.0192 & 0.8010 $\pm$ 0.0130 & 0.8036 $\pm$ 0.0078 \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Residual-routing and parameter-sweep summary on four representative targets. Numbers are five-fold mean accuracy $\pm$ standard deviation.}
+\label{tab:appendix_residual_full}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{lcccccccc}
+\toprule
+Target & Learnable & Top-k 0.25 & Top-k 0.5 & Top-k 0.75 & Sparse 0.02 & Sparse 0.05 & Sparse 0.1 & Best \\
+\midrule
+\texttt{AIDS + GraphResGNN + GINConv} & \textbf{0.9500 $\pm$ 0.0087} & 0.9075 $\pm$ 0.0237 & 0.9330 $\pm$ 0.0251 & 0.9240 $\pm$ 0.0287 & 0.9470 $\pm$ 0.0181 & 0.9250 $\pm$ 0.0152 & 0.8315 $\pm$ 0.0549 & Learnable \\
+\texttt{PROTEINS + GraphResGNN + SAGEConv} & 0.7178 $\pm$ 0.0411 & 0.7241 $\pm$ 0.0407 & 0.7151 $\pm$ 0.0397 & 0.7214 $\pm$ 0.0318 & 0.7160 $\pm$ 0.0248 & \textbf{0.7259 $\pm$ 0.0475} & 0.7088 $\pm$ 0.0521 & Sparse 0.05 \\
+\texttt{AIDS + NodeCrossGNN + GATConv} & 0.8970 $\pm$ 0.0491 & 0.9160 $\pm$ 0.0128 & 0.8960 $\pm$ 0.0483 & 0.8960 $\pm$ 0.0489 & 0.9060 $\pm$ 0.0268 & \textbf{0.9180 $\pm$ 0.0162} & 0.9025 $\pm$ 0.0139 & Sparse 0.05 \\
+\texttt{DD + NodeCrossGNN + GATConv} & 0.7080 $\pm$ 0.0172 & 0.7062 $\pm$ 0.0249 & 0.7029 $\pm$ 0.0160 & 0.7164 $\pm$ 0.0248 & 0.7147 $\pm$ 0.0259 & \textbf{0.7181 $\pm$ 0.0196} & 0.7105 $\pm$ 0.0243 & Sparse 0.05 \\
+\bottomrule
+\end{tabular}
+}
+\end{table*}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Family-wise routing winners on representative targets.}
+\label{tab:appendix_residual_family}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{lcccc}
+\toprule
+Target & Best learnable & Best top-k & Best sparse & Overall winner \\
+\midrule
+\texttt{AIDS + GraphResGNN + GINConv} & 0.9500 & 0.9330 & 0.9470 & Learnable \\
+\texttt{PROTEINS + GraphResGNN + SAGEConv} & 0.7178 & 0.7241 & 0.7259 & Sparse \\
+\texttt{AIDS + NodeCrossGNN + GATConv} & 0.8970 & 0.9160 & 0.9180 & Sparse \\
+\texttt{DD + NodeCrossGNN + GATConv} & 0.7080 & 0.7164 & 0.7181 & Sparse \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
