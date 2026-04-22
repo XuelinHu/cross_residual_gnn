@@ -44,7 +44,7 @@ ANALYSIS_DIR = ROOT / "figures" / "analysis"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Export paper analysis artifacts for one V3 config.")
+    parser = argparse.ArgumentParser(description="Export paper analysis artifacts for one latest config.")
     parser.add_argument("--ds", required=True)
     parser.add_argument("--gname", required=True)
     parser.add_argument("--name", default="GCNConv")

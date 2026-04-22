@@ -96,20 +96,20 @@ cross_residual_gnn/
 
 这里的“快照”主要指训练过程和实验汇总生成的结果文件：
 
-- `logs/V2/train_<dataset>_<model>_<operator>_fold<k>__<timestamp>.json`
-  当前重跑日志目录：[logs/V2](./logs/V2)
-- `logs/V2/dataset_stats_<dataset>__<timestamp>.json`
-  数据集统计日志目录：[logs/V2](./logs/V2)
-- `records/V2/suite_<suite_name>_<dataset>__<timestamp>.txt`
-  当前重跑记录目录：[records/V2](./records/V2)
-- `records/V2/missing_experiment_status.json`
-  当前补跑状态快照：[records/V2](./records/V2)
-- `runs/V2/<model>_<operator>_<dataset>_<dim>_fold<k>_<h_layer>_<timestamp>/events.out.tfevents.*`
-  TensorBoard 根路径：[runs/V2](./runs/V2)
-- `logs/V2/missing_jobs/<job_slug>.log`
-  单任务训练日志：[logs/V2/missing_jobs](./logs/V2/missing_jobs)
+- `logs/LATEST/train_<dataset>_<model>_<operator>_fold<k>__<timestamp>.json`
+  当前最新日志目录：[logs/LATEST](./logs/LATEST)
+- `logs/LATEST/dataset_stats_<dataset>__<timestamp>.json`
+  数据集统计日志目录：[logs/LATEST](./logs/LATEST)
+- `records/LATEST/suite_<suite_name>_<dataset>__<timestamp>.txt`
+  当前最新记录目录：[records/LATEST](./records/LATEST)
+- `records/LATEST/missing_experiment_status.json`
+  当前最新补跑状态快照：[records/LATEST](./records/LATEST)
+- `runs/LATEST/<model>_<operator>_<dataset>_<dim>_fold<k>_<h_layer>_<timestamp>/events.out.tfevents.*`
+  TensorBoard 根路径：[runs/LATEST](./runs/LATEST)
+- `logs/LATEST/missing_jobs/<job_slug>.log`
+  单任务训练日志：[logs/LATEST/missing_jobs](./logs/LATEST/missing_jobs)
 - `records/experiment_versions.json`
-  `V1` / `V2` 统一版本索引：[records/experiment_versions.json](./records/experiment_versions.json)
+  归档 `V1` / `V2` / `V3` 与当前 `LATEST` 的统一版本索引：[records/experiment_versions.json](./records/experiment_versions.json)
 - `figures/analysis/*`
   分析产物目录：[figures/analysis/](./figures/analysis)
 - `figures/exp/*`
@@ -179,20 +179,17 @@ cross_residual_gnn/
 ## 论文文件路径
 
 - [paper/main.tex](./paper/main.tex)
-- [paper/main.pdf](./paper/main.pdf)
 - [paper/references.bib](./paper/references.bib)
 - [paper/compile.bat](./paper/compile.bat)
 - [paper/README.md](./paper/README.md)
 - [paper/paper_corpus_merged.json](./paper/paper_corpus_merged.json)
-- [paper/sections/abstract.tex](./paper/sections/abstract.tex)
-- [paper/sections/introduction.tex](./paper/sections/introduction.tex)
-- [paper/sections/related_work.tex](./paper/sections/related_work.tex)
-- [paper/sections/task_definition.tex](./paper/sections/task_definition.tex)
-- [paper/sections/proposed_model.tex](./paper/sections/proposed_model.tex)
-- [paper/sections/datasets.tex](./paper/sections/datasets.tex)
-- [paper/sections/experiments.tex](./paper/sections/experiments.tex)
-- [paper/sections/conclusion.tex](./paper/sections/conclusion.tex)
-- [paper/sections/appendix.tex](./paper/sections/appendix.tex)
+- [paper/sections/01_introduction_peerj.tex](./paper/sections/01_introduction_peerj.tex)
+- [paper/sections/02_methods_peerj.tex](./paper/sections/02_methods_peerj.tex)
+- [paper/sections/03_results_peerj.tex](./paper/sections/03_results_peerj.tex)
+- [paper/sections/04_discussion_peerj.tex](./paper/sections/04_discussion_peerj.tex)
+- [paper/sections/05_conclusions_peerj.tex](./paper/sections/05_conclusions_peerj.tex)
+- [paper/sections/06_acknowledgments.tex](./paper/sections/06_acknowledgments.tex)
+- [paper/sections/07_appendix.tex](./paper/sections/07_appendix.tex)
 
 ## 常用运行命令
 
@@ -225,7 +222,7 @@ python geomatric/graph_classify_v3.py --mode single --ds PROTEINS
 ### 2. 全量实验批跑
 
 ```bash
-python py/run_paper_experiments.py --dataset_group all --max_workers 6 --tensorboard --version V2
+python py/run_paper_experiments.py --dataset_group all --max_workers 6 --tensorboard
 ```
 
 支持的数据集分组：
@@ -238,14 +235,14 @@ python py/run_paper_experiments.py --dataset_group all --max_workers 6 --tensorb
 ### 3. 汇总最新实验日志
 
 ```bash
-python py/summarize_paper_experiments.py --dataset_group all --version V2
+python py/summarize_paper_experiments.py --dataset_group all
 ```
 
 ### 4. 补齐缺失 baseline / 算子实验
 
 ```bash
-python py/run_missing_experiments.py --report_only --version V2
-python py/run_missing_experiments.py --max_parallel 8 --reserve_gb 4 --no_tensorboard --version V2
+python py/run_missing_experiments.py --report_only
+python py/run_missing_experiments.py --max_parallel 8 --reserve_gb 4 --no_tensorboard
 ```
 
 这次重跑会去掉 `TransformerConv` 算子，不再纳入补跑集合。
@@ -260,8 +257,8 @@ python py/run_missing_experiments.py --max_parallel 8 --reserve_gb 4 --no_tensor
 ### 5. 生成总报告和图
 
 ```bash
-python py/generate_all_result_reports.py --version V2
-python py/generate_suite_analysis_figures.py --version V2
+python py/generate_all_result_reports.py
+python py/generate_suite_analysis_figures.py
 ```
 
 ### 6. 运行参数敏感性分析

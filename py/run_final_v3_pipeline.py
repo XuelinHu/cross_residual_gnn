@@ -10,9 +10,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 STEPS = {
     "consolidate": [sys.executable, "py/consolidate_final_v3.py"],
-    "summarize": [sys.executable, "py/summarize_paper_experiments.py", "--version", "V3"],
-    "reports": [sys.executable, "py/generate_all_result_reports.py", "--version", "V3"],
-    "figures": [sys.executable, "py/generate_suite_analysis_figures.py", "--version", "V3"],
+    "summarize": [sys.executable, "py/summarize_paper_experiments.py", "--version", "LATEST"],
+    "reports": [sys.executable, "py/generate_all_result_reports.py", "--version", "LATEST"],
+    "figures": [sys.executable, "py/generate_suite_analysis_figures.py", "--version", "LATEST"],
     "sensitivity": [sys.executable, "py/generate_sensitivity_reports.py"],
 }
 
@@ -25,7 +25,7 @@ def run_step(name: str) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Final paper-facing V3 workflow entry.")
+    parser = argparse.ArgumentParser(description="Latest paper-facing workflow entry.")
     parser.add_argument(
         "--steps",
         nargs="+",
@@ -40,7 +40,7 @@ def main() -> None:
         if rc != 0:
             raise SystemExit(rc)
 
-    print("[done] final V3 workflow completed", flush=True)
+    print("[done] latest workflow completed", flush=True)
 
 
 if __name__ == "__main__":

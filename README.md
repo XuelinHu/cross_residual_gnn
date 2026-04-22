@@ -122,20 +122,20 @@ If PyTorch Geometric wheels need manual installation, follow the official PyG in
 
 These paths are important because they are the main "snapshots" of runtime results:
 
-- `logs/V2/train_<dataset>_<model>_<operator>_fold<k>__<timestamp>.json`
-  Current rerun log root: [logs/V2](./logs/V2)
-- `logs/V2/dataset_stats_<dataset>__<timestamp>.json`
-  Dataset-stat log root: [logs/V2](./logs/V2)
-- `records/V2/suite_<suite_name>_<dataset>__<timestamp>.txt`
-  Current rerun record root: [records/V2](./records/V2)
-- `records/V2/missing_experiment_status.json`
-  Live backfill status snapshot for the rerun: [records/V2](./records/V2)
-- `runs/V2/<model>_<operator>_<dataset>_<dim>_fold<k>_<h_layer>_<timestamp>/events.out.tfevents.*`
-  TensorBoard root for the rerun: [runs/V2](./runs/V2)
-- `logs/V2/missing_jobs/<job_slug>.log`
-  Per-job training log root: [logs/V2/missing_jobs](./logs/V2/missing_jobs)
+- `logs/LATEST/train_<dataset>_<model>_<operator>_fold<k>__<timestamp>.json`
+  Current latest log root: [logs/LATEST](./logs/LATEST)
+- `logs/LATEST/dataset_stats_<dataset>__<timestamp>.json`
+  Dataset-stat log root: [logs/LATEST](./logs/LATEST)
+- `records/LATEST/suite_<suite_name>_<dataset>__<timestamp>.txt`
+  Current latest record root: [records/LATEST](./records/LATEST)
+- `records/LATEST/missing_experiment_status.json`
+  Live backfill status snapshot for the latest version: [records/LATEST](./records/LATEST)
+- `runs/LATEST/<model>_<operator>_<dataset>_<dim>_fold<k>_<h_layer>_<timestamp>/events.out.tfevents.*`
+  TensorBoard root for the latest version: [runs/LATEST](./runs/LATEST)
+- `logs/LATEST/missing_jobs/<job_slug>.log`
+  Per-job training log root: [logs/LATEST/missing_jobs](./logs/LATEST/missing_jobs)
 - `records/experiment_versions.json`
-  Unified version index for `V1` and `V2`: [records/experiment_versions.json](./records/experiment_versions.json)
+  Unified version index for archived `V1` / `V2` / `V3` and current `LATEST`: [records/experiment_versions.json](./records/experiment_versions.json)
 - `figures/analysis/*`
   Analysis artifact root: [figures/analysis/](./figures/analysis)
 - `figures/exp/*`
@@ -205,20 +205,17 @@ Datasets currently grouped in [geomatric/experiment_catalog.py](./geomatric/expe
 ### Paper file paths
 
 - [paper/main.tex](./paper/main.tex)
-- [paper/main.pdf](./paper/main.pdf)
 - [paper/references.bib](./paper/references.bib)
 - [paper/compile.bat](./paper/compile.bat)
 - [paper/README.md](./paper/README.md)
 - [paper/paper_corpus_merged.json](./paper/paper_corpus_merged.json)
-- [paper/sections/abstract.tex](./paper/sections/abstract.tex)
-- [paper/sections/introduction.tex](./paper/sections/introduction.tex)
-- [paper/sections/related_work.tex](./paper/sections/related_work.tex)
-- [paper/sections/task_definition.tex](./paper/sections/task_definition.tex)
-- [paper/sections/proposed_model.tex](./paper/sections/proposed_model.tex)
-- [paper/sections/datasets.tex](./paper/sections/datasets.tex)
-- [paper/sections/experiments.tex](./paper/sections/experiments.tex)
-- [paper/sections/conclusion.tex](./paper/sections/conclusion.tex)
-- [paper/sections/appendix.tex](./paper/sections/appendix.tex)
+- [paper/sections/01_introduction_peerj.tex](./paper/sections/01_introduction_peerj.tex)
+- [paper/sections/02_methods_peerj.tex](./paper/sections/02_methods_peerj.tex)
+- [paper/sections/03_results_peerj.tex](./paper/sections/03_results_peerj.tex)
+- [paper/sections/04_discussion_peerj.tex](./paper/sections/04_discussion_peerj.tex)
+- [paper/sections/05_conclusions_peerj.tex](./paper/sections/05_conclusions_peerj.tex)
+- [paper/sections/06_acknowledgments.tex](./paper/sections/06_acknowledgments.tex)
+- [paper/sections/07_appendix.tex](./paper/sections/07_appendix.tex)
 
 ## Main Commands
 
@@ -264,14 +261,14 @@ Supported dataset groups:
 ### 3. Summarize latest experiment logs
 
 ```bash
-python py/summarize_paper_experiments.py --dataset_group all --version V2
+python py/summarize_paper_experiments.py --dataset_group all
 ```
 
 ### 4. Backfill missing baseline / operator experiments
 
 ```bash
-python py/run_missing_experiments.py --report_only --version V2
-python py/run_missing_experiments.py --max_parallel 8 --reserve_gb 4 --no_tensorboard --version V2
+python py/run_missing_experiments.py --report_only
+python py/run_missing_experiments.py --max_parallel 8 --reserve_gb 4 --no_tensorboard
 ```
 
 The current rerun scope excludes `TransformerConv` from the operator backfill set to keep runtime manageable.
@@ -286,8 +283,8 @@ This runner is designed for the current `24GB` GPU setup:
 ### 5. Generate full-suite report files
 
 ```bash
-python py/generate_all_result_reports.py --version V2
-python py/generate_suite_analysis_figures.py --version V2
+python py/generate_all_result_reports.py
+python py/generate_suite_analysis_figures.py
 ```
 
 ### 6. Run parameter sensitivity scans
@@ -332,3 +329,8 @@ So the current evidence supports a dataset-dependent advantage for cross-residua
 - Large runtime outputs such as `logs/`, `runs/`, `records/`, `data/`, and `tmp/` are intentionally ignored by Git.
 - The `py/` analysis scripts import shared dataset definitions from [geomatric/experiment_catalog.py](./geomatric/experiment_catalog.py), so the active package path should be kept intact.
 - The codebase does not commit the downloaded dataset content itself; only the expected local data roots are documented here.
+
+## others
+- https://peerj.com/articles/cs-3773/
+- https://peerj.com/articles/cs-3762/
+- https://www.overleaf.com/latex/templates/latex-template-for-peerj-journal-and-pre-print-submissions/ptdwfrqxqzbn

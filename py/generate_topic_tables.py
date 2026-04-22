@@ -114,7 +114,7 @@ def build_aux_table(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate topic-facing LaTeX tables from latest V3 logs.")
+    parser = argparse.ArgumentParser(description="Generate topic-facing LaTeX tables from latest logs.")
     parser.add_argument("--output", default=str(OUT_PATH))
     parser.add_argument("--version", default=DEFAULT_EXPERIMENT_VERSION)
     args = parser.parse_args()

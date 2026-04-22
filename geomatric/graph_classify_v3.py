@@ -1,4 +1,4 @@
-"""图分类 V3 主训练脚本。
+"""图分类最终版主训练脚本。
 
 该文件承担四类职责：
 1. 解析训练参数，并规范化模型别名与默认超参数。
@@ -56,6 +56,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from geomatric.experiment_catalog import dataset_family
 from geomatric.experiment_paths import (
+    ARCHIVED_EXPERIMENT_VERSIONS,
     DEFAULT_EXPERIMENT_VERSION,
     ensure_version_manifest,
     log_dir,
@@ -183,7 +184,7 @@ def parse_args() -> argparse.Namespace:
     """
 
     parser = argparse.ArgumentParser(
-        description="V3 图分类训练入口，包含残差/交叉结构与外部基线。"
+        description="最终版图分类训练入口，包含残差/交叉结构与外部基线。"
     )
     parser.add_argument("--name", type=str, default="GCNConv", help="消息传递算子，默认 GCNConv。")
     parser.add_argument("--gname", type=str, default="PlainGNN", help="模型结构名称，默认 PlainGNN。")
@@ -199,7 +200,7 @@ def parse_args() -> argparse.Namespace:
         "--version",
         type=str,
         default=DEFAULT_EXPERIMENT_VERSION,
-        help="实验输出版本目录，默认写入 V2；旧结果统一归档在 V1。",
+        help="实验输出版本目录，默认写入 LATEST；历史目录保留 V1/V2/V3 兼容。",
     )
     parser.add_argument("--fold", type=int, default=0, help="五折交叉验证中的 fold 编号，默认 0。")
     parser.add_argument("--seed", type=int, default=1024)
@@ -268,7 +269,7 @@ def canonical_args(args: argparse.Namespace) -> argparse.Namespace:
 def ensure_dirs() -> None:
     """确保训练输出所需的目录存在。"""
 
-    for path in [
+    paths = [
         DATA_ROOT,
         PROJECT_ROOT / "logs",
         PROJECT_ROOT / "records",
@@ -276,10 +277,16 @@ def ensure_dirs() -> None:
         log_dir(PROJECT_ROOT, DEFAULT_EXPERIMENT_VERSION),
         record_dir(PROJECT_ROOT, DEFAULT_EXPERIMENT_VERSION),
         run_dir(PROJECT_ROOT, DEFAULT_EXPERIMENT_VERSION),
-        log_dir(PROJECT_ROOT, "V1"),
-        record_dir(PROJECT_ROOT, "V1"),
-        run_dir(PROJECT_ROOT, "V1"),
-    ]:
+    ]
+    for version in ARCHIVED_EXPERIMENT_VERSIONS:
+        paths.extend(
+            [
+                log_dir(PROJECT_ROOT, version),
+                record_dir(PROJECT_ROOT, version),
+                run_dir(PROJECT_ROOT, version),
+            ]
+        )
+    for path in paths:
         path.mkdir(parents=True, exist_ok=True)
     ensure_version_manifest(PROJECT_ROOT)
 

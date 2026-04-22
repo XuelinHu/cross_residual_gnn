@@ -18,7 +18,7 @@ FOCUSED_MODELS: List[str] = [
     "GraphCrossGNN",
 ]
 
-# 当前 V2 全口径实验包含的算子集合。
+# 当前最终版全口径实验包含的算子集合。
 ACTIVE_OPERATORS: List[str] = [
     "GCNConv",
     "GATConv",

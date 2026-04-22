@@ -186,7 +186,7 @@ def run_job(job: Tuple[str, str, str, int, List[str]]) -> Dict[str, object]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run paper-ready V3 experiments.")
+    parser = argparse.ArgumentParser(description="Run paper-ready latest experiments.")
     parser.add_argument(
         "--dataset_group",
         choices=["main", "topic", "extended", "all"],
