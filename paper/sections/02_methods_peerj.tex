@@ -1,7 +1,7 @@
 \section*{Materials and Methods}
 \label{sec:methods}
 
-This section defines the common graph-classification setting, the CR-GNN architecture family, the benchmark package, and the shared experimental protocol. The goal is to isolate where information is reused while keeping the remaining pipeline as consistent as possible.
+This section defines the common graph-classification setting, the CR-GNN architecture family, the benchmark package, and the shared experimental protocol. The guiding principle is to isolate where information is reused while keeping the remaining pipeline as consistent as possible. That design choice is central to the paper's methodological justification: if backbone operator, pooling, and evaluation protocol are held fixed, then performance differences are more plausibly attributable to the reuse topology itself rather than to unrelated implementation changes.
 
 \subsection*{Problem definition and notation}
 
@@ -16,7 +16,7 @@ Given a training dataset $\mathcal{D} = \{(\mathcal{G}_i, y_i)\}_{i=1}^{N}$, the
     \item \textbf{GraphCrossGNN}: graph-level cross-summary exchange across paired blocks
 \end{itemize}
 
-The comparison is designed to isolate where information is reused: inside one branch, across parallel branches, or through pooled graph summaries passed between blocks.
+The comparison is designed to isolate where information is reused: inside one branch, across parallel branches, or through pooled graph summaries passed between blocks. This isolates a concrete research question behind the architecture family. Same-branch residual reuse mainly tests whether re-injecting historical states stabilizes deeper propagation, whereas cross-residual designs test whether exchanging information across parallel streams can preserve complementary structure that would otherwise be lost under ordinary stacking.
 
 \begin{figure}[t]
 \centering
@@ -47,7 +47,7 @@ and the model is trained end-to-end by minimizing cross-entropy:
 \subsection*{CR-GNN architecture family}
 \label{sec:model}
 
-CR-GNN is defined as a compact family of graph classification architectures. All variants share the same input projection, stacked message-passing layers, graph-level pooling, and linear classifier; they differ only in how intermediate node states and graph-level summaries are reused across depth and across branches.
+CR-GNN is defined as a compact family of graph classification architectures. All variants share the same input projection, stacked message-passing layers, graph-level pooling, and linear classifier; they differ only in how intermediate node states and graph-level summaries are reused across depth and across branches. The design deliberately avoids introducing separate encoders, task-specific feature engineering, or architecture-specific readout heads, because such additions would make it harder to interpret whether any observed gain comes from residual topology or from extra model capacity.
 
 \begin{figure}[!htbp]
 \centering
@@ -110,13 +110,13 @@ The final graph embedding is
 
 \subsection*{Residual routing mechanisms}
 
-Beyond the architecture family itself, this study evaluates how residual information is injected. Three routing modes are used in the targeted ablations:
+Beyond the architecture family itself, this study evaluates how residual information is injected. This second layer is necessary because the architecture comparison alone cannot answer whether an apparent residual advantage comes from the existence of an extra path or from the way that path is filtered. Three routing modes are used in the targeted ablations:
 \begin{itemize}
     \item \textbf{Learnable routing}: dense residual injection modulated by an adaptive gate.
     \item \textbf{Top-k routing}: only the strongest residual channels are retained before injection.
     \item \textbf{Sparse routing}: weak residual coefficients are suppressed, leaving a filtered residual path.
 \end{itemize}
-These routing modes are not used to redefine the core architecture family. Instead, they form a mechanism layer on top of selected residual and cross-residual targets in the experimental design.
+These routing modes are not used to redefine the core architecture family. Instead, they form a mechanism layer on top of selected residual and cross-residual targets in the experimental design. The routing study is therefore interpretive rather than decorative: it tests whether the same architecture behaves differently when residual information is passed forward densely, selectively, or sparsely.
 
 \subsection*{Datasets}
 \label{sec:datasets}
@@ -159,7 +159,7 @@ and the corresponding standard deviation
 
 \subsection*{Compared methods and backbone operators}
 
-The full paper-facing benchmark compares nine methods. The CR-GNN family contains five models: PlainGNN, NodeResGNN, NodeCrossGNN, GraphResGNN, and GraphCrossGNN. Four external baselines are also included in the benchmark package: GraphSAGEBaseline, GINBaseline, JKNetBaseline, and APPNPBaseline.
+The full paper-facing benchmark compares nine methods. The CR-GNN family contains five models: PlainGNN, NodeResGNN, NodeCrossGNN, GraphResGNN, and GraphCrossGNN. Four external baselines are also included in the benchmark package: GraphSAGEBaseline, GINBaseline, JKNetBaseline, and APPNPBaseline. These baselines are intended to anchor the controlled comparison against representative graph-classification families with distinct propagation or aggregation behavior, rather than to claim exhaustive coverage of every recent leaderboard method.
 
 Each method is evaluated under four message-passing operators:
 \begin{itemize}
@@ -171,8 +171,18 @@ Each method is evaluated under four message-passing operators:
 
 \subsection*{Training configuration and implementation details}
 
-All reported runs follow the same versioned experimental workflow, with \texttt{V3} as the active paper-facing source. The recommended workflow entry is \texttt{py/run\_final\_v3\_pipeline.py}, and the associated outputs are stored in \texttt{logs/V3}, \texttt{records/V3}, and \texttt{runs/V3}. Preprocessing is intentionally light, and the final protocol does not add task-specific feature engineering, graph augmentation, or custom edge redesign.
+All reported runs follow the same latest versioned experimental workflow. The recommended workflow entry is \texttt{py/run\_final\_v3\_pipeline.py}, and the associated outputs are stored in \texttt{logs/LATEST}, \texttt{records/LATEST}, and \texttt{runs/LATEST}. Preprocessing is intentionally light, and the final protocol does not add task-specific feature engineering, graph augmentation, or custom edge redesign. This common workflow is important for reliability: every main benchmark and targeted ablation result reported in the paper is computed under the same split logic, selection rule, and logging structure.
+
+\subsection*{Experimental design}
+
+The empirical study is organized to separate confirmatory five-fold evidence from exploratory supporting analyses. The latest benchmark evaluates six datasets, nine methods, four message-passing operators, and five outer folds under one unified protocol. This full matrix provides the main comparison used throughout the paper, and the benchmark tables are placed directly in the corresponding result subsections so that each empirical claim is supported in place.
+
+The benchmark is divided into two layers. The biological core consists of PROTEINS, DD, and ENZYMES, which anchor the main biomolecular interpretation of the paper. A supplementary robustness package extends the analysis to MUTAG, AIDS, and Mutagenicity. This split keeps the central claim focused while still testing whether the conclusions remain stable on additional molecular graph settings.
+
+Targeted ablations are organized around three mechanism questions. First, gate-control ablations test whether adaptive residual injection is stronger or more stable than fixed-strength reuse on a strong graph-level residual target. Second, cross-gate ablations examine settings where a cross architecture is already locally competitive, asking whether adaptive gating remains robust in those cases. Third, residual-routing ablations compare learnable, top-k, and sparse routing modes on representative residual- and cross-oriented targets, so that the study can move beyond architecture labels and evaluate how residual information is injected.
+
+Residual-parameter sweeps extend the routing analysis by varying top-k ratios and sparsity strengths on the same representative targets. Older single-fold sensitivity scans over depth, dropout, and learning rate are retained only as exploratory supporting analyses. In the final interpretation, the five-fold latest-version runs are treated as the confirmatory evidence, while the single-fold scans are used only to describe optimization trends rather than to support the main claim.
 
 \subsection*{Evaluation metrics and statistical reporting}
 
-The primary metric is graph classification accuracy on the held-out test fold. Main benchmark and targeted ablation results are reported as five-fold mean accuracy with standard deviation. In the final paper, the five-fold \texttt{V3} experiments are treated as the main confirmatory evidence, while older single-fold parameter scans are used only as supporting exploratory analyses.
+The primary metric is graph classification accuracy on the held-out test fold. Main benchmark and targeted ablation results are reported as five-fold mean accuracy with standard deviation. In the final paper, the five-fold latest-version experiments are treated as the main confirmatory evidence, while older single-fold parameter scans are used only as supporting exploratory analyses.

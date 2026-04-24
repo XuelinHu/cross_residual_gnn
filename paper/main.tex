@@ -9,31 +9,32 @@
 \usepackage{flafter}
 \usepackage{microtype}
 \usepackage{url}
+\usepackage[authoryear,round]{natbib}
 \usepackage{hyperref}
 \usepackage{graphicx}
+
+\let\cite\citep
 
 \graphicspath{{figures/}{../figures/}}
 
 \title{Cross-Residual Graph Neural Networks for Biomolecular Graph Classification: An Empirical Study of Residual Routing}
 
-\author[1]{Jingchao Wang}
-\author[1]{Wei Huang}
-\author[2]{Xuelin Hu}
+\author[1]{Xuelin Hu}
 \author[2]{Xiaoqin Fu}
 
-\affil[1]{School of Computer Science, Zhongyuan University of Technology, Zhengzhou 450000, China}
-\affil[2]{School of Railway Communication and Signaling Engineering, Liuzhou Railway Vocational Technical College, Liuzhou, Guangxi, China}
+\affil[1]{School of Railway Communication and Signaling Engineering, Liuzhou Railway Vocational Technical College, Liuzhou 545000, China}
+\affil[2]{School of Railway Locomotive and Rolling Stock, Liuzhou Railway Vocational Technical College, Liuzhou 545000, China}
 
-\corrauthor[1]{Xuelin Hu}{huxuelinai@gmail.com}
+\corrauthor[2]{Xiaoqin Fu}{fuxiaoqin@ltzy.edu.cn}
 
 \begin{abstract}
-\textbf{Background.} Graph neural networks are widely used for graph classification on proteins and molecules, but deeper message passing can blur discriminative local structure, and standard skip connections do not test whether cross-branch historical exchange offers a better trade-off than ordinary residual reuse. This issue is especially relevant in biomolecular graph classification, where useful evidence may depend on both local motifs and graph-level context.
+\textbf{Background.} Graph neural networks are widely used for graph classification on proteins and molecules, but deeper message passing can blur discriminative local structure, and standard skip connections do not clarify whether cross-branch historical exchange offers a better trade-off than ordinary residual reuse. This issue is especially relevant in biomolecular graph classification, where useful evidence may depend on both local motifs and graph-level context.
 
-\textbf{Methods.} We study Cross-Residual Graph Neural Networks (CR-GNN), a controlled model family that compares plain stacking, node-level residual reuse, node-level cross-residual exchange, graph-level residual propagation, and graph-level cross-summary exchange under shared graph-classification backbones. The final benchmark uses six datasets, nine methods, four message-passing operators, and stratified five-fold evaluation. We further organize targeted experiments on gate control, residual routing modes, residual-parameter sweeps, and exploratory sensitivity scans.
+\textbf{Methods.} We study Cross-Residual Graph Neural Networks (CR-GNN) as a controlled comparison framework that evaluates plain stacking, node-level residual reuse, node-level cross-residual exchange, graph-level residual propagation, and graph-level cross-summary exchange under shared graph-classification backbones. The main benchmark uses six datasets, nine methods, four message-passing operators, and stratified five-fold evaluation with mean best test accuracy and fold-level standard deviation. We further organize targeted experiments on gate control, residual routing modes, residual-parameter sweeps, and exploratory sensitivity scans.
 
-\textbf{Results.} The final results show that residual reuse remains the stronger default family across the biomolecular benchmark package, while cross-residual routing usually improves over plain stacking and yields selective gains on specific datasets. The strongest graph-level residual line remains best on several core settings, but residual routing design materially affects the outcome: mild sparse routing is often competitive and is the strongest family on three of four representative residual-routing targets.
+\textbf{Results.} The five-fold results show that residual reuse remains the stronger default family across the biomolecular benchmark package, while cross-residual routing usually improves over plain stacking and yields selective gains on specific datasets rather than a uniform advantage. Within the biological core, GraphResGNN is strongest on PROTEINS and ENZYMES, whereas NodeResGNN is strongest on DD. The targeted routing analyses further show that routing design materially affects performance: learnable dense routing remains strongest on the best graph-level residual line, whereas mild sparse routing is strongest on three of four representative routing targets.
 
-\textbf{Conclusions.} CR-GNN is best interpreted as a biomolecular graph-classification design space rather than a universally dominant architecture. The empirical evidence supports a constrained conclusion: cross-residual interaction is useful but conditional, and residual routing strategy is an important determinant of performance.
+\textbf{Conclusions.} CR-GNN is best interpreted as a controlled biomolecular graph-classification design space rather than a universally dominant architecture. The empirical evidence supports a bounded conclusion: cross-residual interaction is useful but conditional, residual reuse remains the stronger default reference, and routing strategy is an important determinant of performance.
 \end{abstract}
 
 \begin{document}
@@ -49,10 +50,7 @@
 \input{sections/05_conclusions_peerj.tex}
 \input{sections/06_acknowledgments.tex}
 
-\appendix
-\input{sections/07_appendix.tex}
-
-\bibliographystyle{plain}
+\bibliographystyle{plainnat}
 \bibliography{references}
 
 \end{document}

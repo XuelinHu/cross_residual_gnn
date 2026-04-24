@@ -334,3 +334,4 @@ So the current evidence supports a dataset-dependent advantage for cross-residua
 - https://peerj.com/articles/cs-3773/
 - https://peerj.com/articles/cs-3762/
 - https://www.overleaf.com/latex/templates/latex-template-for-peerj-journal-and-pre-print-submissions/ptdwfrqxqzbn
+- https://peerj.com/about/author-instructions/#instruction-standard-sections-rass
