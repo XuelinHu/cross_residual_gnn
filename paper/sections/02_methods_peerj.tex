@@ -18,12 +18,6 @@ Given a training dataset $\mathcal{D} = \{(\mathcal{G}_i, y_i)\}_{i=1}^{N}$, the
 
 The comparison is designed to isolate where information is reused: inside one branch, across parallel branches, or through pooled graph summaries passed between blocks. This isolates a concrete research question behind the architecture family. Same-branch residual reuse mainly tests whether re-injecting historical states stabilizes deeper propagation, whereas cross-residual designs test whether exchanging information across parallel streams can preserve complementary structure that would otherwise be lost under ordinary stacking.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.98\linewidth]{figures/task_model_comparison.png}
-\caption{Main model comparison in this paper. The five architectures differ only in how intermediate node states or graph summaries are reused, which allows a controlled study of residual and cross-residual information flow.}
-\label{fig:task_model_comparison}
-\end{figure}
 
 \subsection*{Shared message passing and graph-level learning}
 
@@ -49,12 +43,7 @@ and the model is trained end-to-end by minimizing cross-entropy:
 
 CR-GNN is defined as a compact family of graph classification architectures. All variants share the same input projection, stacked message-passing layers, graph-level pooling, and linear classifier; they differ only in how intermediate node states and graph-level summaries are reused across depth and across branches. The design deliberately avoids introducing separate encoders, task-specific feature engineering, or architecture-specific readout heads, because such additions would make it harder to interpret whether any observed gain comes from residual topology or from extra model capacity.
 
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.98\linewidth]{figures/cr_gnn_schematic.png}
-\caption{Schematic view of the CR-GNN pipeline. All models share the same graph-classification backbone, while node-level reuse and graph-level summary reuse define the residual and cross-residual variants.}
-\label{fig:crgnn_schematic}
-\end{figure}
+
 
 Let $\mathcal{G}=(\mathcal{V},\mathcal{E})$ be a graph with node feature matrix $\mathbf{X}\in\mathbb{R}^{n\times d_{\mathrm{in}}}$ and adjacency structure $\mathbf{A}$. The model can be instantiated with one of several standard message-passing operators,
 \[
@@ -91,6 +80,13 @@ The final node representation is the branch sum
 \mathbf{H}^{(L)} = \mathbf{H}^{(L)}_{1} + \mathbf{H}^{(L)}_{2}.
 \end{equation}
 
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/cr_gnn_node_architecture.png}
+\caption{Node-Level CR-GNN Architecture. The three columns compare plain stacking (left), same-branch residual reuse (middle), and two-branch cross-residual exchange (right). In the cross-residual design, each branch reuses not only its own previous state but also the counterpart branch's state from the previous layer, with residual routers controlling the strength and sparsity of cross-branch injection.}
+\label{fig:node_architecture}
+\end{figure}
+
 \subsubsection*{Graph-level residual propagation}
 
 \textbf{GraphResGNN.} This variant chains three graph-conditioned blocks:
@@ -107,6 +103,13 @@ The final graph embedding is
 \begin{equation}
 \mathbf{g}_{\mathrm{final}} = \mathbf{g}^{(T)}_{1} + \mathbf{g}^{(T)}_{2}.
 \end{equation}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/cr_gnn_graph_architecture.png}
+\caption{Graph-Level CR-GNN Architecture. The three columns compare plain graph-level stacking (left), sequential graph-level residual propagation (middle), and cross-summary exchange across paired blocks (right). In the cross-residual design, shared residual states and residual routers control graph-level information exchange between parallel block sequences, with four routing modes available: fixed, learnable, top-k, and sparse residual.}
+\label{fig:graph_architecture}
+\end{figure}
 
 \subsection*{Residual routing mechanisms}
 
