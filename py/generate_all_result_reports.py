@@ -67,6 +67,8 @@ def summarize_model(dataset: str, model: str, active_log_dir: Path) -> Dict[str,
         "model": model,
         "mean_acc": st.mean(accs),
         "std_acc": st.pstdev(accs),
+        "max_acc": max(accs),
+        "min_acc": min(accs),
         "mean_loss": st.mean(losses),
         "std_loss": st.pstdev(losses),
         "mean_best_epoch": st.mean(epochs),
@@ -99,7 +101,8 @@ def build_text_summary(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
             fold_text = ",".join(f"{value:.5f}" for value in row["fold_accs"])
             lines.append(
                 f"{index}. {row['model']}\tmean_acc={row['mean_acc']:.5f}\t"
-                f"std_acc={row['std_acc']:.5f}\tmean_loss={row['mean_loss']:.5f}\t"
+                f"std_acc={row['std_acc']:.5f}\tmax_acc={row['max_acc']:.5f}\t"
+                f"min_acc={row['min_acc']:.5f}\tmean_loss={row['mean_loss']:.5f}\t"
                 f"mean_best_epoch={row['mean_best_epoch']:.1f}\tparams={row['params']}"
             )
             lines.append(f"   folds={fold_text}")
@@ -111,7 +114,11 @@ def build_text_summary(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
 
 
 def format_metric(row: Dict[str, object], best_acc: float) -> str:
-    text = f"{row['mean_acc']:.4f} $\\pm$ {row['std_acc']:.4f}"
+    """Format a cell as: mean ± std [min–max], bold if best mean."""
+    text = (
+        f"{row['mean_acc']:.4f} $\\pm$ {row['std_acc']:.4f} "
+        f"[{row['min_acc']:.3f}, {row['max_acc']:.3f}]"
+    )
     if abs(row["mean_acc"] - best_acc) < 1e-12:
         return f"\\textbf{{{text}}}"
     return text
@@ -134,12 +141,14 @@ def build_tex_tables(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
         lines: List[str] = [
             r"\begin{table*}[t]",
             r"\centering",
-            r"\small",
+            r"\footnotesize",
+            r"\setlength{\tabcolsep}{4pt}",
             (
                 r"\caption{Main biological benchmark results. "
-                r"Numbers are mean best test accuracy $\pm$ standard deviation.}"
+                r"Cells show mean $\pm$ std [min, max] over five folds. Bold: best mean per dataset.}"
                 if table_index == 1
-                else r"\caption{Supplementary robustness benchmark results.}"
+                else r"\caption{Supplementary robustness benchmark results. "
+                r"Cells show mean $\pm$ std [min, max] over five folds. Bold: best mean per dataset.}"
             ),
             rf"\label{{tab:all_results_{table_index}}}",
             rf"\begin{{tabular}}{{{colspec}}}",
@@ -163,21 +172,22 @@ def build_tex_tables(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
         r"\begin{table}[t]",
         r"\centering",
         r"\small",
-        r"\caption{Winner summary, optimization depth, and parameter count for each dataset.}",
+        r"\caption{Winner summary with max/min fold accuracy and parameter count for each dataset.}",
         r"\label{tab:all_winners}",
-        r"\begin{tabular}{l l c c c}",
+        r"\begin{tabular}{l l c c c c c}",
         r"\toprule",
-        r"Dataset & Winner & Mean Acc & Mean Best Epoch & Params \\",
+        r"Dataset & Winner & Mean Acc & Max Acc & Min Acc & Best Epoch & Params \\",
         r"\midrule",
     ]
     for dataset in DATASETS:
         rows = ranked_rows(summary, dataset)
         if not rows:
-            lines.append(f"{tex_escape(dataset)} & pending & -- & -- & -- \\\\")
+            lines.append(f"{tex_escape(dataset)} & pending & -- & -- & -- & -- & -- \\\\")
         else:
             winner = rows[0]
             lines.append(
                 f"{tex_escape(dataset)} & {winner['model']} & {winner['mean_acc']:.4f} & "
+                f"{winner['max_acc']:.4f} & {winner['min_acc']:.4f} & "
                 f"{winner['mean_best_epoch']:.1f} & {winner['params']} \\\\"
             )
     lines.extend([r"\bottomrule", r"\end{tabular}", r"\end{table}"])
