@@ -112,7 +112,7 @@ def add_bar_labels(
     ax: plt.Axes,
     bars,
     fmt: str = "{:.3f}",
-    fontsize: int = 8,
+    fontsize: int = 10,
     rotation: int = 90,
     inside: bool = False,
 ) -> None:
@@ -166,14 +166,20 @@ def plot_full_suite(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
             capsize=3,
             zorder=3,
         )
-        add_bar_labels(ax, bars, fontsize=7)
+        add_bar_labels(ax, bars, fontsize=10)
 
     ax.set_xticks(x)
-    ax.set_xticklabels(datasets, rotation=20)
-    ax.set_ylabel("Mean best test accuracy")
-    ax.set_title("Benchmark across the active dataset package")
+    ax.set_xticklabels(datasets, rotation=20, fontsize=13)
+    ax.set_ylabel("Mean best test accuracy", fontsize=15)
+    ax.set_title("Benchmark across the active dataset package", fontsize=17, fontweight="bold")
+    # Adaptive y-axis based on data
+    all_means = [summary[ds][m]["mean_acc"] for ds in datasets for m in MODELS]
+    all_stds = [summary[ds][m]["std_acc"] for ds in datasets for m in MODELS]
+    y_min = max(0, min(all_means) - max(all_stds) - 0.08)
+    y_max = max(all_means) + max(all_stds) + 0.08
+    ax.set_ylim(y_min, y_max)
     style_axis(ax)
-    ax.legend(frameon=False, ncol=5, loc="upper center", bbox_to_anchor=(0.5, 1.18))
+    ax.legend(frameon=False, ncol=5, loc="upper center", bbox_to_anchor=(0.5, 1.18), fontsize=12)
     fig.tight_layout()
     save(fig, "fig1_full_suite_results")
     plt.close(fig)
@@ -208,13 +214,13 @@ def plot_cross_heatmap(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
     fig, ax = plt.subplots(figsize=(8.8, 5.8))
     im = ax.imshow(values, cmap="coolwarm", aspect="auto")
     ax.set_xticks(np.arange(len(labels)))
-    ax.set_xticklabels(labels, rotation=20, ha="right")
+    ax.set_xticklabels(labels, rotation=20, ha="right", fontsize=12)
     ax.set_yticks(np.arange(len(datasets)))
-    ax.set_yticklabels(datasets)
-    ax.set_title("Accuracy deltas defining the cross-residual advantage")
+    ax.set_yticklabels(datasets, fontsize=12)
+    ax.set_title("Accuracy deltas defining the cross-residual advantage", fontsize=16, fontweight="bold")
     for i in range(values.shape[0]):
         for j in range(values.shape[1]):
-            ax.text(j, i, f"{values[i, j]:+.3f}", ha="center", va="center", fontsize=8)
+            ax.text(j, i, f"{values[i, j]:+.3f}", ha="center", va="center", fontsize=10)
     cbar = fig.colorbar(im, ax=ax, shrink=0.9)
     cbar.set_label("Accuracy delta")
     fig.tight_layout()
@@ -253,11 +259,12 @@ def plot_rank_summary(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
         linewidth=0.8,
     )
     axes[0].set_xticks(np.arange(len(MODELS)))
-    axes[0].set_xticklabels([MODEL_DISPLAY[model] for model in MODELS], rotation=20)
-    axes[0].set_ylabel("Average rank")
-    axes[0].set_title("Average rank across datasets")
+    axes[0].set_xticklabels([MODEL_DISPLAY[model] for model in MODELS], rotation=20, fontsize=12)
+    axes[0].set_ylabel("Average rank", fontsize=14)
+    axes[0].set_title("Average rank across datasets", fontsize=15, fontweight="bold")
+    # Adaptive y-axis: invert so rank 1 is best
+    axes[0].set_ylim(max(avg_rank) + 0.5, min(avg_rank) - 0.5)
     style_axis(axes[0])
-    axes[0].invert_yaxis()
 
     axes[1].bar(
         np.arange(len(MODELS)),
@@ -267,9 +274,10 @@ def plot_rank_summary(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
         linewidth=0.8,
     )
     axes[1].set_xticks(np.arange(len(MODELS)))
-    axes[1].set_xticklabels([MODEL_DISPLAY[model] for model in MODELS], rotation=20)
-    axes[1].set_ylabel("Winner count")
-    axes[1].set_title("Number of dataset wins")
+    axes[1].set_xticklabels([MODEL_DISPLAY[model] for model in MODELS], rotation=20, fontsize=12)
+    axes[1].set_ylabel("Winner count", fontsize=14)
+    axes[1].set_title("Number of dataset wins", fontsize=15, fontweight="bold")
+    axes[1].set_ylim(0, max(wins) + 1.2)
     style_axis(axes[1])
 
     fig.tight_layout()
@@ -282,9 +290,13 @@ def plot_topic_focus(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
     datasets = [dataset for dataset in TOPIC_DATASETS if dataset in completed_datasets(summary)]
     if not datasets:
         return
-    fig, axes = plt.subplots(1, len(datasets), figsize=(11.2, 3.8), sharey=True)
+    fig, axes = plt.subplots(1, len(datasets), figsize=(11.2, 4.5), sharey=False)
     if len(datasets) == 1:
         axes = [axes]
+    # Compute global y-range for consistent comparison
+    all_means = [summary[ds][m]["mean_acc"] for ds in datasets for m in MODELS]
+    global_y_max = max(all_means) + 0.12
+    global_y_min = max(0, min(all_means) - 0.06)
     for ax, dataset in zip(axes, datasets):
         means = [summary[dataset][model]["mean_acc"] for model in MODELS]
         bars = ax.bar(
@@ -304,20 +316,20 @@ def plot_topic_focus(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
                 textcoords="offset points",
                 ha="center",
                 va="bottom",
-                fontsize=9,
+                fontsize=11,
                 color="black",
                 bbox={"facecolor": "white", "edgecolor": "none", "pad": 0.2},
                 clip_on=False,
                 zorder=6,
             )
-        ax.set_title(dataset)
+        ax.set_title(dataset, fontsize=15, fontweight="bold")
         ax.set_xticks(np.arange(len(MODELS)))
-        ax.set_xticklabels([MODEL_DISPLAY[model] for model in MODELS], rotation=30, ha="right")
-        ax.set_ylim(0, max(means) + 0.10)
+        ax.set_xticklabels([MODEL_DISPLAY[model] for model in MODELS], rotation=30, ha="right", fontsize=11)
+        ax.set_ylim(global_y_min, global_y_max)
         ax.margins(y=0.12)
         style_axis(ax)
-    axes[0].set_ylabel("Mean 5-fold best test accuracy")
-    fig.subplots_adjust(left=0.08, right=0.995, top=0.88, bottom=0.30, wspace=0.12)
+    axes[0].set_ylabel("Mean 5-fold best test accuracy", fontsize=14)
+    fig.subplots_adjust(left=0.08, right=0.995, top=0.88, bottom=0.35, wspace=0.12)
     save(fig, "fig4_topic_focus_results")
     plt.close(fig)
 
@@ -329,22 +341,28 @@ def plot_protein_package(summary: Dict[str, Dict[str, Dict[str, float]]]) -> Non
         return
     fig, ax = plt.subplots(figsize=(10.8, 4.8))
     x = np.arange(len(datasets))
+    all_acc_values = []
     for idx, model in enumerate(MODELS):
+        accs = [summary[dataset][model]["mean_acc"] for dataset in datasets]
+        all_acc_values.extend(accs)
         ax.plot(
             x,
-            [summary[dataset][model]["mean_acc"] for dataset in datasets],
+            accs,
             color=MODEL_COLORS[model],
             marker=MODEL_MARKERS[model],
-            linewidth=1.8,
-            markersize=5.5,
+            linewidth=2.2,
+            markersize=8,
             label=MODEL_DISPLAY[model],
         )
     ax.set_xticks(x)
-    ax.set_xticklabels(datasets)
-    ax.set_ylabel("Mean best test accuracy")
-    ax.set_title("Protein-oriented benchmark package")
+    ax.set_xticklabels(datasets, fontsize=13)
+    ax.set_ylabel("Mean best test accuracy", fontsize=14)
+    ax.set_title("Protein-oriented benchmark package", fontsize=16, fontweight="bold")
+    # Adaptive y-axis
+    margin = (max(all_acc_values) - min(all_acc_values)) * 0.18
+    ax.set_ylim(max(0, min(all_acc_values) - margin), max(all_acc_values) + margin)
     style_axis(ax)
-    ax.legend(ncol=3, loc="upper center", bbox_to_anchor=(0.5, 1.22))
+    ax.legend(ncol=3, loc="upper center", bbox_to_anchor=(0.5, 1.22), fontsize=12)
     fig.tight_layout()
     save(fig, "fig5_protein_package_summary")
     plt.close(fig)
