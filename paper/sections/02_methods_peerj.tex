@@ -182,10 +182,6 @@ All train--validation--test splits are fixed by a global random seed of 1024, en
 
 The learnable gate used in residual and cross-residual variants applies a sigmoid activation to a scalar parameter initialized at $0.8$, allowing each residual injection to be adaptively scaled during training. For the top-k routing mode, only the strongest fraction of residual channels (determined by absolute magnitude) is retained before injection. For the sparse routing mode, a softshrink operator with threshold $\lambda$ suppresses residual coefficients whose magnitude falls below $\lambda$, leaving a filtered residual path.
 
-The four external baselines are configured as follows. GraphSAGEBaseline stacks SAGEConv layers with mean aggregation. GINBaseline stacks GINConv layers, each containing a two-layer MLP with ReLU activation. JKNetBaseline stacks GCNConv layers and aggregates representations from all depths via Jumping Knowledge with concatenation mode (\texttt{cat}). APPNPBaseline uses a GCNConv backbone followed by APPNP propagation with $K=10$ steps and teleport probability $\alpha=0.1$.
-
-All experiments are run under a single version-controlled workflow. Each fold's best checkpoint is selected by minimum validation loss, and the corresponding test accuracy is recorded as the fold result. The five fold-level test accuracies are then summarized as mean $\pm$ population standard deviation.
-
 \subsection*{Experimental design}
 
 The empirical study is organized to separate confirmatory five-fold evidence from exploratory supporting analyses. The latest benchmark evaluates six datasets, nine methods, four message-passing operators, and five outer folds under one unified protocol. This full matrix provides the main comparison used throughout the paper, and the benchmark tables are placed directly in the corresponding result subsections so that each empirical claim is supported in place.
