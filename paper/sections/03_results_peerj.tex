@@ -32,11 +32,11 @@ Figure~\ref{fig:full_suite_results} and Figure~\ref{fig:cross_advantage_heatmap}
 
 The main biological benchmark results are reported in Table~\ref{tab:all_results_1}. The topic-facing interpretation is anchored in the protein-oriented core datasets. These datasets carry the main substantive weight of the paper, so the interpretation here is intentionally more detailed than in the supplementary package.
 
-\textbf{Residual reuse remains the strongest default family in the reported suite.} Residual variants rank first numerically on PROTEINS, DD, ENZYMES, and AIDS. GraphResGNN leads on PROTEINS ($0.7223 \pm 0.0367$), ENZYMES ($0.3117 \pm 0.0746$), and AIDS ($0.9160 \pm 0.0121$), while NodeResGNN leads on DD ($0.7207 \pm 0.0259$). The point is not that every residual margin is large, but that residual models repeatedly remain at or near the top across the core biological tasks under the same five-fold protocol. It is important to note that many of these numerical leads are modest: paired statistical tests (reported in Table~\ref{tab:statistical_tests}) show that the majority of pairwise architecture comparisons do not reach conventional significance ($p < 0.05$), a pattern that is itself informative---it indicates that architecture-level differences are smaller than split-level variation under the controlled protocol.
+\textbf{Residual reuse remains the strongest default family in the reported suite.} Residual variants rank first numerically on PROTEINS, DD, ENZYMES, and AIDS. GraphResGNN leads on PROTEINS ($0.7223 \pm 0.0367$), ENZYMES ($0.3117 \pm 0.0746$), and AIDS ($0.9160 \pm 0.0121$), while NodeResGNN leads on DD ($0.7207 \pm 0.0259$). The point is not that every residual margin is large, but that residual models repeatedly remain at or near the top across the core biological tasks under the same five-fold protocol. It is important to note that many of these numerical leads are modest: paired statistical tests (reported in Tables~\ref{tab:statistical_tests_main} and~\ref{tab:statistical_tests_supp}) show that the majority of pairwise architecture comparisons do not reach conventional significance ($p < 0.05$), a pattern that is itself informative---it indicates that architecture-level differences are smaller than split-level variation under the controlled protocol.
 
 \textbf{Cross-residual design is selectively strong, not universally dominant.} Cross variants rank first numerically on MUTAG and Mutagenicity. More importantly, the best cross variant beats PlainGNN on most completed datasets. Therefore, cross routing is clearly more than a design curiosity, but the evidence does not support the stronger claim that cross universally outperforms residual reuse. This narrower reading is important for reliability because it matches both the mean results and the observed split-level variation. The few pairwise comparisons that are statistically significant (e.g., GraphResGNN $>$ GraphCrossGNN on PROTEINS with SAGEConv, $p=0.031$; NodeCrossGNN $>$ GraphCrossGNN on DD with SAGEConv, $p=0.027$) all involve graph-level cross variants losing to either residual or node-level cross models---suggesting that the graph-level cross design is the more fragile element of the family.
 
-\textbf{Node-level cross is more reliable than graph-level cross.} Across the completed datasets, NodeCrossGNN outperforms NodeResGNN numerically more often than GraphCrossGNN outperforms GraphResGNN. This suggests that exchanging intermediate node-level states is the more robust cross-residual design in the present study, while graph-level cross routing is more dataset-sensitive and its advantage over graph-level residual reuse is statistically significant in the negative direction on several operator--dataset combinations (Table~\ref{tab:statistical_tests}).
+\textbf{Node-level cross is more reliable than graph-level cross.} Across the completed datasets, NodeCrossGNN outperforms NodeResGNN numerically more often than GraphCrossGNN outperforms GraphResGNN. This suggests that exchanging intermediate node-level states is the more robust cross-residual design in the present study, while graph-level cross routing is more dataset-sensitive and its advantage over graph-level residual reuse is statistically significant in the negative direction on several operator--dataset combinations (Tables~\ref{tab:statistical_tests_main} and~\ref{tab:statistical_tests_supp}).
 
 \textbf{Plain stacking suffers from depth-induced signal collapse but is not uniformly worse.} PlainGNN remains competitive on PROTEINS and DD, but it never leads a dataset in the final suite and is usually surpassed by either a residual or a cross-residual variant. On ENZYMES and AIDS under GCNConv, the gap between PlainGNN and the best residual variant is statistically significant (ENZYMES + GINConv: $p=0.002$; AIDS + GCNConv: $p=0.039$), consistent with the interpretation that plain stacking's head-pattern dominance suppresses discriminative mid-range structural information on tasks where deeper propagation alone is insufficient.
 
@@ -78,11 +78,12 @@ The supplementary robustness results are reported in Table~\ref{tab:all_results_
 \input{../md/peerj_gate_tables.tex}
 \input{../md/peerj_gate_fold_table.tex}
 \input{../md/peerj_cross_gate_full_table.tex}
-\input{../md/statistical_tests_table.tex}
+\input{../md/statistical_tests_main.tex}
+\input{../md/statistical_tests_supp.tex}
 
 The gate ablations are designed to test whether adaptive control of residual injection is useful once the main benchmark has identified strong target configurations. On the strongest graph-level residual line, \texttt{AIDS + GraphResGNN + GINConv}, the comparison among learnable and fixed gates is the cleanest direct test of adaptive graph-level reuse. Table~\ref{tab:aids_gate_ablation} shows that the learnable gate is the strongest setting, although the fixed coefficient \texttt{0.5} remains very close. The cross-gate ablation extends the same comparison to six settings where a cross architecture is already locally favored. In other words, the gate study addresses a question left open by the benchmark tables: if reuse helps, is the benefit coming from adaptive control or merely from adding another injection path with any fixed weight?
 
-Table~\ref{tab:statistical_tests} provides the complete paired-test matrix for all architecture comparisons across datasets and operators. The overall pattern confirms that most numerical gaps between architectures are modest relative to fold-level variation: only a small fraction of comparisons reach $p<0.05$ under both the paired $t$-test and the Wilcoxon signed-rank test. This is consistent with the paper's bounded interpretation---differences between reuse topologies are real but conditional, and no single architecture dominates across all settings.
+Tables~\ref{tab:statistical_tests_main} and~\ref{tab:statistical_tests_supp} provides the complete paired-test matrix for all architecture comparisons across datasets and operators. The overall pattern confirms that most numerical gaps between architectures are modest relative to fold-level variation: only a small fraction of comparisons reach $p<0.05$ under both the paired $t$-test and the Wilcoxon signed-rank test. This is consistent with the paper's bounded interpretation---differences between reuse topologies are real but conditional, and no single architecture dominates across all settings.
 
 The fold-level table is useful because it shows where that robustness comes from: the learnable gate is not just strong in the average, but remains consistently high across the five AIDS folds without relying on one unusually favorable split. The fuller cross-gate table also makes the mixed pattern easier to inspect target by target. The intended interpretation is therefore constrained. The gate study does not need to show that learnable gating is best on every target. Instead, the relevant question is whether adaptive control is generally more robust than fixed injection strengths across the selected residual and cross-residual settings. Table~\ref{tab:cross_gate_ablation_full} shows that learnable gating is best on three of the six cross-favored targets, while fixed gates remain competitive and can even be superior on the other three targets. This supports a robustness claim, not a universal-optimum claim.
 
@@ -97,6 +98,35 @@ This pattern supports a more precise conclusion than the architecture-only bench
 \subsection*{Residual-parameter sweep results}
 
 The additional routing settings \texttt{topk\_0p75} and \texttt{sparse\_0p1} refine the previous result rather than changing it. Table~\ref{tab:residual_routing_full} shows that the strongest top-k ratio varies by target, which indicates that top-k routing is not governed by one globally optimal retention level. The sparse sweep also shows a clear failure mode: aggressive sparsity can damage otherwise strong residual lines, especially on the strongest graph-level residual target, where \texttt{sparse\_0p1} drops to \texttt{0.8315 $\pm$ 0.0549}.
+
+\subsection*{Depth scaling and representation similarity}
+
+To further test how depth affects the representation dynamics of each architecture, we extend the hidden-state similarity analysis from $L=4$ to $L=5,6,7,8$ layers on PROTEINS under GCNConv. Figure~\ref{fig:layer_cka_comparison} shows the CKA similarity between adjacent depth stages across all five layer counts for each model, and Figure~\ref{fig:layer_cosine_comparison} shows the corresponding cosine similarity. Three patterns emerge from this comparison.
+
+First, deeper stacking consistently reduces adjacent-stage similarity across all five architectures, confirming that depth-induced representation divergence is a general phenomenon rather than an artifact of a specific reuse strategy. Second, residual and cross-residual variants exhibit systematically higher CKA values than PlainGNN at every depth configuration, with the gap widening as layer count increases---at $L=8$, PlainGNN's final CKA transition drops visibly below those of all four reuse variants. This is consistent with the mechanism interpretation in Section~\ref{sec:results}: residual reuse preserves more historical signal across depth, and this preservation effect becomes more pronounced as depth increases. Third, the node-level cross variant (NodeCrossGNN) maintains CKA values comparable to NodeResGNN across all layer counts, suggesting that cross-branch exchange does not destabilize representation continuity even under deeper configurations.
+
+Figure~\ref{fig:layer_gradient_comparison} further shows that the deepest-layer gradient norm behaves differently across architectures as depth scales. PlainGNN's deepest gradient norm degrades more rapidly with increasing depth than those of the residual family, while NodeResGNN and NodeCrossGNN maintain more stable gradient signals even at $L=8$. The graph-level variants (GraphResGNN and GraphCrossGNN) occupy an intermediate position, with GraphResGNN showing the most stable gradient profile among graph-level models. Taken together, these depth-scaling results reinforce the paper's central mechanism narrative: residual reuse slows both representation collapse and gradient degradation under deeper configurations, and cross-residual exchange does not introduce destructive interference that would undermine this stabilizing effect.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/exp/fig_supp_layer_cka_comparison_PROTEINS_GCNConv.pdf}
+\caption{CKA similarity between adjacent depth stages across layer counts $L=4,5,6,7,8$. Each subplot shows one model; curves correspond to different layer counts. Higher CKA indicates greater representation continuity across depth.}
+\label{fig:layer_cka_comparison}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/exp/fig_supp_layer_cosine_comparison_PROTEINS_GCNConv.pdf}
+\caption{Cosine similarity between adjacent depth stages across layer counts $L=4,5,6,7,8$. The pattern mirrors the CKA results: deeper stacking reduces adjacent-stage cosine similarity across all architectures, with PlainGNN showing the steepest decline at higher layer counts.}
+\label{fig:layer_cosine_comparison}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{figures/exp/fig_supp_layer_gradient_comparison_PROTEINS_GCNConv.pdf}
+\caption{Deepest-layer gradient L2 norm as a function of layer count for all five architectures on PROTEINS (GCNConv). The residual family maintains more stable gradient signals at depth, while PlainGNN shows the steepest decline. Graph-level variants occupy an intermediate position.}
+\label{fig:layer_gradient_comparison}
+\end{figure}
 
 \subsection*{Exploratory sensitivity analysis}
 
