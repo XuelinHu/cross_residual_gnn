@@ -174,11 +174,37 @@ Each method is evaluated under four message-passing operators:
 
 \subsection*{Training configuration and implementation details}
 
-All models are implemented in PyTorch Geometric \cite{fey2019fast} and trained under a unified protocol. The shared backbone across all CR-GNN variants and external baselines uses a hidden dimension of $d=64$, $L=4$ message-passing layers, and a dropout rate of $p=0.5$ applied after each layer's activation and before the final classifier. After the last message-passing layer, node representations are aggregated via global mean pooling, and a single linear layer maps the resulting graph embedding to class logits. No batch normalization or layer normalization is applied; the only regularization is dropout and weight decay.
+All models are implemented in PyTorch Geometric \cite{fey2019fast} under a unified training protocol. The key hyperparameters are summarized in Table~\ref{tab:hyperparams}. No batch normalization or layer normalization is applied; the only regularization is dropout and weight decay. All train--validation--test splits are fixed by a global random seed of 1024, ensuring identical data partitions across models within each fold. No task-specific feature engineering, graph augmentation, or edge redesign is applied; the raw node features and adjacency structures from TUDataset are used directly.
 
-Training uses the Adam optimizer with an initial learning rate of $5\times10^{-3}$ and weight decay of $1\times10^{-4}$. The learning rate is reduced by a factor of $0.5$ when validation loss fails to improve for 15 epochs (ReduceLROnPlateau), with a minimum learning rate of $1\times10^{-5}$. Each run trains for at most 200 epochs with a batch size of 256 graphs. Early stopping terminates training when validation loss does not improve for 60 consecutive epochs. Gradients are clipped to a maximum $L_2$-norm of $2.0$. The loss function is standard cross-entropy.
-
-All train--validation--test splits are fixed by a global random seed of 1024, ensuring that every model sees identical data partitions within each fold. No task-specific feature engineering, graph augmentation, or edge redesign is applied; the raw node features and adjacency structures from TUDataset are used directly.
+\begin{table}[h]
+\centering
+\small
+\caption{Key training hyperparameters shared across all experiments.}
+\label{tab:hyperparams}
+\begin{tabular}{l c}
+\toprule
+Parameter & Value \\
+\midrule
+Framework & PyTorch Geometric \\
+Hidden dimension ($d$) & 64 \\
+Message-passing layers ($L$) & 4 \\
+Dropout rate & 0.5 \\
+Optimizer & Adam \\
+Initial learning rate & $5\times10^{-3}$ \\
+Weight decay & $1\times10^{-4}$ \\
+LR schedule & ReduceLROnPlateau (factor 0.5, patience 15) \\
+Minimum learning rate & $1\times10^{-5}$ \\
+Batch size & 256 \\
+Maximum epochs & 200 \\
+Early stopping patience & 60 epochs \\
+Gradient clip norm ($L_2$) & 2.0 \\
+Pooling & Global mean pooling \\
+Loss function & Cross-entropy \\
+Random seed & 1024 \\
+Validation split ratio & 0.1 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 The learnable gate used in residual and cross-residual variants applies a sigmoid activation to a scalar parameter initialized at $0.8$, allowing each residual injection to be adaptively scaled during training. For the top-k routing mode, only the strongest fraction of residual channels (determined by absolute magnitude) is retained before injection. For the sparse routing mode, a softshrink operator with threshold $\lambda$ suppresses residual coefficients whose magnitude falls below $\lambda$, leaving a filtered residual path.
 
@@ -191,9 +217,9 @@ The benchmark is divided into two layers. The biological core consists of PROTEI
 Targeted ablations are organized to address the three research questions posed in the Introduction through controlled mechanism experiments:
 
 \begin{enumerate}
-    \item \textbf{Q1: When does cross-residual interaction help?} \textit{Cross-gate ablations.} Six settings where a cross architecture is already locally competitive are evaluated under four gate configurations (learnable, fixed 0.0, fixed 0.5, fixed 1.0). This tests whether the observed cross-residual advantage depends on adaptive injection control, or whether any fixed-weight additional path produces similar gains. The comparison isolates the source of cross-residual benefit: adaptive filtering versus structural pathway addition.
+    \item \textbf{Q1: How do reuse topologies trade off peak performance, consistency, and representational stability?} \textit{Full-benchmark and depth-scaling analyses.} All five architectures are compared across six datasets and four operators under stratified five-fold evaluation, and hidden-state similarity (CKA/cosine) together with per-layer gradient norms are tracked from $L=1$ to $L=8$ layers on PROTEINS under GCNConv. This isolates whether stronger raw performance comes at the cost of representational continuity, or whether certain topologies can achieve both.
 
-    \item \textbf{Q2: When does ordinary residual reuse remain the stronger default?} \textit{Gate-control ablations.} On the strongest graph-level residual target (AIDS + GraphResGNN + GINConv), learnable versus fixed-strength gates are compared under identical conditions. This directly tests whether the residual family's default strength comes from adaptive reuse or merely from having an extra injection path, and whether fixed residual injection can match or surpass adaptive control.
+    \item \textbf{Q2: When does cross-residual interaction outperform residual reuse?} \textit{Gate-control and cross-gate ablations.} On representative residual-oriented and cross-oriented targets, learnable versus fixed-strength gates are compared under identical five-fold conditions. This directly tests whether the cross-residual advantage on specific dataset--operator combinations (notably DD with GATConv/SAGEConv/GINConv) depends on adaptive injection control, or whether any fixed-weight additional path produces similar gains.
 
     \item \textbf{Q3: How does residual routing design change the answer?} \textit{Residual-routing ablations.} Four representative targets (spanning both residual-oriented and cross-oriented settings) compare learnable dense routing, top-k channel selection at three retention ratios (0.25, 0.5, 0.75), and sparse suppression at three thresholds (0.02, 0.05, 0.10) under the same five-fold protocol. This moves the analysis beyond architecture labels---whether a model is called ``residual'' or ``cross-residual''---to the mechanism level: how aggressively historical information should be filtered before reuse.
 \end{enumerate}
