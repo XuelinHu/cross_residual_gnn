@@ -591,19 +591,25 @@ def plot_gradient_norms(results_b: Dict, ds: str, op: str) -> None:
 # ──────────────────────────────────────────────
 
 LAYER_COLORS = {
-    4: "#1f77b4",
-    5: "#ff7f0e",
-    6: "#2ca02c",
-    7: "#d62728",
-    8: "#9467bd",
+    1: "#1f77b4",
+    2: "#ff7f0e",
+    3: "#2ca02c",
+    4: "#d62728",
+    5: "#9467bd",
+    6: "#8c564b",
+    7: "#e377c2",
+    8: "#7f7f7f",
 }
 
 LAYER_MARKERS = {
-    4: "o",
-    5: "s",
-    6: "D",
-    7: "^",
-    8: "v",
+    1: "o",
+    2: "s",
+    3: "D",
+    4: "^",
+    5: "v",
+    6: "<",
+    7: ">",
+    8: "P",
 }
 
 
@@ -652,15 +658,16 @@ def plot_layer_depth_comparison(
             if model_name in all_results[h_layer]:
                 all_vals.extend(all_results[h_layer][model_name].get("cka", []))
         if all_vals:
-            y_min = max(0.0, min(all_vals) - 0.08)
-            y_max = min(1.05, max(all_vals) + 0.08)
+            margin = (max(all_vals) - min(all_vals)) * 0.12 + 0.03
+            y_min = min(all_vals) - margin
+            y_max = min(1.05, max(all_vals) + margin)
             ax.set_ylim(y_min, y_max)
 
     # Hide unused subplot
     axes[5].set_visible(False)
 
-    fig.suptitle(f"CKA similarity vs depth across layer counts — {ds} ({op})",
-                 fontsize=16, fontweight="bold", y=1.01)
+    fig.suptitle(f"CKA similarity vs depth across layer counts (L=1--8) — {ds} ({op})",
+                 fontsize=17, fontweight="bold", y=1.01)
     plt.tight_layout()
     path = OUTPUT_DIR / f"fig_supp_layer_cka_comparison_{ds}_{op}.pdf"
     fig.savefig(path, dpi=150, bbox_inches="tight")
@@ -697,13 +704,14 @@ def plot_layer_depth_comparison(
             if model_name in all_results[h_layer]:
                 all_vals.extend(all_results[h_layer][model_name].get("cosine", []))
         if all_vals:
-            y_min = max(0.0, min(all_vals) - 0.08)
-            y_max = min(1.05, max(all_vals) + 0.08)
+            margin = (max(all_vals) - min(all_vals)) * 0.12 + 0.03
+            y_min = min(all_vals) - margin
+            y_max = min(1.05, max(all_vals) + margin)
             ax.set_ylim(y_min, y_max)
 
     axes[5].set_visible(False)
-    fig.suptitle(f"Cosine similarity vs depth across layer counts — {ds} ({op})",
-                 fontsize=16, fontweight="bold", y=1.01)
+    fig.suptitle(f"Cosine similarity vs depth across layer counts (L=1--8) — {ds} ({op})",
+                 fontsize=17, fontweight="bold", y=1.01)
     plt.tight_layout()
     path = OUTPUT_DIR / f"fig_supp_layer_cosine_comparison_{ds}_{op}.pdf"
     fig.savefig(path, dpi=150, bbox_inches="tight")
@@ -760,8 +768,8 @@ def plot_layer_gradient_comparison(
 
     ax.set_xlabel("Number of layers (L)", fontsize=14)
     ax.set_ylabel("Deepest-layer gradient L2 norm", fontsize=14)
-    ax.set_title(f"Deepest-layer gradient norm vs depth — {ds} ({op})",
-                 fontsize=15, fontweight="bold")
+    ax.set_title(f"Deepest-layer gradient norm vs depth (L=1--8) — {ds} ({op})",
+                 fontsize=16, fontweight="bold")
     ax.legend(fontsize=11, loc="upper left", framealpha=0.9)
     ax.grid(True, alpha=0.3)
     ax.set_xticks(layers_sorted)
@@ -803,7 +811,7 @@ def run_multi_layer_comparison(args, dataset, train_dataset, test_loader):
     all_a: Dict[int, Dict] = {}
     all_b: Dict[int, Dict] = {}
 
-    for h_layer in [4, 5, 6, 7, 8]:
+    for h_layer in [1, 2, 3, 4, 5, 6, 7, 8]:
         print("\n" + "=" * 60)
         print(f"Layer count: L = {h_layer}")
         print("=" * 60)

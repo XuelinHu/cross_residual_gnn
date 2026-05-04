@@ -146,14 +146,14 @@ def plot_full_suite(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
     datasets = completed_datasets(summary)
     if not datasets:
         return
-    fig, ax = plt.subplots(figsize=(12.5, 5.8))
+    fig, ax = plt.subplots(figsize=(14, 6.5))
     x = np.arange(len(datasets))
-    width = 0.15
-    offsets = np.linspace(-2, 2, len(MODELS)) * width
+    n_models = len(MODELS)
+    width = 0.9 / n_models  # bars fill the group with no gap
+    offsets = np.linspace(-(n_models-1)/2, (n_models-1)/2, n_models) * width
 
     for offset, model in zip(offsets, MODELS):
         means = [summary[dataset][model]["mean_acc"] for dataset in datasets]
-        stds = [summary[dataset][model]["std_acc"] for dataset in datasets]
         bars = ax.bar(
             x + offset,
             means,
@@ -161,25 +161,23 @@ def plot_full_suite(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
             color=MODEL_COLORS[model],
             label=MODEL_DISPLAY[model],
             edgecolor="black",
-            linewidth=0.8,
-            yerr=stds,
-            capsize=3,
+            linewidth=0.5,
             zorder=3,
         )
-        add_bar_labels(ax, bars, fontsize=10)
+        add_bar_labels(ax, bars, fmt="{:.4f}", fontsize=8, rotation=90)
 
     ax.set_xticks(x)
-    ax.set_xticklabels(datasets, rotation=20, fontsize=13)
-    ax.set_ylabel("Mean best test accuracy", fontsize=15)
-    ax.set_title("Benchmark across the active dataset package", fontsize=17, fontweight="bold")
+    ax.set_xticklabels(datasets, rotation=15, fontsize=16)
+    ax.set_ylabel("Mean best test accuracy", fontsize=18)
+    ax.set_title("Benchmark across the active dataset package", fontsize=20, fontweight="bold")
     # Adaptive y-axis based on data
     all_means = [summary[ds][m]["mean_acc"] for ds in datasets for m in MODELS]
-    all_stds = [summary[ds][m]["std_acc"] for ds in datasets for m in MODELS]
-    y_min = max(0, min(all_means) - max(all_stds) - 0.08)
-    y_max = max(all_means) + max(all_stds) + 0.08
+    y_min = max(0, min(all_means) - 0.10)
+    y_max = max(all_means) + 0.08
     ax.set_ylim(y_min, y_max)
+    ax.tick_params(axis='y', labelsize=14)
     style_axis(ax)
-    ax.legend(frameon=False, ncol=5, loc="upper center", bbox_to_anchor=(0.5, 1.18), fontsize=12)
+    ax.legend(frameon=False, ncol=5, loc="upper center", bbox_to_anchor=(0.5, 1.16), fontsize=14)
     fig.tight_layout()
     save(fig, "fig1_full_suite_results")
     plt.close(fig)

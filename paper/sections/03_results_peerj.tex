@@ -101,30 +101,30 @@ The additional routing settings \texttt{topk\_0p75} and \texttt{sparse\_0p1} ref
 
 \subsection*{Depth scaling and representation similarity}
 
-To further test how depth affects the representation dynamics of each architecture, we extend the hidden-state similarity analysis from $L=4$ to $L=5,6,7,8$ layers on PROTEINS under GCNConv. Figure~\ref{fig:layer_cka_comparison} shows the CKA similarity between adjacent depth stages across all five layer counts for each model, and Figure~\ref{fig:layer_cosine_comparison} shows the corresponding cosine similarity. Three patterns emerge from this comparison.
+To further test how depth affects the representation dynamics of each architecture, we extend the hidden-state similarity analysis across $L=1$ through $L=8$ layers on PROTEINS under GCNConv. Figure~\ref{fig:layer_cka_comparison} shows the CKA similarity between adjacent depth stages across all eight layer counts for each model, and Figure~\ref{fig:layer_cosine_comparison} shows the corresponding cosine similarity. Several patterns emerge from this comparison.
 
-First, deeper stacking consistently reduces adjacent-stage similarity across all five architectures, confirming that depth-induced representation divergence is a general phenomenon rather than an artifact of a specific reuse strategy. Second, residual and cross-residual variants exhibit systematically higher CKA values than PlainGNN at every depth configuration, with the gap widening as layer count increases---at $L=8$, PlainGNN's final CKA transition drops visibly below those of all four reuse variants. This is consistent with the mechanism interpretation in Section~\ref{sec:results}: residual reuse preserves more historical signal across depth, and this preservation effect becomes more pronounced as depth increases. Third, the node-level cross variant (NodeCrossGNN) maintains CKA values comparable to NodeResGNN across all layer counts, suggesting that cross-branch exchange does not destabilize representation continuity even under deeper configurations.
+First, deeper stacking consistently reduces adjacent-stage similarity across all five architectures, confirming that depth-induced representation divergence is a general phenomenon rather than an artifact of a specific reuse strategy. Second, residual and cross-residual variants exhibit systematically higher CKA values than PlainGNN at every depth configuration beyond the shallowest layers, with the gap widening as layer count increases---at $L=8$, PlainGNN's final CKA transition drops visibly below those of all four reuse variants. At very shallow depths ($L=2$--$3$), all architectures maintain relatively high similarity, consistent with the expectation that early layers capture broadly shared local structure. This is consistent with the mechanism interpretation in Section~\ref{sec:results}: residual reuse preserves more historical signal across depth, and this preservation effect becomes more pronounced as depth increases. Third, the node-level cross variant (NodeCrossGNN) maintains CKA values comparable to NodeResGNN across all layer counts, suggesting that cross-branch exchange does not destabilize representation continuity even under deeper configurations.
 
-Figure~\ref{fig:layer_gradient_comparison} further shows that the deepest-layer gradient norm behaves differently across architectures as depth scales. PlainGNN's deepest gradient norm degrades more rapidly with increasing depth than those of the residual family, while NodeResGNN and NodeCrossGNN maintain more stable gradient signals even at $L=8$. The graph-level variants (GraphResGNN and GraphCrossGNN) occupy an intermediate position, with GraphResGNN showing the most stable gradient profile among graph-level models. Taken together, these depth-scaling results reinforce the paper's central mechanism narrative: residual reuse slows both representation collapse and gradient degradation under deeper configurations, and cross-residual exchange does not introduce destructive interference that would undermine this stabilizing effect.
+Figure~\ref{fig:layer_gradient_comparison} further shows that the deepest-layer gradient norm behaves differently across architectures as depth scales. PlainGNN's deepest gradient norm degrades more rapidly with increasing depth than those of the residual family, while NodeResGNN and NodeCrossGNN maintain more stable gradient signals even at $L=8$. The graph-level variants (GraphResGNN and GraphCrossGNN) occupy an intermediate position, with GraphResGNN showing the most stable gradient profile among graph-level models. Taken together, these depth-scaling results---spanning from shallow single-layer configurations to deeper eight-layer stacks---reinforce the paper's central mechanism narrative: residual reuse slows both representation collapse and gradient degradation under deeper configurations, and cross-residual exchange does not introduce destructive interference that would undermine this stabilizing effect.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\linewidth]{figures/exp/fig_supp_layer_cka_comparison_PROTEINS_GCNConv.pdf}
-\caption{CKA similarity between adjacent depth stages across layer counts $L=4,5,6,7,8$. Each subplot shows one model; curves correspond to different layer counts. Higher CKA indicates greater representation continuity across depth.}
+\caption{CKA similarity between adjacent depth stages across layer counts $L=1$ through $L=8$. Each subplot shows one model; curves correspond to different layer counts. Higher CKA indicates greater representation continuity across depth.}
 \label{fig:layer_cka_comparison}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\linewidth]{figures/exp/fig_supp_layer_cosine_comparison_PROTEINS_GCNConv.pdf}
-\caption{Cosine similarity between adjacent depth stages across layer counts $L=4,5,6,7,8$. The pattern mirrors the CKA results: deeper stacking reduces adjacent-stage cosine similarity across all architectures, with PlainGNN showing the steepest decline at higher layer counts.}
+\caption{Cosine similarity between adjacent depth stages across layer counts $L=1$ through $L=8$. The pattern mirrors the CKA results: deeper stacking reduces adjacent-stage cosine similarity across all architectures, with PlainGNN showing the steepest decline at higher layer counts. Negative values indicate anti-correlated representations between adjacent stages.}
 \label{fig:layer_cosine_comparison}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/exp/fig_supp_layer_gradient_comparison_PROTEINS_GCNConv.pdf}
-\caption{Deepest-layer gradient L2 norm as a function of layer count for all five architectures on PROTEINS (GCNConv). The residual family maintains more stable gradient signals at depth, while PlainGNN shows the steepest decline. Graph-level variants occupy an intermediate position.}
+\caption{Deepest-layer gradient L2 norm as a function of layer count ($L=1$ through $L=8$) for all five architectures on PROTEINS (GCNConv). The residual family maintains more stable gradient signals at depth, while PlainGNN shows the steepest decline. Graph-level variants occupy an intermediate position.}
 \label{fig:layer_gradient_comparison}
 \end{figure}
 
