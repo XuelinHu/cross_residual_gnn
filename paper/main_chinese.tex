@@ -324,54 +324,31 @@ Validation split ratio & 0.1 \\
 
 \subsection*{整体基准性能}
 
-最终基准在统一协议下评估了六个数据集、九种方法、四种算子和五个外折。因此，正文将基准表格置于它们所支持的具体声明旁边，而非将表格证据单独列入附录。该呈现方式是有意为之：本文主张有限制的实证结论，所以表格证据被放置在每项声明被提出和解释的位置。
+最终基准评估了六个数据集、九种方法（五种CR-GNN变体加上四种外部基线），CR-GNN家族使用GCNConv算子，各基线使用其原生算子，在统一协议下进行五外折评估。
 
 \input{../md/all_exp_tables.tex}
 
-总体而言，三张表显示出一致的层次关系。残差复用仍是蛋白质导向核心中更强的默认家族，交叉残差路由在补充分子数据集上变得选择性有用，而优胜者摘要确认没有任何单一复杂度趋势能单独解释结果。均值和标准差的组合在此处同样重要：若干差距是有限而非巨大，这正说明为何本文将结果解释为受控的相对稳定模式，而非某一设计普遍占优的证据。
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.98\linewidth]{figures/exp/fig1_full_suite_results.pdf}
-\caption{活跃数据集包上的基准测试。每个柱表示平均最佳测试准确率，柱顶数字标出精确均值，误差线显示折间标准差。}
-\label{fig:full_suite_results}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.90\linewidth]{figures/exp/fig2_cross_advantage_heatmap.pdf}
-\caption{定义交叉残差路由实际价值的准确率增量。正值表示交叉设计的优势，负值表示对应的普通或残差替代方案仍然更强。}
-\label{fig:cross_advantage_heatmap}
-\end{figure}
-
-图~\ref{fig:full_suite_results} 和图~\ref{fig:cross_advantage_heatmap} 从互补角度阐明同一点：交叉残差路由通常优于普通堆叠，但并非始终强于最佳残差替代方案。
+三张表共同揭示了一个细致入微的格局。在CR-GNN家族内部，GraphResGNN在PROTEINS、ENZYMES和AIDS上保持最强；NodeResGNN在PROTEINS上领先。在外部基线中，GIN在MUTAG（0.8403）和AIDS（0.9145）上尤其强劲，而GraphSAGE在DD（0.7334）和Mutagenicity（0.8084）上领先。具有竞争力的外部基线的存在强化了本文的中心论点：CR-GNN家族并非被宣称普遍占优，而是提供了一个受控设计空间，在此空间内可以研究系统性的权衡——即使外部方法被纳入比较，这些权衡仍然存在。
 
 \subsection*{生物学核心数据集结果}
 
-主生物基准结果报告于表~\ref{tab:all_results_1}。面向主题的解释锚定在蛋白质导向核心数据集中。这些数据集承载了本文的主要实质性分量，因此这里的解释刻意比补充包更加详细。
+主生物基准结果报告于表~\ref{tab:all_results_1}。
 
-\textbf{残差复用仍是所报告套件中最强的默认家族。} 残差变体在 PROTEINS、DD、ENZYMES 和 AIDS 上数值排名第一。GraphResGNN 在 PROTEINS（$0.7223 \pm 0.0367$）、ENZYMES（$0.3117 \pm 0.0746$）和 AIDS（$0.9160 \pm 0.0121$）上领先，而 NodeResGNN 在 DD（$0.7207 \pm 0.0259$）上领先。重点不在于每次残差领先幅度很大，而在于残差模型在相同五折协议下、跨核心生物任务反复保持在或接近顶部。值得注意的是，许多数值领先是有限度的：配对统计检验（见表~\ref{tab:statistical_tests_main} 和表~\ref{tab:statistical_tests_supp}）显示大多数成对架构比较未达常规显著性（$p < 0.05$），这一模式本身即具有信息量——它表明在受控协议下，架构级别的差异小于划分级别的变异性。
+\textbf{PROTEINS.} 在CR-GNN家族内部，NodeResGNN数值领先（0.7143 $\pm$ 0.0223），紧随其后的是GraphResGNN（0.7071 $\pm$ 0.0402）。外部基线具有竞争力：GraphSAGE（0.6954）、GIN（0.6972）和JKNet（0.6954）均聚集在CR-GNN模型附近。APPNP表现明显更差（0.5966），与其在需要局部结构区分的图上的已知局限性一致。
 
-\textbf{交叉残差设计具有选择性强度，而非普遍占优。} 交叉变体在 MUTAG 和 Mutagenicity 上数值排名第一。更重要的是，最佳交叉变体在大多数已完成数据集上击败了 PlainGNN。因此，交叉路由明显不仅是设计上的新奇事物，但证据不支持"交叉普遍优于残差复用"这一更强声明。这一更窄的解读对可靠性至关重要，因为它同时匹配均值结果和所观察到的划分级变异。统计上显著的少数成对比较（例如，PROTEINS 上 SAGEConv 下 GraphResGNN $>$ GraphCrossGNN，$p=0.031$；DD 上 SAGEConv 下 NodeCrossGNN $>$ GraphCrossGNN，$p=0.027$）均涉及图级交叉变体输给残差或节点级交叉模型——表明图级交叉设计是家族中更脆弱的元素。
+\textbf{DD.} GraphSAGE整体领先（0.7334 $\pm$ 0.0227），GraphResGNN是CR-GNN家族中最强的变体（0.7275 $\pm$ 0.0144）。值得注意的是，两个交叉残差变体——GraphCrossGNN（0.7207）和NodeCrossGNN（0.7164）——在该数据集上均优于NodeResGNN（0.7088）。这支持了先前的观察，即跨分支交换在大型稀疏蛋白质图上特别有效。
 
-\textbf{节点级交叉比图级交叉更可靠。} 跨已完成数据集，NodeCrossGNN 在数值上超越 NodeResGNN 的次数多于 GraphCrossGNN 超越 GraphResGNN 的次数。这表明在当前研究中，交换中间节点级状态是更鲁棒的交叉残差设计，而图级交叉路由对数据集更敏感，其在若干算子-数据集组合上相比图级残差复用的优势在统计上显著为负方向（见表~\ref{tab:statistical_tests_main} 和表~\ref{tab:statistical_tests_supp}）。
+\textbf{ENZYMES.} 所有模型在绝对指标上均表现不佳，GraphResGNN领先（0.3333 $\pm$ 0.1000），GIN第二（0.2883 $\pm$ 0.1148）。较大的标准差反映了具有挑战性的6类、600图设定。CR-GNN家族的相对排序（GraphRes $>$ GraphCross $>$ NodeCross $\approx$ NodeRes $\approx$ Plain）与在其他数据集上观察到的模式一致，尽管噪声较大的制度限制了任何架构级结论的强度。
 
-\textbf{普通堆叠遭受深度诱导信号坍塌，但并非一致更差。} PlainGNN 在 PROTEINS 和 DD 上保持竞争力，但在最终套件中从未在数据集上领先，通常被残差或交叉残差变体超越。在 GCNConv 下的 ENZYMES 和 AIDS 上，PlainGNN 与最佳残差变体之间的差距具有统计显著性（ENZYMES + GINConv：$p=0.002$；AIDS + GCNConv：$p=0.039$），这与"普通堆叠的主导模式压制了具有判别力的中层结构信息，而单纯更深传播不足以弥补"的解释一致。
+\subsection*{补充鲁棒性数据集结果}
 
-\subsection*{PROTEINS、DD 和 ENZYMES 的主题聚焦结果}
+补充鲁棒性结果报告于表~\ref{tab:all_results_2}。
 
-\textbf{PROTEINS.} GraphResGNN 数值领先（$0.7223 \pm 0.0367$），相比 PlainGNN 的优势为 $+0.017$，在大多数算子级比较中未达统计显著性（例如 GCNConv：$p=0.375$，Cohen's $d=+0.45$，小到中等效应）。这表明尾部保留残差路由——重复注入图级摘要——提供有限但一致的收益，与"GraphResGNN 比普通堆叠保存了更多历史结构信号"的解释一致，同时不宣称普遍优势。最佳交叉变体 NodeCrossGNN（$0.6963 \pm 0.0433$）在该数据集上仍低于 GraphResGNN。
+\textbf{MUTAG.} GIN是整体最强的模型（0.8403 $\pm$ 0.0298），大幅领先所有其他方法。在CR-GNN家族内部，NodeResGNN（0.7451）和NodeCrossGNN（0.7398）与GraphSAGE（0.7504）具有竞争力。GraphResGNN在该数据集上表现最差（0.7238），与此前的观察一致，即其激进的表示重塑策略不太适合局部基序保留至关重要的小型分子图。
 
-\textbf{DD.} NodeResGNN（$0.7207 \pm 0.0259$）和 NodeCrossGNN（$0.7198 \pm 0.0178$）几乎持平（$\Delta = 0.0009$，在任何算子下均不显著）。实践解读是节点级历史结构信号保存在大型稀疏蛋白质图上很重要——增加交叉分支交换既不帮助也不损害。这是一个值得报告的零结果：它表明交叉分支通路在 DD 上不引入破坏性干预，但也不提供在其他数据集上所观察到的选择性增益。
+\textbf{AIDS.} GIN（0.9145 $\pm$ 0.0415）和GraphResGNN（0.9090 $\pm$ 0.0194）几乎并列领先，GraphResGNN的方差显著更低。GraphSAGE（0.8800）、NodeCrossGNN（0.8850）、JKNet（0.8775）和GraphCrossGNN（0.8740）构成一个紧密的聚类。
 
-\textbf{ENZYMES.} 交叉变体在数值上变得更具吸引力。GraphCrossGNN 达到 $0.3017 \pm 0.0750$，NodeCrossGNN 达到 $0.3000 \pm 0.0580$，均明显高于 PlainGNN 的 $0.2450 \pm 0.0407$（在 GINConv 下具有统计显著性：NodeCrossGNN vs PlainGNN $p=0.009$，GraphResGNN vs PlainGNN $p=0.002$）。即便如此，GraphResGNN 仍数值领先（$0.3117 \pm 0.0746$）。然而，所有模型的绝对准确率仍然较低（最佳模型仅比 6 类随机基线 16.7\% 高出约 15 个百分点），表明 3 维输入特征和 600 张图的样本量创造了一个具有挑战性的制度，其中表示学习本质上充满噪声。因此，ENZYMES 结果应被解读为相对排序的证据，而非绝对任务掌握的证据。
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.98\linewidth]{figures/exp/fig4_topic_focus_results.pdf}
-\caption{已完成主题导向 TU 数据集的聚焦比较。模式是混合而非单边的：图级残差细化在 PROTEINS 和 ENZYMES 上最强，而 DD 偏好节点级复用，NodeCrossGNN 保持竞争力但非主导。}
-\label{fig:topic_focus_results}
-\end{figure}
+\textbf{Mutagenicity.} GraphSAGE领先（0.8084 $\pm$ 0.0180），紧随其后的是GraphResGNN（0.8022 $\pm$ 0.0244）和GraphCrossGNN（0.7992 $\pm$ 0.0232）。NodeCrossGNN（0.7939）和GIN（0.7985）具有竞争力。排名前四的模型仅相差0.015，标准差重叠——这与本文的解读一致，即架构级差异虽然系统存在，但相对于折间变异是有限的。
 
 \subsection*{设计空间中的性能权衡}
 
@@ -429,9 +406,6 @@ GraphCrossGNN 占据了一个具有启发意义的中间位置：它在复用变
 
 综合来看，这些结果表明 CR-GNN 设计空间由一种三维张力定义：激进重塑表示的架构（GraphResGNN）实现最高峰值准确率，但排名跨数据集不一致；最忠实地保存表示的架构（NodeResGNN）实现最强的连续性，但性能波动大；平衡这些力量的架构（GraphCrossGNN、NodeCrossGNN）实现最一致（尽管不是最峰值）的性能。实践启示是：复用拓扑的选择应由实践者对风险的容忍度引导——峰值准确率至关重要且数据集特征充分理解时选择 GraphResGNN；跨多样数据集的一致、可预测性能是优先事项时选择 GraphCrossGNN。
 
-\subsection*{补充鲁棒性数据集结果}
-
-补充鲁棒性结果报告于表~\ref{tab:all_results_2}。补充包强化了权衡模式。NodeCrossGNN 在 MUTAG（GATConv 算子）和 Mutagenicity（GATConv）上最强，而 GraphResGNN 在 AIDS 上保持最强。跨数据集一致性模式仍然成立：没有单一架构支配所有补充数据集，峰值准确率与一致性之间的选择取决于具体的数据集-算子上下文。
 
 \subsection*{门控消融结果}
 
