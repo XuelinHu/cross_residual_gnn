@@ -1,8 +1,8 @@
-\section*{Discussion}
+\section{Discussion}
 
 The main empirical message of this study is that the CR-GNN design space reveals systematic trade-offs among peak accuracy, cross-dataset consistency, and representational continuity---trade-offs that are not visible when architectures are compared only by a single winner-take-all metric. GraphResGNN wins most frequently (50\% of combinations) but with the weakest representational continuity at depth and with outlier performance on specific datasets. NodeResGNN achieves the best representational continuity (CKA 0.968 at $L=8$) but with the greatest performance volatility. Cross-residual architectures (NodeCrossGNN, GraphCrossGNN) occupy the middle ground in both dimensions, with GraphCrossGNN emerging as the most rank-consistent design. The contribution of the paper is therefore not a declaration of a single best architecture, but the controlled comparison framework that makes these trade-offs quantitatively visible.
 
-\subsection*{Two paths to strong performance}
+\subsection{Two paths to strong performance}
 
 The data support the existence of two distinct pathways to strong graph classification performance within the CR-GNN design space.
 
@@ -12,26 +12,26 @@ The data support the existence of two distinct pathways to strong graph classifi
 
 The existence of these two paths carries a practical implication: the choice between GraphResGNN and a cross-residual variant should be guided by whether the practitioner prioritizes peak single-task accuracy (choose GraphResGNN) or consistent performance across diverse, possibly heterogeneous datasets (choose GraphCrossGNN), or specifically works with large sparse graphs and attention-based operators (choose NodeCrossGNN).
 
-\subsection*{Node-level and graph-level reuse create different trade-off profiles}
+\subsection{Node-level and graph-level reuse create different trade-off profiles}
 
 The distinction between node-level and graph-level reuse is practically important and interacts with the trade-off framework. GraphResGNN and GraphCrossGNN carry more parameters than their node-level counterparts (e.g., GraphResGNN $\approx$51k vs.\ NodeResGNN $\approx$23k on PROTEINS), yet this parameter advantage does not translate uniformly: GraphResGNN ranks first on PROTEINS and ENZYMES but fifth on MUTAG, where lighter node-level models perform better. This suggests that information-flow topology, rather than parameter count, is the primary determinant of the performance--consistency trade-off. NodeCrossGNN, despite using fewer parameters than GraphResGNN, is the second-most winning architecture (6/24 combinations), and it achieves this through topology rather than capacity.
 
-\subsection*{Why ENZYMES remains difficult}
+\subsection{Why ENZYMES remains difficult}
 
 All models perform poorly on ENZYMES in absolute terms: the best model (GraphResGNN, 0.333) is only $\sim$16 percentage points above the 6-class random baseline (16.7\%). Several factors contribute: only 600 graphs with 3-dimensional input features; a 6-class structure creating a harder decision boundary than the binary tasks dominating the rest of the benchmark; and the largest fold-level standard deviation ($\pm$0.100) in the biological core. The ENZYMES results are best interpreted as evidence that the architecture ranking remains consistent even under noisy, low-data regimes, rather than as evidence that any architecture solves the task well.
 
-\subsection*{Residual routing and sparsity modulate the trade-off}
+\subsection{Residual routing and sparsity modulate the trade-off}
 
 The routing analysis reveals that routing strategy can shift the performance--consistency trade-off. Sparse routing with moderate threshold (0.05) is optimal on three of four representative targets, and two of these three targets involve cross-residual architectures. This points to a mechanism-level synergy: sparsity suppresses weak residual channels that would otherwise accumulate as noise across depth, while the cross-branch pathway ensures that genuinely complementary information is preserved through an alternative route. Learnable dense routing remains best on the strongest graph-level residual target (AIDS + GraphResGNN + GINConv), where rich historical context benefits from unfiltered reuse. The practical guidance is: combine sparse routing with cross-residual architectures for balanced, consistent performance; use learnable dense routing with graph-level residual architectures when maximizing peak accuracy on well-characterized datasets.
 
-\subsection*{Depth-scaling evidence and the CKA--performance paradox}
+\subsection{Depth-scaling evidence and the CKA--performance paradox}
 
 The depth-scaling analysis (Figures~\ref{fig:layer_cka_comparison}--\ref{fig:layer_gradient_comparison}) documents a finding that challenges the intuitive assumption that stronger representational continuity should predict better performance. NodeResGNN achieves the highest CKA at $L=8$ (0.968) but wins only 3/24 combinations with the greatest rank volatility. GraphResGNN achieves the lowest CKA (0.942) but wins 12/24 combinations. This ``CKA--performance paradox'' suggests that representational change between depth stages is not inherently detrimental---when structured through a mechanism such as graph-conditioned block reinjection, it can be productive. Conversely, preserving representations too faithfully (as NodeResGNN does) may limit the model's ability to adapt its representations to task-specific structure at each depth stage. The cross-residual variants occupy a productive middle ground: enough continuity to avoid the brittleness of PlainGNN, enough change to remain competitive with GraphResGNN.
 
-\subsection*{Evidence hierarchy and study limitations}
+\subsection{Evidence hierarchy and study limitations}
 
 The strongest evidence comes from the five-fold benchmark and targeted five-fold ablations. The older single-fold sensitivity scans are useful only for optimization interpretation. A second limitation is statistical power: with five paired observations per combination, the tests have limited power to detect small-to-medium effects (Cohen's $d < 0.5$). This does not undermine the paper's conclusions, but it means that architecture comparisons should be understood as numerical orderings under controlled conditions rather than statements of statistical dominance. A third limitation is baseline scope: the benchmark includes representative baselines but is not an exhaustive leaderboard against every recent method. A fourth limitation is dataset scale: although biomolecular and meaningful, the datasets are medium-scale benchmarks. The study therefore supports conclusions about controlled graph-classification behavior and design trade-offs, not about large-scale scalability or direct biological discovery. A fifth limitation specific to the depth-scaling analysis is that it was conducted on a single dataset--operator combination (PROTEINS, GCNConv); extending it to other datasets and operators would test the generality of the CKA--performance paradox.
 
-\subsection*{Future directions}
+\subsection{Future directions}
 
 The most important extension is to test whether the trade-off framework generalizes to larger graph benchmarks and richer biological inputs. The CKA--performance paradox---that the architecture with the weakest representational continuity achieves the highest peak accuracy---warrants further investigation across diverse domains to determine whether it is a general property of deep GNN design spaces or specific to the biomolecular setting studied here. The finding that cross-residual plus sparse routing forms a particularly effective combination should also be tested on broader tasks where graph topology must be combined with stronger domain supervision.

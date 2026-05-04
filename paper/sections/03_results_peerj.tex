@@ -1,10 +1,10 @@
-\section*{Results}
+\section{Results}
 \label{sec:results}
 \label{sec:experiments}
 
 This section reports the final empirical evidence in four layers: the full benchmark, a mechanism-oriented interpretation of the strongest residual patterns, the targeted gate and residual-routing studies, and the exploratory sensitivity analyses. The evidence hierarchy is explicit. The main benchmark and the targeted ablations use the latest stratified five-fold results and are reported as mean best test accuracy $\pm$ fold-level standard deviation, whereas the older sensitivity scans are retained only as supporting trend analyses. This separation matters because the paper's main claims are intended to rest on repeated-split evidence rather than on one favorable run.
 
-\subsection*{Overall benchmark performance}
+\subsection{Overall benchmark performance}
 
 The final benchmark evaluates six datasets, nine methods (five CR-GNN variants plus four external baselines), under GCNConv for the CR-GNN family and each baseline's native operator, with five outer folds under one unified protocol.
 
@@ -12,7 +12,7 @@ The final benchmark evaluates six datasets, nine methods (five CR-GNN variants p
 
 The three tables together reveal a nuanced landscape. Within the CR-GNN family, GraphResGNN remains the strongest on PROTEINS, ENZYMES, and AIDS; NodeResGNN leads on PROTEINS. Among external baselines, GIN is particularly strong on MUTAG (0.8403) and AIDS (0.9145), while GraphSAGE leads on DD (0.7334) and Mutagenicity (0.8084). The presence of competitive external baselines reinforces the paper's central point: the CR-GNN family is not claimed to be universally dominant, but rather provides a controlled design space within which systematic trade-offs can be studied---trade-offs that persist even when external methods are included in the comparison.
 
-\subsection*{Results on the biological core datasets}
+\subsection{Results on the biological core datasets}
 
 The main biological benchmark results are reported in Table~\ref{tab:all_results_1}.
 
@@ -22,7 +22,7 @@ The main biological benchmark results are reported in Table~\ref{tab:all_results
 
 \textbf{ENZYMES.} All models perform poorly in absolute terms, with GraphResGNN leading (0.3333 $\pm$ 0.1000) and GIN second (0.2883 $\pm$ 0.1148). The large standard deviations reflect the challenging 6-class, 600-graph setting. The CR-GNN family's relative ordering (GraphRes $>$ GraphCross $>$ NodeCross $\approx$ NodeRes $\approx$ Plain) is consistent with the pattern observed on other datasets, though the noisy regime limits the strength of any architecture-level conclusion.
 
-\subsection*{Results on the supplementary robustness datasets}
+\subsection{Results on the supplementary robustness datasets}
 
 The supplementary robustness results are reported in Table~\ref{tab:all_results_2}.
 
@@ -32,7 +32,7 @@ The supplementary robustness results are reported in Table~\ref{tab:all_results_
 
 \textbf{Mutagenicity.} GraphSAGE leads (0.8084 $\pm$ 0.0180), followed closely by GraphResGNN (0.8022 $\pm$ 0.0244) and GraphCrossGNN (0.7992 $\pm$ 0.0232). NodeCrossGNN (0.7939) and GIN (0.7985) are competitive. The top four models are separated by only 0.015, with overlapping standard deviations---consistent with the paper's interpretation that architecture-level differences, while systematic, are modest relative to fold-level variation.
 
-\subsection*{Performance trade-offs across the design space}
+\subsection{Performance trade-offs across the design space}
 
 Table~\ref{tab:winner_summary} summarizes the winner counts across all 24 dataset--operator combinations. GraphResGNN achieves the highest peak accuracy in 12 of 24 combinations (50\%), making it the most frequent winner. NodeCrossGNN is the second-strongest architecture with 6 wins (25\%), and notably dominates DD across three of four operators (GATConv, SAGEConv, GINConv). NodeResGNN wins 3 combinations (PROTEINS/GCNConv, MUTAG/GCNConv, Mutagenicity/SAGEConv), PlainGNN wins 2 (both on MUTAG), and GraphCrossGNN wins 1 (MUTAG/GATConv).
 
@@ -76,7 +76,7 @@ PlainGNN & 4.3 & 0.036 & \textbf{0.75} \\
 
 The DD case is particularly instructive for understanding when cross-residual interaction helps. DD is the largest and sparsest protein graph in the biological core (1,178 graphs, 89-dim features), and NodeCrossGNN wins under three of four operators. This suggests that dual-branch node-level exchange is especially effective when graphs are large and sparse, where complementary parallel pathways can preserve discriminative structural signals that a single branch would suppress under repeated propagation. By contrast, on smaller, denser graphs such as AIDS (where global context dominates), GraphResGNN's sequential graph-conditioned block structure is the more effective strategy.
 
-\subsection*{Mechanistic interpretation: accuracy, consistency, and representational continuity}
+\subsection{Mechanistic interpretation: accuracy, consistency, and representational continuity}
 
 The benchmark patterns above delineate a design space in which peak accuracy, cross-dataset consistency, and representational continuity are not aligned. This tension is most clearly visible in the depth-scaling analysis.
 
@@ -88,7 +88,7 @@ GraphCrossGNN occupies an instructive middle ground: it achieves the second-high
 
 Taken together, these results suggest that the CR-GNN design space is defined by a three-way tension: architectures that aggressively reshape representations (GraphResGNN) achieve the highest peak accuracy but with inconsistent ranking across datasets; architectures that preserve representations most faithfully (NodeResGNN) achieve the strongest continuity but with volatile performance; and architectures that balance these forces (GraphCrossGNN, NodeCrossGNN) achieve the most consistent, though not peak, performance. The practical implication is that the choice of reuse topology should be guided by the practitioner's tolerance for risk: GraphResGNN when peak accuracy is paramount and dataset characteristics are well-understood; GraphCrossGNN when consistent, predictable performance across diverse datasets is the priority.
 
-\subsection*{Gate ablation results}
+\subsection{Gate ablation results}
 
 \input{../md/peerj_gate_tables.tex}
 \input{../md/peerj_gate_fold_table.tex}
@@ -100,17 +100,17 @@ The gate ablations test whether adaptive control of residual injection is necess
 
 Tables~\ref{tab:statistical_tests_main} and~\ref{tab:statistical_tests_supp} provide the complete paired-test matrix. Most architecture-level numerical gaps are modest relative to fold-level variation, consistent with the paper's interpretation that differences between reuse topologies are real but conditional.
 
-\subsection*{Residual-routing results}
+\subsection{Residual-routing results}
 
 \input{../md/peerj_residual_tables.tex}
 
 The residual-routing analysis adds a mechanism dimension to the trade-off framework. Four representative targets compare learnable, top-k, and sparse routing modes under the same five-fold protocol. The clearest signal is that sparse routing with moderate threshold (0.05) is the most frequently optimal configuration, winning on three of four targets. Learnable dense routing remains best only on the strongest graph-level residual line. Two of the three sparse-favoring targets involve cross-residual architectures, suggesting that sparse filtering and cross-branch exchange form a particularly effective combination: sparsity suppresses weak residual channels that would otherwise accumulate as noise, while the cross-branch pathway ensures that genuinely complementary information is preserved.
 
-\subsection*{Residual-parameter sweep results}
+\subsection{Residual-parameter sweep results}
 
 The additional routing settings refine rather than change the pattern. The strongest top-k ratio varies by target, confirming no globally optimal retention level. Aggressive sparsity (0.10) damages the strongest graph-level residual target, where accuracy drops markedly, reinforcing that the benefit of sparsity is conditional on the appropriate threshold.
 
-\subsection*{Depth scaling and representation similarity}
+\subsection{Depth scaling and representation similarity}
 
 To further test how depth affects representation dynamics, we extend the hidden-state similarity analysis across $L=1$ through $L=8$ layers on PROTEINS under GCNConv. Figure~\ref{fig:layer_cka_comparison} shows the CKA similarity between adjacent depth stages for each model, and Figure~\ref{fig:layer_cosine_comparison} shows the corresponding cosine similarity.
 
@@ -141,6 +141,6 @@ Figure~\ref{fig:layer_gradient_comparison} further shows that the deepest-layer 
 \label{fig:layer_gradient_comparison}
 \end{figure}
 
-\subsection*{Exploratory sensitivity analysis}
+\subsection{Exploratory sensitivity analysis}
 
 Auxiliary sensitivity checks over depth, dropout, and learning rate on PROTEINS, DD, and ENZYMES do not materially change the main conclusion. On PROTEINS and DD, moderate tuning changes affect the gap between the two cross variants, but they do not overturn the broader conclusion that residual baselines remain the stronger default reference. On ENZYMES, the validation signal is visibly noisier, and promising local settings did not reproduce the original full-suite cross results under the final 5-fold average. These checks are reported for transparency, but they should not be read as evidence at the same level as the repeated-split benchmark and targeted ablations.
