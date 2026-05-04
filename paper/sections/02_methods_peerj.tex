@@ -124,9 +124,9 @@ These routing modes are not used to redefine the core architecture family. Inste
 \subsection{Datasets}
 \label{sec:datasets}
 
-To test the proposed architecture in a biologically meaningful setting, the benchmarks are organized into a unified two-layer package.
+To test the proposed architecture in a biologically meaningful setting, the benchmarks are organized into two tiers.
 
-The main biological benchmark consists of PROTEINS, DD, and ENZYMES \cite{fey2019fast,morris2020tudataset}. The supplementary robustness package consists of MUTAG, AIDS, and Mutagenicity. This organization keeps the main biological claim centered on protein-oriented datasets while still testing structural robustness on additional molecular graphs.
+The main biological benchmark consists of PROTEINS, DD, and ENZYMES \cite{fey2019fast,morris2020tudataset}. The supplementary robustness suite consists of MUTAG, AIDS, and Mutagenicity. This organization keeps the main biological claim centered on protein-oriented datasets while still testing structural robustness on additional molecular graphs.
 
 \paragraph{PROTEINS}
 PROTEINS contains graph representations of proteins, where nodes denote secondary structure elements and edges encode neighborhood relations between them. The task is binary graph classification. The dataset contains 1,113 graphs, 2 classes, and 3 input features per node.
@@ -139,7 +139,7 @@ ENZYMES is a 6-class enzyme classification benchmark with 600 graphs and 3 input
 
 \input{../md/dataset_statistics_tables.tex}
 
-All active datasets are used through a unified benchmark interface \cite{fey2019fast,morris2020tudataset}. We keep preprocessing intentionally light and do not introduce task-specific feature engineering, graph augmentation, or edge redesign in the final protocol.
+All datasets are accessed through a unified benchmark interface \cite{fey2019fast,morris2020tudataset}. We keep preprocessing light and do not introduce task-specific feature engineering, graph augmentation, or edge redesign.
 
 All reported results follow the same stratified two-stage evaluation design:
 \begin{itemize}
@@ -162,7 +162,7 @@ and the corresponding standard deviation
 
 \subsection{Compared methods and backbone operators}
 
-The full paper-facing benchmark compares nine methods. The CR-GNN family contains five models: PlainGNN, NodeResGNN, NodeCrossGNN, GraphResGNN, and GraphCrossGNN. Four external baselines are also included in the benchmark package: GraphSAGEBaseline, GINBaseline, JKNetBaseline, and APPNPBaseline. These baselines are intended to anchor the controlled comparison against representative graph-classification families with distinct propagation or aggregation behavior, rather than to claim exhaustive coverage of every recent leaderboard method.
+The main benchmark compares nine methods. The CR-GNN family contains five models: PlainGNN, NodeResGNN, NodeCrossGNN, GraphResGNN, and GraphCrossGNN. Four external baselines are also included in the benchmark suite: GraphSAGEBaseline, GINBaseline, JKNetBaseline, and APPNPBaseline. These baselines are intended to anchor the controlled comparison against representative graph-classification families with distinct propagation or aggregation behavior, rather than to claim exhaustive coverage of every recent leaderboard method.
 
 Each method is evaluated under four message-passing operators:
 \begin{itemize}
@@ -210,9 +210,7 @@ The learnable gate used in residual and cross-residual variants applies a sigmoi
 
 \subsection{Experimental design}
 
-The empirical study is organized to separate confirmatory five-fold evidence from exploratory supporting analyses. The latest benchmark evaluates six datasets, nine methods, four message-passing operators, and five outer folds under one unified protocol. This full matrix provides the main comparison used throughout the paper, and the benchmark tables are placed directly in the corresponding result subsections so that each empirical claim is supported in place.
-
-The benchmark is divided into two layers. The biological core consists of PROTEINS, DD, and ENZYMES, which anchor the main biomolecular interpretation of the paper. A supplementary robustness package extends the analysis to MUTAG, AIDS, and Mutagenicity. This split keeps the central claim focused while still testing whether the conclusions remain stable on additional molecular graph settings.
+The empirical study separates confirmatory five-fold evidence from exploratory analyses. The benchmark evaluates six datasets, nine methods, four message-passing operators, and five outer folds under a unified protocol. The benchmark is divided into a biological core (PROTEINS, DD, ENZYMES) and a supplementary robustness suite (MUTAG, AIDS, Mutagenicity).
 
 Targeted ablations are organized to address the three research questions posed in the Introduction through controlled mechanism experiments:
 
@@ -224,8 +222,8 @@ Targeted ablations are organized to address the three research questions posed i
     \item \textbf{Q3: How does residual routing design change the answer?} \textit{Residual-routing ablations.} Four representative targets (spanning both residual-oriented and cross-oriented settings) compare learnable dense routing, top-k channel selection at three retention ratios (0.25, 0.5, 0.75), and sparse suppression at three thresholds (0.02, 0.05, 0.10) under the same five-fold protocol. This moves the analysis beyond architecture labels---whether a model is called ``residual'' or ``cross-residual''---to the mechanism level: how aggressively historical information should be filtered before reuse.
 \end{enumerate}
 
-Residual-parameter sweeps extend the routing analysis by varying top-k ratios and sparsity strengths on the same representative targets. Older single-fold sensitivity scans over depth, dropout, and learning rate are retained only as exploratory supporting analyses. In the final interpretation, the five-fold latest-version runs are treated as the confirmatory evidence, while the single-fold scans are used only to describe optimization trends rather than to support the main claim.
+Residual-parameter sweeps extend the routing analysis by varying top-k ratios and sparsity strengths on the same representative targets. Single-fold sensitivity analyses over depth, dropout, and learning rate are reported as exploratory evidence and are not used to support the main claims. The five-fold results serve as confirmatory evidence throughout.
 
 \subsection{Evaluation metrics and statistical reporting}
 
-The primary metric is graph classification accuracy on the held-out test fold. Main benchmark and targeted ablation results are reported as five-fold mean accuracy with standard deviation. In the final paper, the five-fold latest-version experiments are treated as the main confirmatory evidence, while older single-fold parameter scans are used only as supporting exploratory analyses.
+The primary metric is graph classification accuracy on the held-out test fold. Main benchmark and targeted ablation results are reported as five-fold mean accuracy with standard deviation. Five-fold experiments provide confirmatory evidence; single-fold parameter scans are reported as exploratory analyses.
