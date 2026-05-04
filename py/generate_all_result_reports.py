@@ -14,8 +14,10 @@ if str(ROOT) not in sys.path:
 
 from geomatric.experiment_catalog import (
     ALL_ACTIVE_DATASETS,
+    EXTERNAL_BASELINES,
     FOCUSED_MODELS,
     MAIN_BIOLOGICAL_DATASETS,
+    MODEL_DISPLAY,
     SUPPLEMENTARY_DATASETS,
 )
 from geomatric.experiment_paths import DEFAULT_EXPERIMENT_VERSION, ensure_version_manifest, log_dir, normalize_version
@@ -25,7 +27,24 @@ MD_DIR = ROOT / "md"
 DATASETS = ALL_ACTIVE_DATASETS
 MAIN_DATASETS = MAIN_BIOLOGICAL_DATASETS
 SUPP_DATASETS = SUPPLEMENTARY_DATASETS
-MODELS = FOCUSED_MODELS
+# CR-GNN family + external baselines
+CR_MODELS = list(FOCUSED_MODELS)
+EXT_MODELS = [name for name, _ in EXTERNAL_BASELINES]
+ALL_MODELS = CR_MODELS + EXT_MODELS
+
+# Operator mapping: CR models all use GCNConv in main benchmark;
+# external baselines each use their native operator.
+_MODEL_OPERATOR = {m: "GCNConv" for m in CR_MODELS}
+_MODEL_OPERATOR.update({name: op for name, op in EXTERNAL_BASELINES})
+
+_BASELINE_DISPLAY = {
+    "GraphSAGEBaseline": "GraphSAGE",
+    "GINBaseline": "GIN",
+    "JKNetBaseline": "JKNet",
+    "APPNPBaseline": "APPNP",
+}
+_ALL_DISPLAY = {**MODEL_DISPLAY, **_BASELINE_DISPLAY}
+MODELS = ALL_MODELS
 
 TXT_OUT = MD_DIR / "all_results_summary.txt"
 TEX_OUT = MD_DIR / "all_exp_tables.tex"
@@ -37,7 +56,8 @@ def tex_escape(text: str) -> str:
 
 
 def latest_matching_log(dataset: str, model: str, fold: int, active_log_dir: Path) -> Path:
-    pattern = str(active_log_dir / f"train_{dataset}_{model}_GCNConv_fold{fold}__*.json")
+    op = _MODEL_OPERATOR.get(model, "GCNConv")
+    pattern = str(active_log_dir / f"train_{dataset}_{model}_{op}_fold{fold}__*.json")
     matches = sorted(glob.glob(pattern))
     if not matches:
         raise FileNotFoundError(pattern)
@@ -164,7 +184,8 @@ def build_tex_tables(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
                     cells.append("--")
                 else:
                     cells.append(format_metric(row, best_by_dataset[dataset]))
-            lines.append(f"{model} & {' & '.join(cells)} \\\\")
+            display = _ALL_DISPLAY.get(model, model)
+            lines.append(f"{display} & {' & '.join(cells)} \\\\")
         lines.extend([r"\bottomrule", r"\end{tabular}", r"\end{table*}"])
         tables.append("\n".join(lines))
 
@@ -185,8 +206,9 @@ def build_tex_tables(summary: Dict[str, Dict[str, Dict[str, object]]]) -> str:
             lines.append(f"{tex_escape(dataset)} & pending & -- & -- & -- & -- & -- \\\\")
         else:
             winner = rows[0]
+            winner_display = _ALL_DISPLAY.get(winner['model'], winner['model'])
             lines.append(
-                f"{tex_escape(dataset)} & {winner['model']} & {winner['mean_acc']:.4f} & "
+                f"{tex_escape(dataset)} & {winner_display} & {winner['mean_acc']:.4f} & "
                 f"{winner['max_acc']:.4f} & {winner['min_acc']:.4f} & "
                 f"{winner['mean_best_epoch']:.1f} & {winner['params']} \\\\"
             )

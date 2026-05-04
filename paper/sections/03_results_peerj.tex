@@ -6,54 +6,31 @@ This section reports the final empirical evidence in four layers: the full bench
 
 \subsection*{Overall benchmark performance}
 
-The final benchmark evaluates six datasets, nine methods, four operators, and five outer folds under one unified protocol. The main text therefore keeps the benchmark tables next to the specific claims they support, rather than separating the tabular evidence into a standalone appendix. This presentation is deliberate: the paper argues for a bounded empirical conclusion, so the tabular evidence is placed where each claim is made and interpreted.
+The final benchmark evaluates six datasets, nine methods (five CR-GNN variants plus four external baselines), under GCNConv for the CR-GNN family and each baseline's native operator, with five outer folds under one unified protocol.
 
 \input{../md/all_exp_tables.tex}
 
-Taken together, the three tables show a consistent hierarchy. Residual reuse is still the stronger default family in the protein-oriented core, cross-residual routing becomes selectively useful on supplementary molecular datasets, and the winner summary confirms that no single complexity trend explains the results by itself. The combination of mean values and standard deviations is also important here: several gaps are modest rather than dramatic, which is exactly why the paper interprets the results as a controlled pattern of relative stability rather than as evidence of universal domination by one design.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.98\linewidth]{figures/exp/fig1_full_suite_results.pdf}
-\caption{Benchmark over the active dataset package. Each bar reports mean best test accuracy, the numeric label above each bar gives the exact mean value, and error bars show the fold-level standard deviation.}
-\label{fig:full_suite_results}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.90\linewidth]{figures/exp/fig2_cross_advantage_heatmap.pdf}
-\caption{Accuracy deltas that define the practical value of cross-residual routing. Positive values indicate an advantage for the cross design, while negative values indicate that the corresponding plain or residual alternative remains stronger.}
-\label{fig:cross_advantage_heatmap}
-\end{figure}
-
-Figure~\ref{fig:full_suite_results} and Figure~\ref{fig:cross_advantage_heatmap} make the same point from complementary angles: cross-residual routing is usually better than plain stacking, but it is not consistently stronger than the best residual alternative.
+The three tables together reveal a nuanced landscape. Within the CR-GNN family, GraphResGNN remains the strongest on PROTEINS, ENZYMES, and AIDS; NodeResGNN leads on PROTEINS. Among external baselines, GIN is particularly strong on MUTAG (0.8403) and AIDS (0.9145), while GraphSAGE leads on DD (0.7334) and Mutagenicity (0.8084). The presence of competitive external baselines reinforces the paper's central point: the CR-GNN family is not claimed to be universally dominant, but rather provides a controlled design space within which systematic trade-offs can be studied---trade-offs that persist even when external methods are included in the comparison.
 
 \subsection*{Results on the biological core datasets}
 
-The main biological benchmark results are reported in Table~\ref{tab:all_results_1}. The topic-facing interpretation is anchored in the protein-oriented core datasets. These datasets carry the main substantive weight of the paper, so the interpretation here is intentionally more detailed than in the supplementary package.
+The main biological benchmark results are reported in Table~\ref{tab:all_results_1}.
 
-\textbf{Residual reuse remains the strongest default family in the reported suite.} Residual variants rank first numerically on PROTEINS, DD, ENZYMES, and AIDS. GraphResGNN leads on PROTEINS ($0.7223 \pm 0.0367$), ENZYMES ($0.3117 \pm 0.0746$), and AIDS ($0.9160 \pm 0.0121$), while NodeResGNN leads on DD ($0.7207 \pm 0.0259$). The point is not that every residual margin is large, but that residual models repeatedly remain at or near the top across the core biological tasks under the same five-fold protocol. It is important to note that many of these numerical leads are modest: paired statistical tests (reported in Tables~\ref{tab:statistical_tests_main} and~\ref{tab:statistical_tests_supp}) show that the majority of pairwise architecture comparisons do not reach conventional significance ($p < 0.05$), a pattern that is itself informative---it indicates that architecture-level differences are smaller than split-level variation under the controlled protocol.
+\textbf{PROTEINS.} Within the CR-GNN family, NodeResGNN leads numerically (0.7143 $\pm$ 0.0223), followed closely by GraphResGNN (0.7071 $\pm$ 0.0402). External baselines are competitive: GraphSAGE (0.6954), GIN (0.6972), and JKNet (0.6954) all cluster near the CR-GNN models. APPNP performs markedly worse (0.5966), consistent with its known limitations on graphs requiring local structural discrimination.
 
-\textbf{Cross-residual design is selectively strong, not universally dominant.} Cross variants rank first numerically on MUTAG and Mutagenicity. More importantly, the best cross variant beats PlainGNN on most completed datasets. Therefore, cross routing is clearly more than a design curiosity, but the evidence does not support the stronger claim that cross universally outperforms residual reuse. This narrower reading is important for reliability because it matches both the mean results and the observed split-level variation. The few pairwise comparisons that are statistically significant (e.g., GraphResGNN $>$ GraphCrossGNN on PROTEINS with SAGEConv, $p=0.031$; NodeCrossGNN $>$ GraphCrossGNN on DD with SAGEConv, $p=0.027$) all involve graph-level cross variants losing to either residual or node-level cross models---suggesting that the graph-level cross design is the more fragile element of the family.
+\textbf{DD.} GraphSAGE leads overall (0.7334 $\pm$ 0.0227), with GraphResGNN as the strongest CR-GNN variant (0.7275 $\pm$ 0.0144). Notably, the two cross-residual variants---GraphCrossGNN (0.7207) and NodeCrossGNN (0.7164)---both outperform NodeResGNN (0.7088) on this dataset. This supports the earlier observation that cross-branch exchange is especially effective on large, sparse protein graphs.
 
-\textbf{Node-level cross is more reliable than graph-level cross.} Across the completed datasets, NodeCrossGNN outperforms NodeResGNN numerically more often than GraphCrossGNN outperforms GraphResGNN. This suggests that exchanging intermediate node-level states is the more robust cross-residual design in the present study, while graph-level cross routing is more dataset-sensitive and its advantage over graph-level residual reuse is statistically significant in the negative direction on several operator--dataset combinations (Tables~\ref{tab:statistical_tests_main} and~\ref{tab:statistical_tests_supp}).
+\textbf{ENZYMES.} All models perform poorly in absolute terms, with GraphResGNN leading (0.3333 $\pm$ 0.1000) and GIN second (0.2883 $\pm$ 0.1148). The large standard deviations reflect the challenging 6-class, 600-graph setting. The CR-GNN family's relative ordering (GraphRes $>$ GraphCross $>$ NodeCross $\approx$ NodeRes $\approx$ Plain) is consistent with the pattern observed on other datasets, though the noisy regime limits the strength of any architecture-level conclusion.
 
-\textbf{Plain stacking suffers from depth-induced signal collapse but is not uniformly worse.} PlainGNN remains competitive on PROTEINS and DD, but it never leads a dataset in the final suite and is usually surpassed by either a residual or a cross-residual variant. On ENZYMES and AIDS under GCNConv, the gap between PlainGNN and the best residual variant is statistically significant (ENZYMES + GINConv: $p=0.002$; AIDS + GCNConv: $p=0.039$), consistent with the interpretation that plain stacking's head-pattern dominance suppresses discriminative mid-range structural information on tasks where deeper propagation alone is insufficient.
+\subsection*{Results on the supplementary robustness datasets}
 
-\subsection*{Topic-focused results for PROTEINS, DD, and ENZYMES}
+The supplementary robustness results are reported in Table~\ref{tab:all_results_2}.
 
-\textbf{PROTEINS.} GraphResGNN leads numerically ($0.7223 \pm 0.0367$), with an advantage of $+0.017$ over PlainGNN that does not reach statistical significance in most operator-level comparisons (e.g., GCNConv: $p=0.375$, Cohen's $d=+0.45$, small-to-medium effect). This suggests that tail-preserving residual routing---repeated graph-level summary reinjection---offers a modest but consistent benefit, consistent with the interpretation that GraphResGNN preserves more historical structural signal than plain stacking, without claiming a universal advantage. The best cross variant, NodeCrossGNN ($0.6963 \pm 0.0433$), remains below GraphResGNN on this dataset.
+\textbf{MUTAG.} GIN is the strongest model overall (0.8403 $\pm$ 0.0298), substantially ahead of all other methods. Within the CR-GNN family, NodeResGNN (0.7451) and NodeCrossGNN (0.7398) are competitive with GraphSAGE (0.7504). GraphResGNN performs worst on this dataset (0.7238), consistent with the earlier observation that its strategy of aggressive representational reshaping is less suited to small molecular graphs where local motif preservation is critical.
 
-\textbf{DD.} NodeResGNN ($0.7207 \pm 0.0259$) and NodeCrossGNN ($0.7198 \pm 0.0178$) are nearly tied ($\Delta = 0.0009$, not statistically significant across any operator). The practical interpretation is that node-level historical structural signal preservation is important on large sparse protein graphs---adding cross-branch exchange neither helps nor hurts materially. This is a null result worth reporting: it indicates that the cross-branch pathway does not introduce destructive interference on DD, but also does not provide the selective gain observed on other datasets.
+\textbf{AIDS.} GIN (0.9145 $\pm$ 0.0415) and GraphResGNN (0.9090 $\pm$ 0.0194) are nearly tied for the lead, with GraphResGNN showing substantially lower variance. GraphSAGE (0.8800), NodeCrossGNN (0.8850), JKNet (0.8775), and GraphCrossGNN (0.8740) form a tight cluster.
 
-\textbf{ENZYMES.} Cross variants become more attractive numerically. GraphCrossGNN reaches $0.3017 \pm 0.0750$ and NodeCrossGNN reaches $0.3000 \pm 0.0580$, both clearly above PlainGNN at $0.2450 \pm 0.0407$ (statistically significant under GINConv: NodeCrossGNN vs PlainGNN $p=0.009$, GraphResGNN vs PlainGNN $p=0.002$). Even so, GraphResGNN still leads numerically ($0.3117 \pm 0.0746$). However, the absolute accuracy across all models remains low (best model only $\sim$15 percentage points above the 6-class random baseline of 16.7\%), indicating that the 3-dimensional input features and 600-graph sample size create a challenging regime where representation learning is inherently noisy. The ENZYMES results should therefore be read as evidence of relative ordering rather than absolute task mastery.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.98\linewidth]{figures/exp/fig4_topic_focus_results.pdf}
-\caption{Focused comparison on the completed topic-facing TU datasets. The pattern is mixed rather than one-sided: graph-level residual refinement is strongest on PROTEINS and ENZYMES, while DD favors node-level reuse, with NodeCrossGNN remaining competitive but not dominant.}
-\label{fig:topic_focus_results}
-\end{figure}
+\textbf{Mutagenicity.} GraphSAGE leads (0.8084 $\pm$ 0.0180), followed closely by GraphResGNN (0.8022 $\pm$ 0.0244) and GraphCrossGNN (0.7992 $\pm$ 0.0232). NodeCrossGNN (0.7939) and GIN (0.7985) are competitive. The top four models are separated by only 0.015, with overlapping standard deviations---consistent with the paper's interpretation that architecture-level differences, while systematic, are modest relative to fold-level variation.
 
 \subsection*{Performance trade-offs across the design space}
 
@@ -110,10 +87,6 @@ The depth-scaling CKA results at $L=8$ (Figure~\ref{fig:layer_cka_comparison}) r
 GraphCrossGNN occupies an instructive middle ground: it achieves the second-highest mean CKA at depth (0.952) among the reuse variants, and it is simultaneously the most rank-consistent performer (rank std 0.75). Its paired-block structure with cross-summary exchange appears to provide enough representational continuity to remain stable across datasets, while still allowing sufficient representational change to remain competitive. NodeCrossGNN similarly maintains intermediate CKA values and intermediate rank consistency, confirming that cross-branch exchange does not destabilize representations.
 
 Taken together, these results suggest that the CR-GNN design space is defined by a three-way tension: architectures that aggressively reshape representations (GraphResGNN) achieve the highest peak accuracy but with inconsistent ranking across datasets; architectures that preserve representations most faithfully (NodeResGNN) achieve the strongest continuity but with volatile performance; and architectures that balance these forces (GraphCrossGNN, NodeCrossGNN) achieve the most consistent, though not peak, performance. The practical implication is that the choice of reuse topology should be guided by the practitioner's tolerance for risk: GraphResGNN when peak accuracy is paramount and dataset characteristics are well-understood; GraphCrossGNN when consistent, predictable performance across diverse datasets is the priority.
-
-\subsection*{Results on the supplementary robustness datasets}
-
-The supplementary robustness results are reported in Table~\ref{tab:all_results_2}. The supplementary package reinforces the trade-off pattern. NodeCrossGNN is strongest on MUTAG (GATConv operator) and Mutagenicity (GATConv), whereas GraphResGNN remains strongest on AIDS. The cross-dataset consistency pattern holds: no single architecture dominates all supplementary datasets, and the choice between peak accuracy and consistency depends on the specific dataset--operator context.
 
 \subsection*{Gate ablation results}
 

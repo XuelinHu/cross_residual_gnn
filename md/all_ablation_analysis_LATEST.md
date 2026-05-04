@@ -20,39 +20,47 @@ Compared models:
 - `NodeCrossGNN`
 - `GraphResGNN`
 - `GraphCrossGNN`
+- `GraphSAGEBaseline`
+- `GINBaseline`
+- `JKNetBaseline`
+- `APPNPBaseline`
 
 ## Dataset Winners
 
-- `PROTEINS`: `NodeResGNN` with `0.71425 ± 0.02235`
-- `DD`: `GraphResGNN` with `0.72746 ± 0.01436`
-- `ENZYMES`: `GraphResGNN` with `0.33333 ± 0.10000`
-- `MUTAG`: `NodeResGNN` with `0.74509 ± 0.05036`
-- `AIDS`: `GraphResGNN` with `0.90900 ± 0.01940`
-- `Mutagenicity`: `GraphResGNN` with `0.80219 ± 0.02440`
+- `PROTEINS`: pending, no complete log set found yet.
+- `DD`: pending, no complete log set found yet.
+- `ENZYMES`: pending, no complete log set found yet.
+- `MUTAG`: pending, no complete log set found yet.
+- `AIDS`: pending, no complete log set found yet.
+- `Mutagenicity`: pending, no complete log set found yet.
 
 ## Overall Ranking Signals
 
-- `GraphResGNN`: wins `4/7`, average rank `1.83`
-- `NodeResGNN`: wins `2/7`, average rank `3.17`
-- `GraphCrossGNN`: wins `0/7`, average rank `2.67`
-- `NodeCrossGNN`: wins `0/7`, average rank `3.00`
-- `PlainGNN`: wins `0/7`, average rank `4.33`
+- `PlainGNN`: wins `0/7`, average rank `0.00`
+- `NodeResGNN`: wins `0/7`, average rank `0.00`
+- `NodeCrossGNN`: wins `0/7`, average rank `0.00`
+- `GraphResGNN`: wins `0/7`, average rank `0.00`
+- `GraphCrossGNN`: wins `0/7`, average rank `0.00`
+- `GraphSAGEBaseline`: wins `0/7`, average rank `0.00`
+- `GINBaseline`: wins `0/7`, average rank `0.00`
+- `JKNetBaseline`: wins `0/7`, average rank `0.00`
+- `APPNPBaseline`: wins `0/7`, average rank `0.00`
 
 ## Cross vs Plain and Residual
 
-- `PROTEINS`: best cross vs plain `-0.00092`, best cross vs best residual `-0.01258`, `NodeCrossGNN - NodeResGNN = -0.01977`, `GraphCrossGNN - GraphResGNN = -0.00541`
-- `DD`: best cross vs plain `+0.02370`, best cross vs best residual `-0.00678`, `NodeCrossGNN - NodeResGNN = +0.00762`, `GraphCrossGNN - GraphResGNN = -0.00678`
-- `ENZYMES`: best cross vs plain `+0.01667`, best cross vs best residual `-0.04833`, `NodeCrossGNN - NodeResGNN = +0.00333`, `GraphCrossGNN - GraphResGNN = -0.04833`
-- `MUTAG`: best cross vs plain `+0.00555`, best cross vs best residual `-0.00526`, `NodeCrossGNN - NodeResGNN = -0.00526`, `GraphCrossGNN - GraphResGNN = +0.01593`
-- `AIDS`: best cross vs plain `+0.05550`, best cross vs best residual `-0.02400`, `NodeCrossGNN - NodeResGNN = +0.02350`, `GraphCrossGNN - GraphResGNN = -0.03500`
-- `Mutagenicity`: best cross vs plain `+0.01615`, best cross vs best residual `-0.00300`, `NodeCrossGNN - NodeResGNN = +0.00646`, `GraphCrossGNN - GraphResGNN = -0.00300`
+- `PROTEINS`: pending, no complete log set found yet.
+- `DD`: pending, no complete log set found yet.
+- `ENZYMES`: pending, no complete log set found yet.
+- `MUTAG`: pending, no complete log set found yet.
+- `AIDS`: pending, no complete log set found yet.
+- `Mutagenicity`: pending, no complete log set found yet.
 
 ## Aggregated Conclusions
 
-- Best cross model beats `PlainGNN` on `5` completed datasets.
+- Best cross model beats `PlainGNN` on `0` completed datasets.
 - Best cross model beats the best residual baseline on `0` completed datasets.
-- `NodeCrossGNN` beats `NodeResGNN` on `4` completed datasets.
-- `GraphCrossGNN` beats `GraphResGNN` on `1` completed datasets.
+- `NodeCrossGNN` beats `NodeResGNN` on `0` completed datasets.
+- `GraphCrossGNN` beats `GraphResGNN` on `0` completed datasets.
 
 ## Interpretation
 

@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
 
 from geomatric.experiment_catalog import (
     ALL_ACTIVE_DATASETS,
+    EXTERNAL_BASELINES,
     FOCUSED_MODELS,
     MAIN_BIOLOGICAL_DATASETS,
     MODEL_DISPLAY,
@@ -31,12 +32,41 @@ FIG_DIRS = [
 
 DATASETS = ALL_ACTIVE_DATASETS
 TOPIC_DATASETS = MAIN_BIOLOGICAL_DATASETS
-MODELS = FOCUSED_MODELS
+CR_MODELS = list(FOCUSED_MODELS)
+EXT_MODELS = [name for name, _ in EXTERNAL_BASELINES]
+ALL_MODELS = CR_MODELS + EXT_MODELS
+MODELS = ALL_MODELS
 OUTPUT_SUFFIX = ""
+
+_BASELINE_COLORS = {
+    "GraphSAGEBaseline": "#E69F00",
+    "GINBaseline": "#56B4E9",
+    "JKNetBaseline": "#F0E442",
+    "APPNPBaseline": "#D55E00",
+}
+_BASELINE_MARKERS = {
+    "GraphSAGEBaseline": "*",
+    "GINBaseline": "X",
+    "JKNetBaseline": "p",
+    "APPNPBaseline": "h",
+}
+_BASELINE_DISPLAY = {
+    "GraphSAGEBaseline": "GraphSAGE",
+    "GINBaseline": "GIN",
+    "JKNetBaseline": "JKNet",
+    "APPNPBaseline": "APPNP",
+}
+ALL_COLORS = {**MODEL_COLORS, **_BASELINE_COLORS}
+ALL_MARKERS = {**MODEL_MARKERS, **_BASELINE_MARKERS}
+ALL_DISPLAY = {**MODEL_DISPLAY, **_BASELINE_DISPLAY}
+
+_MODEL_OPERATOR = {m: "GCNConv" for m in CR_MODELS}
+_MODEL_OPERATOR.update({name: op for name, op in EXTERNAL_BASELINES})
 
 
 def latest_matching_log(dataset: str, model: str, fold: int, active_log_dir: Path) -> Path:
-    pattern = str(active_log_dir / f"train_{dataset}_{model}_GCNConv_fold{fold}__*.json")
+    op = _MODEL_OPERATOR.get(model, "GCNConv")
+    pattern = str(active_log_dir / f"train_{dataset}_{model}_{op}_fold{fold}__*.json")
     matches = sorted(glob.glob(pattern))
     if not matches:
         raise FileNotFoundError(pattern)
@@ -158,8 +188,8 @@ def plot_full_suite(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
             x + offset,
             means,
             width=width,
-            color=MODEL_COLORS[model],
-            label=MODEL_DISPLAY[model],
+            color=ALL_COLORS[model],
+            label=ALL_DISPLAY[model],
             edgecolor="black",
             linewidth=0.5,
             zorder=3,
@@ -252,12 +282,12 @@ def plot_rank_summary(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
     axes[0].bar(
         np.arange(len(MODELS)),
         avg_rank,
-        color=[MODEL_COLORS[model] for model in MODELS],
+        color=[ALL_COLORS[model] for model in MODELS],
         edgecolor="black",
         linewidth=0.8,
     )
     axes[0].set_xticks(np.arange(len(MODELS)))
-    axes[0].set_xticklabels([MODEL_DISPLAY[model] for model in MODELS], rotation=20, fontsize=12)
+    axes[0].set_xticklabels([ALL_DISPLAY[model] for model in MODELS], rotation=20, fontsize=12)
     axes[0].set_ylabel("Average rank", fontsize=14)
     axes[0].set_title("Average rank across datasets", fontsize=15, fontweight="bold")
     # Adaptive y-axis: invert so rank 1 is best
@@ -267,12 +297,12 @@ def plot_rank_summary(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
     axes[1].bar(
         np.arange(len(MODELS)),
         wins,
-        color=[MODEL_COLORS[model] for model in MODELS],
+        color=[ALL_COLORS[model] for model in MODELS],
         edgecolor="black",
         linewidth=0.8,
     )
     axes[1].set_xticks(np.arange(len(MODELS)))
-    axes[1].set_xticklabels([MODEL_DISPLAY[model] for model in MODELS], rotation=20, fontsize=12)
+    axes[1].set_xticklabels([ALL_DISPLAY[model] for model in MODELS], rotation=20, fontsize=12)
     axes[1].set_ylabel("Winner count", fontsize=14)
     axes[1].set_title("Number of dataset wins", fontsize=15, fontweight="bold")
     axes[1].set_ylim(0, max(wins) + 1.2)
@@ -300,7 +330,7 @@ def plot_topic_focus(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
         bars = ax.bar(
             np.arange(len(MODELS)),
             means,
-            color=[MODEL_COLORS[model] for model in MODELS],
+            color=[ALL_COLORS[model] for model in MODELS],
             edgecolor="black",
             linewidth=0.8,
             zorder=3,
@@ -322,7 +352,7 @@ def plot_topic_focus(summary: Dict[str, Dict[str, Dict[str, float]]]) -> None:
             )
         ax.set_title(dataset, fontsize=15, fontweight="bold")
         ax.set_xticks(np.arange(len(MODELS)))
-        ax.set_xticklabels([MODEL_DISPLAY[model] for model in MODELS], rotation=30, ha="right", fontsize=11)
+        ax.set_xticklabels([ALL_DISPLAY[model] for model in MODELS], rotation=30, ha="right", fontsize=11)
         ax.set_ylim(global_y_min, global_y_max)
         ax.margins(y=0.12)
         style_axis(ax)
@@ -346,11 +376,11 @@ def plot_protein_package(summary: Dict[str, Dict[str, Dict[str, float]]]) -> Non
         ax.plot(
             x,
             accs,
-            color=MODEL_COLORS[model],
-            marker=MODEL_MARKERS[model],
+            color=ALL_COLORS[model],
+            marker=ALL_MARKERS[model],
             linewidth=2.2,
             markersize=8,
-            label=MODEL_DISPLAY[model],
+            label=ALL_DISPLAY[model],
         )
     ax.set_xticks(x)
     ax.set_xticklabels(datasets, fontsize=13)
