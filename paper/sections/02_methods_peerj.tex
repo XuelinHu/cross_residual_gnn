@@ -83,7 +83,7 @@ The final node representation is the branch sum
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.98\linewidth]{figures/cr_gnn_node_architecture.png}
-\caption{Node-Level CR-GNN Architecture. The three columns compare plain stacking (left), same-branch residual reuse (middle), and two-branch cross-residual exchange (right). In the cross-residual design, each branch reuses not only its own previous state but also the counterpart branch's state from the previous layer, with residual routers controlling the strength and sparsity of cross-branch injection.}
+\caption{Node-level CR-GNN architecture family. Left: PlainGNN --- sequential message-passing layers without state reuse. Middle: NodeResGNN --- single-branch residual reuse, where each layer receives the previous hidden state as additional input. Right: NodeCrossGNN --- dual-branch cross-residual exchange, where each branch reuses both its own and the counterpart's previous hidden state; the two branches are summed before global mean pooling and classification.}
 \label{fig:node_architecture}
 \end{figure}
 
@@ -107,7 +107,7 @@ The final graph embedding is
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.98\linewidth]{figures/cr_gnn_graph_architecture.png}
-\caption{Graph-Level CR-GNN Architecture. The three columns compare plain graph-level stacking (left), sequential graph-level residual propagation (middle), and cross-summary exchange across paired blocks (right). In the cross-residual design, shared residual states and residual routers control graph-level information exchange between parallel block sequences, with four routing modes available: fixed, learnable, top-k, and sparse residual.}
+\caption{Graph-level CR-GNN architecture family. Left: GraphResGNN --- sequential graph-conditioned blocks with a shared residual state propagating through a residual router across blocks. Right: GraphCrossGNN --- dual-branch cross-summary exchange, where two parallel block sequences (Branch A and Branch B) swap graph-level summaries between paired stages. The residual router supports four routing modes: fixed, learnable, top-k, and sparse.}
 \label{fig:graph_architecture}
 \end{figure}
 

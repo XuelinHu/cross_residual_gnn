@@ -166,7 +166,7 @@ CR-GNN 被定义为一个紧凑的图分类架构家族。所有变体共享相�
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.98\linewidth]{figures/cr_gnn_node_architecture.png}
-\caption{节点级CR-GNN架构。三列分别比较普通堆叠（左）、同分支残差复用（中）和双分支交叉残差交换（右）。在交叉残差设计中，每个分支不仅复用自身的先前状态，还复用对侧分支在前一层的状态，残差路由器控制跨分支注入的强度和稀疏度。}
+\caption{节点级CR-GNN架构家族。左：PlainGNN——无状态复用的顺序消息传递层。中：NodeResGNN——单分支残差复用，每层接收前一隐藏状态作为额外输入。右：NodeCrossGNN——双分支交叉残差交换，每个分支复用自身和对侧的先前隐藏状态；两分支求和后进行全局均值池化和分类。}
 \label{fig:node_architecture}
 \end{figure}
 
@@ -190,7 +190,7 @@ CR-GNN 被定义为一个紧凑的图分类架构家族。所有变体共享相�
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.98\linewidth]{figures/cr_gnn_graph_architecture.png}
-\caption{图级CR-GNN架构。三列分别比较普通图级堆叠（左）、顺序图级残差传播（中）和跨配对块的交叉摘要交换（右）。在交叉残差设计中，共享残差状态和残差路由器控制并行块序列之间的图级信息交换，可用四种路由模式：固定、可学习、Top-k和稀疏残差。}
+\caption{图级CR-GNN架构家族。左：GraphResGNN——顺序图条件块，共享残差状态通过残差路由器跨块传播。右：GraphCrossGNN——双分支交叉摘要交换，两条并行块序列（分支A和分支B）在配对阶段之间交换图级摘要。残差路由器支持四种路由模式：固定、可学习、Top-k和稀疏。}
 \label{fig:graph_architecture}
 \end{figure}
 
