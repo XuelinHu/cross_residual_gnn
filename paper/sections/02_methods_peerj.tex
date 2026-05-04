@@ -174,7 +174,7 @@ Each method is evaluated under four message-passing operators:
 
 \subsection{Training configuration and implementation details}
 
-All models are implemented in PyTorch Geometric \cite{fey2019fast} under a unified training protocol. The key hyperparameters are summarized in Table~\ref{tab:hyperparams}. No batch normalization or layer normalization is applied; the only regularization is dropout and weight decay. All train--validation--test splits are fixed by a global random seed of 1024, ensuring identical data partitions across models within each fold. No task-specific feature engineering, graph augmentation, or edge redesign is applied; the raw node features and adjacency structures from TUDataset are used directly.
+All models are implemented in PyTorch Geometric \cite{fey2019fast} under a unified training protocol. The key hyperparameters are summarized in Table~\ref{tab:hyperparams}. Training is terminated by early stopping when validation loss fails to improve for 60 consecutive epochs, and the checkpoint with the lowest validation loss is retained for test evaluation. No batch normalization or layer normalization is applied; the only regularization is dropout and weight decay. All train--validation--test splits are fixed by a global random seed of 1024, ensuring identical data partitions across models within each fold. No task-specific feature engineering, graph augmentation, or edge redesign is applied; the raw node features and adjacency structures from TUDataset are used directly.
 
 \begin{table}[h]
 \centering
