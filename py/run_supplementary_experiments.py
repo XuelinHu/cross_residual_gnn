@@ -28,6 +28,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch_geometric.loader import DataLoader
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +37,7 @@ if str(ROOT) not in sys.path:
 
 from geomatric.graph_classify_v3 import (
     DEVICE,
+    apply_residual_mode,
     build_model,
     load_dataset,
     split_dataset,
@@ -114,38 +116,111 @@ def capture_graph_level_states(
     model: nn.Module,
     data,
 ) -> List[np.ndarray]:
-    """Capture intermediate graph embeddings for graph-level models.
+    """Capture per-layer graph embeddings for graph-level models.
 
-    GraphResGNN and GraphCrossGNN internally produce graph_embedding
-    at each block. We hook block-level outputs.
+    Instead of only hooking block-level outputs (which yields only 2-3
+    graph embeddings regardless of depth), we manually step through every
+    convolution layer inside every block and global-mean-pool node states
+    after each layer.  This produces (N_blocks * (1+L)) graph embeddings,
+    whose count scales with h_layer.
 
     Returns:
-        List of graph embedding arrays, one per block stage.
+        List of graph embedding arrays [num_graphs, hidden_dim], one per
+        internal convolution layer across all blocks.
     """
     from torch_geometric.nn import global_mean_pool
 
     graph_embs: List[torch.Tensor] = []
-
-    def make_graph_hook(store: List):
-        def hook(module, inp, out):
-            # out is (logits, graph_embedding) from PlainBlock
-            if isinstance(out, tuple) and len(out) == 2:
-                store.append(out[1].detach())
-        return hook
-
-    handles = []
-    if hasattr(model, "blocks"):
-        for block in model.blocks:
-            handles.append(block.register_forward_hook(make_graph_hook(graph_embs)))
+    x_raw = data.x
+    edge_index = data.edge_index
+    batch = data.batch
 
     model.eval()
     with torch.no_grad():
-        _ = model(data.x, data.edge_index, data.batch)
+        # Determine whether this is GraphCrossGNN (paired cross-exchange)
+        is_cross = hasattr(model, "blocks") and len(model.blocks) == 4
 
-    for h in handles:
-        h.remove()
+        if not is_cross:
+            # ── GraphResGNN (3 blocks, sequential) ──
+            graph_hidden = None
+            for block in model.blocks:
+                # ─ input_layer ─
+                x = F.relu(block.input_layer(x_raw, edge_index))
+                graph_embs.append(
+                    global_mean_pool(x, batch).detach()
+                )
+                gate = block.graph_gate()
+                # ─ hidden_layers ─
+                for layer in block.hidden_layers:
+                    if block.res_graph and graph_hidden is not None:
+                        residual = apply_residual_mode(
+                            graph_hidden[batch],
+                            residual_mode=block.residual_mode,
+                            topk_ratio=block.topk_ratio,
+                            sparse_lambda=block.sparse_lambda,
+                        )
+                        x = x + gate * residual
+                    x = F.relu(layer(x, edge_index))
+                    x = F.dropout(x, p=block.dropout, training=False)
+                    graph_embs.append(
+                        global_mean_pool(x, batch).detach()
+                    )
+                # ─ end-of-block graph_embedding (for next block's graph_hidden) ─
+                graph_embedding = global_mean_pool(x, batch)
+                if graph_hidden is not None:
+                    residual = apply_residual_mode(
+                        graph_hidden,
+                        residual_mode=block.residual_mode,
+                        topk_ratio=block.topk_ratio,
+                        sparse_lambda=block.sparse_lambda,
+                    )
+                    graph_embedding = graph_embedding + gate * residual
+                graph_hidden = graph_embedding
+        else:
+            # ── GraphCrossGNN (4 blocks, paired cross-exchange) ──
+            # Same internal logic but blocks swap graph_hidden in pairs
+            g1: Optional[torch.Tensor] = None
+            g2: Optional[torch.Tensor] = None
+            blocks_list = list(model.blocks)
+            for pair_idx in range(2):
+                b1, b2 = blocks_list[2 * pair_idx], blocks_list[2 * pair_idx + 1]
+                # ── pair: block b1 uses g1, block b2 uses g2 ──
+                for block, g_in in [(b1, g1), (b2, g2)]:
+                    x = F.relu(block.input_layer(x_raw, edge_index))
+                    graph_embs.append(
+                        global_mean_pool(x, batch).detach()
+                    )
+                    gate = block.graph_gate()
+                    for layer in block.hidden_layers:
+                        if block.res_graph and g_in is not None:
+                            residual = apply_residual_mode(
+                                g_in[batch],
+                                residual_mode=block.residual_mode,
+                                topk_ratio=block.topk_ratio,
+                                sparse_lambda=block.sparse_lambda,
+                            )
+                            x = x + gate * residual
+                        x = F.relu(layer(x, edge_index))
+                        x = F.dropout(x, p=block.dropout, training=False)
+                        graph_embs.append(
+                            global_mean_pool(x, batch).detach()
+                        )
+                    g_out = global_mean_pool(x, batch)
+                    if g_in is not None:
+                        residual = apply_residual_mode(
+                            g_in,
+                            residual_mode=block.residual_mode,
+                            topk_ratio=block.topk_ratio,
+                            sparse_lambda=block.sparse_lambda,
+                        )
+                        g_out = g_out + gate * residual
+                    if block is b1:
+                        g1 = g_out
+                    else:
+                        g2 = g_out
+                # ── cross-swap: g1 ↔ g2 between pairs ──
+                g1, g2 = g2, g1
 
-    # Each graph_emb is already [num_graphs, hidden_dim]
     return [g.cpu().numpy() for g in graph_embs]
 
 
@@ -161,7 +236,7 @@ def capture_states(
         label = "layer_pair"
     elif model_name in ("GraphResGNN", "GraphCrossGNN"):
         states = capture_graph_level_states(model, data)
-        label = "block"
+        label = "layer"  # now per-layer granularity, not just block-level
     else:
         raise ValueError(f"Unknown model: {model_name}")
     return states, label
