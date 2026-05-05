@@ -102,30 +102,6 @@ PlainGNN & 4.3 & 0.036 & \textbf{0.75} \\
 The trade-off is now quantitative. GraphResGNN wins most often (12/24) but with the weakest rank stability (std 1.46)---it can win big or lose badly. GraphCrossGNN wins only once yet is the most stable performer (std 0.75), never falling below fourth. NodeCrossGNN occupies the middle: second-most wins (6/24), intermediate stability (std 1.00), and dominance on DD specifically.
 
 % ============================================================
-\subsection{Ablation evidence}
-% ============================================================
-
-\subsubsection{Gate ablation}
-
-\input{../md/peerj_gate_tables.tex}
-\input{../md/peerj_gate_fold_table.tex}
-\input{../md/peerj_cross_gate_full_table.tex}
-\input{../md/statistical_tests_main.tex}
-\input{../md/statistical_tests_supp.tex}
-
-Gate ablations test whether adaptive residual injection control explains the observed architectural differences. On the strongest graph-level residual target (\texttt{AIDS + GraphResGNN + GINConv}), the learnable gate performs best, though fixed coefficient 0.5 is close. On six cross-favored targets, learnable and fixed gates each win three---cross-residual architectures are robust to gate configuration, consistent with their greater rank stability. The paired-test matrices (Tables~\ref{tab:statistical_tests_main}--\ref{tab:statistical_tests_supp}) confirm that most architecture-level gaps are modest relative to fold-level variation.
-
-\subsubsection{Residual routing}
-
-\input{../md/peerj_residual_tables.tex}
-
-Four representative targets compare learnable dense, top-k, and sparse routing modes. Sparse routing (threshold 0.05) is optimal on three of four targets; learnable dense routing remains best only on the strongest graph-level residual target. Two of the three sparse-favoring targets involve cross-residual architectures, suggesting that sparse filtering and cross-branch exchange are complementary: sparsity suppresses noise, while the cross-branch pathway preserves genuinely complementary information.
-
-\subsubsection{Parameter sweep}
-
-Additional top-k ratios and sparsity levels refine rather than change the pattern. The strongest top-k ratio varies by target, and aggressive sparsity (0.10) damages the graph-level residual target, confirming that sparsity benefits are threshold-dependent.
-
-% ============================================================
 \subsection{Exploratory sensitivity analysis}
 % ============================================================
 
