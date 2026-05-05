@@ -330,8 +330,11 @@ So the current evidence supports a dataset-dependent advantage for cross-residua
 - The `py/` analysis scripts import shared dataset definitions from [geomatric/experiment_catalog.py](./geomatric/experiment_catalog.py), so the active package path should be kept intact.
 - The codebase does not commit the downloaded dataset content itself; only the expected local data roots are documented here.
 
-## others
+ 
+## format
 - https://peerj.com/articles/cs-3773/
 - https://peerj.com/articles/cs-3762/
 - https://www.overleaf.com/latex/templates/latex-template-for-peerj-journal-and-pre-print-submissions/ptdwfrqxqzbn
 - https://peerj.com/about/author-instructions/#instruction-standard-sections-rass
+- https://peerj.com/about/policies-and-procedures/#discipline-standards
+- https://peerj.com/about/author-instructions/#reference-format
