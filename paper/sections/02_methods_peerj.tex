@@ -202,17 +202,16 @@ The learnable gate used in residual and cross-residual variants applies a sigmoi
 
 The empirical study separates confirmatory five-fold evidence from exploratory analyses. The benchmark evaluates six datasets, five architectures, four message-passing operators, and five outer folds under a unified protocol. The benchmark is divided into a biological core (PROTEINS, DD, ENZYMES) and a supplementary robustness suite (MUTAG, AIDS, Mutagenicity).
 
-Targeted ablations are organized to address the three research questions posed in the Introduction through controlled mechanism experiments:
+To answer the research questions posed in the Introduction, the study is organized into four experimental layers:
 
 \begin{enumerate}
-    \item \textbf{Q1: How do reuse topologies trade off peak performance, consistency, and representational stability?} \textit{Full-benchmark and depth-scaling analyses.} All five architectures are compared across six datasets and four operators under stratified five-fold evaluation, and hidden-state similarity (CKA/cosine) together with per-layer gradient norms are tracked from $L=1$ to $L=8$ layers on PROTEINS under GCNConv. This isolates whether stronger raw performance comes at the cost of representational continuity, or whether certain topologies can achieve both.
-
-    \item \textbf{Q2: When does cross-residual interaction outperform residual reuse?} \textit{Gate-control and cross-gate ablations.} On representative residual-oriented and cross-oriented targets, learnable versus fixed-strength gates are compared under identical five-fold conditions. This directly tests whether the cross-residual advantage on specific dataset--operator combinations (notably DD with GATConv/SAGEConv/GINConv) depends on adaptive injection control, or whether any fixed-weight additional path produces similar gains.
-
-    \item \textbf{Q3: How does residual routing design change the answer?} \textit{Residual-routing ablations.} Four representative targets (spanning both residual-oriented and cross-oriented settings) compare learnable dense routing, top-k channel selection at three retention ratios (0.25, 0.5, 0.75), and sparse suppression at three thresholds (0.02, 0.05, 0.10) under the same five-fold protocol. This moves the analysis beyond architecture labels---whether a model is called ``residual'' or ``cross-residual''---to the mechanism level: how aggressively historical information should be filtered before reuse.
+    \item \textbf{Full benchmark.} All five architectures are compared across six datasets and four operators under stratified five-fold evaluation, establishing the performance hierarchy and identifying dataset--operator combinations where each topology excels.
+    \item \textbf{Depth-scaling analysis.} Hidden-state similarity (CKA and cosine) and per-layer gradient norms are tracked across hidden layers on PROTEINS under GCNConv, probing the representational dynamics that underlie the benchmark patterns.
+    \item \textbf{Gate and routing ablations.} On representative targets spanning both residual-oriented and cross-oriented settings, learnable versus fixed-strength gates are compared, and four routing modes (learnable dense, top-k at three retention ratios, sparse at three thresholds) are evaluated under the same five-fold protocol.
+    \item \textbf{Parameter sweeps and sensitivity checks.} Residual-parameter sweeps vary top-k ratios and sparsity strengths; single-fold sensitivity analyses over depth, dropout, and learning rate are reported as exploratory evidence.
 \end{enumerate}
 
-Residual-parameter sweeps extend the routing analysis by varying top-k ratios and sparsity strengths on the same representative targets. Single-fold sensitivity analyses over depth, dropout, and learning rate are reported as exploratory evidence and are not used to support the main claims. The five-fold results serve as confirmatory evidence throughout.
+The five-fold results serve as confirmatory evidence throughout.
 
 \subsection{Evaluation metrics and statistical reporting}
 

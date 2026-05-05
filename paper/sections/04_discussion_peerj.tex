@@ -20,18 +20,7 @@ By contrast, on smaller, denser graphs where global context is strongly discrimi
 
 \subsection{Does routing strategy matter beyond architecture choice?}
 
-\input{../md/peerj_gate_tables.tex}
-\input{../md/peerj_gate_fold_table.tex}
-\input{../md/peerj_cross_gate_full_table.tex}
-\input{../md/peerj_residual_tables.tex}
-\input{../md/statistical_tests_main.tex}
-\input{../md/statistical_tests_supp.tex}
-
-Yes. Two pieces of evidence support this. First, gate ablations show that on the strongest graph-level residual target (\texttt{AIDS + GraphResGNN + GINConv}), the learnable gate outperforms fixed alternatives, though the margin is small---indicating that adaptive control helps but is not decisive. On six cross-favored targets, learnable and fixed gates split evenly (three wins each), showing that cross-residual architectures are robust to gate configuration, consistent with their greater rank stability.
-
-Second, and more importantly, routing mode matters substantially. Sparse routing (threshold 0.05) is optimal on three of four representative targets; learnable dense routing remains best only on the strongest graph-level residual line. Two of the three sparse-favoring targets involve cross-residual architectures, revealing a mechanistic synergy: sparsity suppresses weak residual channels before they accumulate as noise across depth, while the cross-branch pathway preserves genuinely complementary signals through an independent route. Aggressive sparsity (0.10) damages the graph-level residual target, confirming the effect is threshold-dependent.
-
-The paired-test matrices (Tables~\ref{tab:statistical_tests_main}--\ref{tab:statistical_tests_supp}) confirm that most architecture-level gaps are modest relative to fold-level variation: differences are real but conditional.
+The ablation results (Section~\ref{sec:results}) show that it does, and in a target-dependent way. First, gate ablations reveal that cross-residual architectures are robust to gate configuration---learnable and fixed gates split evenly on cross-favored targets---consistent with their greater rank stability. Second, routing mode matters substantially: sparse routing (threshold 0.05) is optimal on three of four representative targets, and two of these involve cross-residual architectures. The mechanism-level synergy is that sparsity suppresses weak residual channels before they accumulate as noise across depth, while the cross-branch pathway preserves genuinely complementary signals through an independent route. Aggressive sparsity (0.10) damages the graph-level residual target, confirming the effect is threshold-dependent.
 
 \textbf{Answer:} Routing strategy is a meaningful secondary design axis. Sparse routing plus cross-residual is the most frequently optimal combination; learnable dense routing plus graph-level residual is best when maximizing peak accuracy on well-characterized datasets.
 
