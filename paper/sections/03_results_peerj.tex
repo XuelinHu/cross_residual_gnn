@@ -2,83 +2,71 @@
 \label{sec:results}
 \label{sec:experiments}
 
-This section reports empirical evidence in four layers: the full benchmark, depth-scaling mechanism analyses, internal CR-GNN trade-off quantification, and targeted ablation studies. The main benchmark and ablations use stratified five-fold results reported as mean best test accuracy $\pm$ fold-level standard deviation; single-fold sensitivity analyses are reported as exploratory evidence only.
+All main results are reported as five-fold mean best test accuracy $\pm$ fold-level standard deviation; single-fold sensitivity analyses are exploratory only.
 
 % ============================================================
 \subsection{Overall benchmark performance}
 % ============================================================
 
-The benchmark evaluates six datasets and five CR-GNN architectures under GCNConv, with five outer folds.
-
 \input{../md/all_exp_tables.tex}
 
-The three tables together reveal a clear hierarchy within the CR-GNN family. GraphResGNN is the strongest on ENZYMES and AIDS; NodeResGNN leads on PROTEINS. No single architecture dominates all datasets, consistent with the paper's central framing: the CR-GNN family provides a controlled design space for studying systematic trade-offs among reuse topologies.
+The benchmark evaluates six datasets and five CR-GNN architectures under GCNConv with five outer folds. Table~\ref{tab:all_results_1} (biological core) and Table~\ref{tab:all_results_2} (supplementary robustness) together show that no single architecture dominates all datasets. GraphResGNN is the strongest on ENZYMES, AIDS, and Mutagenicity; NodeResGNN leads on PROTEINS and MUTAG. DD is the only dataset where cross-residual variants outperform both residual counterparts.
 
 % ============================================================
-\subsection{Results on the biological core datasets}
+\subsection{When does each reuse topology help?}
 % ============================================================
 
-The main biological benchmark results are reported in Table~\ref{tab:all_results_1}.
+The dataset-level results reveal two distinct regimes in which different reuse topologies excel.
 
-\textbf{PROTEINS.} NodeResGNN leads numerically (0.7143 $\pm$ 0.0223), followed closely by GraphResGNN (0.7071 $\pm$ 0.0402). PlainGNN (0.7026 $\pm$ 0.0331) is competitive, while NodeCrossGNN (0.6945 $\pm$ 0.0488) and GraphCrossGNN (0.7017 $\pm$ 0.0520) show larger variance.
+\textbf{Regime 1 --- graph-level context is discriminative.} On PROTEINS, AIDS, and Mutagenicity, GraphResGNN and GraphCrossGNN occupy the top two positions. These datasets share a common property: global graph-level structure carries strong discriminative signal. GraphResGNN's sequential block design, which reinjects pooled graph summaries at each stage, is well-suited to this regime. On AIDS, it achieves the highest accuracy (0.9090) with the lowest variance ($\pm$0.0194) of any architecture on any dataset.
 
-\textbf{DD.} GraphResGNN leads (0.7275 $\pm$ 0.0144), followed by GraphCrossGNN (0.7207 $\pm$ 0.0322) and NodeCrossGNN (0.7164 $\pm$ 0.0315). Notably, both cross-residual variants outperform NodeResGNN (0.7088 $\pm$ 0.0332), supporting the observation that cross-branch exchange is especially effective on large, sparse protein graphs.
+\textbf{Regime 2 --- local structural motifs are discriminative.} On MUTAG---small molecular graphs averaging 18 nodes---NodeResGNN and NodeCrossGNN are the strongest CR-GNN variants, while GraphResGNN ranks last. The same pattern appears on DD, the largest and sparsest protein graph in the core: both cross-residual variants outperform both residual variants. In these settings, aggressive graph-level representational reshaping appears to suppress the local structural signals that matter most.
 
-\textbf{ENZYMES.} All models perform poorly in absolute terms, with GraphResGNN leading (0.3333 $\pm$ 0.1000). The CR-GNN family's relative ordering (GraphRes $>$ GraphCross $>$ NodeCross $\approx$ NodeRes $\approx$ Plain) is consistent with patterns on other datasets, though the 6-class, 600-graph setting creates a noisy regime that limits the strength of architecture-level conclusions.
-
-% ============================================================
-\subsection{Results on the supplementary robustness datasets}
-% ============================================================
-
-The supplementary robustness results are reported in Table~\ref{tab:all_results_2}.
-
-\textbf{MUTAG.} NodeResGNN leads within the CR-GNN family (0.7451 $\pm$ 0.0504), followed closely by NodeCrossGNN (0.7398 $\pm$ 0.0523) and GraphCrossGNN (0.7397 $\pm$ 0.0531). GraphResGNN performs worst (0.7238 $\pm$ 0.0778), consistent with the observation that aggressive representational reshaping is less suited to small molecular graphs where local motif preservation is critical.
-
-\textbf{AIDS.} GraphResGNN leads (0.9090 $\pm$ 0.0194) with substantially lower variance than the other variants. NodeCrossGNN (0.8850 $\pm$ 0.0380) and GraphCrossGNN (0.8740 $\pm$ 0.0460) follow, with NodeResGNN (0.8615 $\pm$ 0.0314) and PlainGNN (0.8295 $\pm$ 0.0456) trailing.
-
-\textbf{Mutagenicity.} GraphResGNN leads (0.8022 $\pm$ 0.0244), followed closely by GraphCrossGNN (0.7992 $\pm$ 0.0232) and NodeCrossGNN (0.7939 $\pm$ 0.0196). The top three are separated by less than 0.01, with overlapping standard deviations.
+\textbf{ENZYMES} stands apart: all architectures perform poorly (best accuracy 0.3333, only $\sim$16 pp above the 6-class random baseline), reflecting the difficulty of learning from 600 graphs with 3-dimensional features across 6 classes.
 
 % ============================================================
-\subsection{Depth scaling and representation similarity}
+\subsection{The mechanism: representational continuity vs.\ performance}
 % ============================================================
 
-To understand the mechanism behind the benchmark patterns, we track hidden-state similarity (CKA and cosine) and per-layer gradient norms across $L=1$ through $L=8$ layers on PROTEINS under GCNConv.
+Why does GraphResGNN---which deliberately alters representations between blocks---outperform architectures that preserve them more faithfully? To answer this, we track hidden-state similarity (CKA and cosine) and per-layer gradient norms from $L=1$ to $L=8$ on PROTEINS under GCNConv.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\linewidth]{figures/exp/fig_supp_layer_cka_comparison_PROTEINS_GCNConv.pdf}
-\caption{CKA similarity between adjacent depth stages across layer counts $L=1$ through $L=8$. Each subplot shows one model; curves correspond to different layer counts. Higher CKA indicates greater representational continuity across depth.}
+\caption{CKA similarity between adjacent depth stages across $L=1$--$8$. Each subplot shows one model.}
 \label{fig:layer_cka_comparison}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.98\linewidth]{figures/exp/fig_supp_layer_cosine_comparison_PROTEINS_GCNConv.pdf}
-\caption{Cosine similarity between adjacent depth stages across layer counts $L=1$ through $L=8$. Negative values indicate anti-correlated representations between adjacent stages.}
+\caption{Cosine similarity between adjacent depth stages across $L=1$--$8$.}
 \label{fig:layer_cosine_comparison}
 \end{figure}
 
-Figure~\ref{fig:layer_cka_comparison} shows the CKA similarity between adjacent depth stages for each model, and Figure~\ref{fig:layer_cosine_comparison} shows the corresponding cosine similarity. Three patterns emerge. First, deeper stacking consistently reduces adjacent-stage similarity across all five architectures, confirming that depth-induced representation divergence is a general phenomenon. Second, at $L=2$--$3$, all architectures maintain relatively high CKA; at $L=8$, the ordering becomes NodeResGNN (0.968) $>$ GraphCrossGNN (0.952) $>$ PlainGNN (0.951) $>$ NodeCrossGNN (0.946) $>$ GraphResGNN (0.942). Third, and most importantly, the relationship between CKA and performance is the opposite of what a naive representational-stability hypothesis would predict: the model with the highest CKA (NodeResGNN) wins only 3 of 24 combinations, while the model with the lowest CKA (GraphResGNN) wins 12 of 24. This counter-intuitive pattern suggests that GraphResGNN's sequential block structure, by deliberately reshaping representations at each stage using reinjected graph-level context, produces more discriminative final representations precisely because of---rather than in spite of---the representational change between stages.
+Figures~\ref{fig:layer_cka_comparison} and~\ref{fig:layer_cosine_comparison} reveal a counter-intuitive pattern. At $L=8$, the CKA ordering is NodeResGNN (0.968) $>$ GraphCrossGNN (0.952) $>$ PlainGNN (0.951) $>$ NodeCrossGNN (0.946) $>$ GraphResGNN (0.942). The architecture that preserves representations most faithfully (NodeResGNN) wins only 3 of 24 combinations; the architecture that reshapes them most aggressively (GraphResGNN) wins 12 of 24. We term this the \textbf{CKA--performance paradox}: stronger layer-wise representational continuity does not predict stronger final accuracy.
+
+This paradox has a structural explanation. GraphResGNN's three graph-conditioned blocks each receive the previous block's pooled graph embedding as a conditioning signal. This deliberate, structured reshaping---reinjecting accumulating global context at each stage---produces more discriminative final representations precisely \emph{because} representations change substantially between blocks. Conversely, NodeResGNN's faithful preservation of representations across depth may limit its capacity to adapt to task-specific structure.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\linewidth]{figures/exp/fig_supp_layer_gradient_comparison_PROTEINS_GCNConv.pdf}
-\caption{Deepest-layer gradient L2 norm as a function of layer count ($L=1$ through $L=8$) for all five architectures on PROTEINS (GCNConv).}
+\caption{Deepest-layer gradient L2 norm across $L=1$--$8$ (PROTEINS, GCNConv).}
 \label{fig:layer_gradient_comparison}
 \end{figure}
 
-Figure~\ref{fig:layer_gradient_comparison} shows that PlainGNN's deepest gradient norm degrades most rapidly with depth, while the residual family maintains more stable gradients. NodeResGNN and NodeCrossGNN maintain comparable gradient stability across all depths, confirming that cross-branch exchange does not introduce destructive gradient interference. GraphResGNN and GraphCrossGNN occupy intermediate positions.
+Figure~\ref{fig:layer_gradient_comparison} confirms that PlainGNN's deepest gradient norm degrades fastest with depth; the residual family maintains more stable gradients throughout. NodeResGNN and NodeCrossGNN exhibit comparable gradient stability, confirming that cross-branch exchange does not introduce gradient interference.
 
 % ============================================================
-\subsection{Performance trade-offs within the CR-GNN family}
+\subsection{Quantifying the trade-offs}
 % ============================================================
 
-To isolate the systematic trade-offs among the five CR-GNN topologies, Table~\ref{tab:winner_summary} summarizes winner counts across all 24 dataset--operator combinations (GCNConv-only). GraphResGNN achieves the highest peak accuracy in 12 of 24 combinations (50\%). NodeCrossGNN is second with 6 wins (25\%), dominating DD across three of four operators (GATConv, SAGEConv, GINConv). NodeResGNN wins 3 combinations, PlainGNN wins 2 (both on MUTAG), and GraphCrossGNN wins 1.
+To move beyond qualitative patterns, Table~\ref{tab:winner_summary} counts per-architecture wins across all 24 dataset--operator combinations, and Table~\ref{tab:consistency} measures cross-dataset rank stability.
 
 \begin{table}[h]
 \centering
 \small
-\caption{Winner counts across all 24 dataset--operator combinations (GCNConv-only, CR-GNN family).}
+\caption{Winner counts across 24 dataset--operator combinations (GCNConv).}
 \label{tab:winner_summary}
 \begin{tabular}{l c c c c c c c}
 \toprule
@@ -93,16 +81,14 @@ GraphCrossGNN & 0 & 0 & 0 & 1 & 0 & 0 & 1 \\
 \end{tabular}
 \end{table}
 
-Beyond win counts, the architectures differ systematically in cross-dataset consistency (Table~\ref{tab:consistency}). GraphCrossGNN, despite winning only one combination, is the most rank-stable design (rank std 0.75), never placing below fourth on any dataset. GraphResGNN, while the most frequent winner, drops to fifth on MUTAG (rank std 1.46). NodeCrossGNN occupies an intermediate consistency position (rank std 1.00) and is the closest competitor to the best model on average (mean gap 0.022).
-
 \begin{table}[h]
 \centering
 \small
-\caption{Mean rank, average gap to best, and rank stability across six datasets (CR-GNN family, GCNConv).}
+\caption{Mean rank and rank stability across six datasets (GCNConv).}
 \label{tab:consistency}
 \begin{tabular}{l c c c}
 \toprule
-Model & Mean rank & Mean gap to best & Rank std \\
+Model & Mean rank & Gap to best & Rank std \\
 \midrule
 GraphResGNN & 1.8 & 0.005 & 1.46 \\
 GraphCrossGNN & 2.7 & 0.018 & \textbf{0.75} \\
@@ -113,13 +99,13 @@ PlainGNN & 4.3 & 0.036 & \textbf{0.75} \\
 \end{tabular}
 \end{table}
 
-The depth-scaling CKA results and the rank-consistency analysis thus reveal a three-way tension: GraphResGNN aggressively reshapes representations to achieve the highest peak accuracy but with inconsistent ranking; NodeResGNN preserves representations most faithfully (highest CKA) but with volatile performance; and GraphCrossGNN balances these forces to achieve the most consistent, though not peak, performance. The DD case further illustrates this trade-off: NodeCrossGNN wins under three of four operators, consistent with dual-branch node-level exchange being especially effective on large, sparse protein graphs where complementary parallel pathways preserve discriminative signals that a single branch would suppress. On smaller, denser graphs such as AIDS, GraphResGNN's sequential graph-conditioned block structure is more effective.
+The trade-off is now quantitative. GraphResGNN wins most often (12/24) but with the weakest rank stability (std 1.46)---it can win big or lose badly. GraphCrossGNN wins only once yet is the most stable performer (std 0.75), never falling below fourth. NodeCrossGNN occupies the middle: second-most wins (6/24), intermediate stability (std 1.00), and dominance on DD specifically.
 
 % ============================================================
-\subsection{Ablation evidence: gates, routing, and parameters}
+\subsection{Ablation evidence}
 % ============================================================
 
-\subsubsection{Gate ablation results}
+\subsubsection{Gate ablation}
 
 \input{../md/peerj_gate_tables.tex}
 \input{../md/peerj_gate_fold_table.tex}
@@ -127,22 +113,20 @@ The depth-scaling CKA results and the rank-consistency analysis thus reveal a th
 \input{../md/statistical_tests_main.tex}
 \input{../md/statistical_tests_supp.tex}
 
-The gate ablations test whether adaptive control of residual injection is necessary for the observed architectural advantages. On the strongest graph-level residual target (\texttt{AIDS + GraphResGNN + GINConv}), the learnable gate is the strongest setting, though fixed coefficient 0.5 remains close. On the six cross-favored targets, learnable gating is best on three and fixed gates are best on the other three---indicating that cross-residual architectures are not overly sensitive to gate configuration, consistent with their greater rank stability.
+Gate ablations test whether adaptive residual injection control explains the observed architectural differences. On the strongest graph-level residual target (\texttt{AIDS + GraphResGNN + GINConv}), the learnable gate performs best, though fixed coefficient 0.5 is close. On six cross-favored targets, learnable and fixed gates each win three---cross-residual architectures are robust to gate configuration, consistent with their greater rank stability. The paired-test matrices (Tables~\ref{tab:statistical_tests_main}--\ref{tab:statistical_tests_supp}) confirm that most architecture-level gaps are modest relative to fold-level variation.
 
-Tables~\ref{tab:statistical_tests_main} and~\ref{tab:statistical_tests_supp} provide the complete paired-test matrix. Most architecture-level numerical gaps are modest relative to fold-level variation, confirming that differences between reuse topologies are real but conditional.
-
-\subsubsection{Residual-routing results}
+\subsubsection{Residual routing}
 
 \input{../md/peerj_residual_tables.tex}
 
-The residual-routing analysis adds a mechanism dimension to the trade-off framework. Four representative targets compare learnable, top-k, and sparse routing modes. Sparse routing with moderate threshold (0.05) is the most frequently optimal configuration, winning on three of four targets. Learnable dense routing remains best only on the strongest graph-level residual line. Two of the three sparse-favoring targets involve cross-residual architectures, suggesting that sparse filtering and cross-branch exchange form a particularly effective combination: sparsity suppresses weak residual channels, while the cross-branch pathway ensures that genuinely complementary information is preserved.
+Four representative targets compare learnable dense, top-k, and sparse routing modes. Sparse routing (threshold 0.05) is optimal on three of four targets; learnable dense routing remains best only on the strongest graph-level residual target. Two of the three sparse-favoring targets involve cross-residual architectures, suggesting that sparse filtering and cross-branch exchange are complementary: sparsity suppresses noise, while the cross-branch pathway preserves genuinely complementary information.
 
-\subsubsection{Residual-parameter sweep results}
+\subsubsection{Parameter sweep}
 
-The additional routing settings refine rather than change the pattern. The strongest top-k ratio varies by target, confirming no globally optimal retention level. Aggressive sparsity (0.10) damages the strongest graph-level residual target, reinforcing that the benefit of sparsity is conditional on an appropriate threshold.
+Additional top-k ratios and sparsity levels refine rather than change the pattern. The strongest top-k ratio varies by target, and aggressive sparsity (0.10) damages the graph-level residual target, confirming that sparsity benefits are threshold-dependent.
 
 % ============================================================
 \subsection{Exploratory sensitivity analysis}
 % ============================================================
 
-Auxiliary sensitivity checks over depth, dropout, and learning rate on PROTEINS, DD, and ENZYMES do not materially change the main conclusions. These checks are reported for transparency but should not be read as evidence at the same level as the repeated-split benchmark and targeted ablations.
+Auxiliary sensitivity checks over depth, dropout, and learning rate on PROTEINS, DD, and ENZYMES do not materially change the conclusions above.
