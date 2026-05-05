@@ -8,11 +8,11 @@ This section reports empirical evidence in four layers: the full benchmark, dept
 \subsection{Overall benchmark performance}
 % ============================================================
 
-The final benchmark evaluates six datasets and nine methods (five CR-GNN variants plus four external baselines), with CR-GNN models using GCNConv and each baseline using its native operator, under five outer folds.
+The benchmark evaluates six datasets and five CR-GNN architectures under GCNConv, with five outer folds.
 
 \input{../md/all_exp_tables.tex}
 
-The three tables together reveal a nuanced landscape. Within the CR-GNN family, GraphResGNN is the strongest on PROTEINS, ENZYMES, and AIDS; NodeResGNN leads on PROTEINS. Among external baselines, GIN is particularly strong on MUTAG (0.8403) and AIDS (0.9145), while GraphSAGE leads on DD (0.7334) and Mutagenicity (0.8084). The presence of competitive external baselines reinforces the paper's central framing: the CR-GNN family is not claimed to be universally dominant, but rather provides a controlled design space for studying systematic trade-offs.
+The three tables together reveal a clear hierarchy within the CR-GNN family. GraphResGNN is the strongest on ENZYMES and AIDS; NodeResGNN leads on PROTEINS. No single architecture dominates all datasets, consistent with the paper's central framing: the CR-GNN family provides a controlled design space for studying systematic trade-offs among reuse topologies.
 
 % ============================================================
 \subsection{Results on the biological core datasets}
@@ -20,9 +20,9 @@ The three tables together reveal a nuanced landscape. Within the CR-GNN family, 
 
 The main biological benchmark results are reported in Table~\ref{tab:all_results_1}.
 
-\textbf{PROTEINS.} Within the CR-GNN family, NodeResGNN leads numerically (0.7143 $\pm$ 0.0223), followed closely by GraphResGNN (0.7071 $\pm$ 0.0402). External baselines GraphSAGE (0.6954), GIN (0.6972), and JKNet (0.6954) cluster near the CR-GNN models. APPNP performs markedly worse (0.5966).
+\textbf{PROTEINS.} NodeResGNN leads numerically (0.7143 $\pm$ 0.0223), followed closely by GraphResGNN (0.7071 $\pm$ 0.0402). PlainGNN (0.7026 $\pm$ 0.0331) is competitive, while NodeCrossGNN (0.6945 $\pm$ 0.0488) and GraphCrossGNN (0.7017 $\pm$ 0.0520) show larger variance.
 
-\textbf{DD.} GraphSAGE leads overall (0.7334 $\pm$ 0.0227), with GraphResGNN as the strongest CR-GNN variant (0.7275 $\pm$ 0.0144). Notably, the two cross-residual variants---GraphCrossGNN (0.7207) and NodeCrossGNN (0.7164)---both outperform NodeResGNN (0.7088), supporting the observation that cross-branch exchange is especially effective on large, sparse protein graphs.
+\textbf{DD.} GraphResGNN leads (0.7275 $\pm$ 0.0144), followed by GraphCrossGNN (0.7207 $\pm$ 0.0322) and NodeCrossGNN (0.7164 $\pm$ 0.0315). Notably, both cross-residual variants outperform NodeResGNN (0.7088 $\pm$ 0.0332), supporting the observation that cross-branch exchange is especially effective on large, sparse protein graphs.
 
 \textbf{ENZYMES.} All models perform poorly in absolute terms, with GraphResGNN leading (0.3333 $\pm$ 0.1000). The CR-GNN family's relative ordering (GraphRes $>$ GraphCross $>$ NodeCross $\approx$ NodeRes $\approx$ Plain) is consistent with patterns on other datasets, though the 6-class, 600-graph setting creates a noisy regime that limits the strength of architecture-level conclusions.
 
@@ -32,11 +32,11 @@ The main biological benchmark results are reported in Table~\ref{tab:all_results
 
 The supplementary robustness results are reported in Table~\ref{tab:all_results_2}.
 
-\textbf{MUTAG.} GIN is the strongest model overall (0.8403 $\pm$ 0.0298), substantially ahead of all other methods. Within the CR-GNN family, NodeResGNN (0.7451) and NodeCrossGNN (0.7398) are competitive with GraphSAGE (0.7504). GraphResGNN performs worst (0.7238), consistent with the observation that aggressive representational reshaping is less suited to small molecular graphs.
+\textbf{MUTAG.} NodeResGNN leads within the CR-GNN family (0.7451 $\pm$ 0.0504), followed closely by NodeCrossGNN (0.7398 $\pm$ 0.0523) and GraphCrossGNN (0.7397 $\pm$ 0.0531). GraphResGNN performs worst (0.7238 $\pm$ 0.0778), consistent with the observation that aggressive representational reshaping is less suited to small molecular graphs where local motif preservation is critical.
 
-\textbf{AIDS.} GIN (0.9145 $\pm$ 0.0415) and GraphResGNN (0.9090 $\pm$ 0.0194) are nearly tied, with GraphResGNN showing substantially lower variance. GraphSAGE (0.8800), NodeCrossGNN (0.8850), JKNet (0.8775), and GraphCrossGNN (0.8740) form a tight cluster.
+\textbf{AIDS.} GraphResGNN leads (0.9090 $\pm$ 0.0194) with substantially lower variance than the other variants. NodeCrossGNN (0.8850 $\pm$ 0.0380) and GraphCrossGNN (0.8740 $\pm$ 0.0460) follow, with NodeResGNN (0.8615 $\pm$ 0.0314) and PlainGNN (0.8295 $\pm$ 0.0456) trailing.
 
-\textbf{Mutagenicity.} GraphSAGE leads (0.8084 $\pm$ 0.0180), followed closely by GraphResGNN (0.8022 $\pm$ 0.0244) and GraphCrossGNN (0.7992 $\pm$ 0.0232). The top four models are separated by only 0.015, with overlapping standard deviations.
+\textbf{Mutagenicity.} GraphResGNN leads (0.8022 $\pm$ 0.0244), followed closely by GraphCrossGNN (0.7992 $\pm$ 0.0232) and NodeCrossGNN (0.7939 $\pm$ 0.0196). The top three are separated by less than 0.01, with overlapping standard deviations.
 
 % ============================================================
 \subsection{Depth scaling and representation similarity}

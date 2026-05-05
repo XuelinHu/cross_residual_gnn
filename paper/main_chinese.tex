@@ -245,7 +245,7 @@ ENZYMES 是一个 6 类酶分类基准，包含 600 张图和 3 维输入特征�
 
 \subsection{比较方法与主干算子}
 
-主基准比较了九种方法。CR-GNN 家族包含五个模型：PlainGNN、NodeResGNN、NodeCrossGNN、GraphResGNN 和 GraphCrossGNN。四个外部基线也包含在基准测试集中：GraphSAGEBaseline、GINBaseline、JKNetBaseline 和 APPNPBaseline。这些基线旨在将受控比较锚定在具有不同传播或聚合行为的代表性图分类家族上，而非宣称穷尽覆盖所有近期排行榜方法。
+基准评估五种架构，在四种消息传递算子（GCNConv、GATConv、SAGEConv、GINConv）下进行。
 
 每种方法在四种消息传递算子下评估：
 \begin{itemize}
@@ -293,7 +293,7 @@ Validation split ratio & 0.1 \\
 
 \subsection{实验设计}
 
-实证研究将确认性五折证据与探索性分析分开。基准评估了六个数据集、九种方法、四种消息传递算子和五外折，统一在一个协议下。基准分为一个生物学核心（PROTEINS、DD、ENZYMES）和一个补充鲁棒性测试集（MUTAG、AIDS、Mutagenicity）。
+实证研究将确认性五折证据与探索性分析分开。基准评估了六个数据集、五种架构、四种消息传递算子和五外折，统一在一个协议下。基准分为一个生物学核心（PROTEINS、DD、ENZYMES）和一个补充鲁棒性测试集（MUTAG、AIDS、Mutagenicity）。
 
 针对性消融实验围绕引言中提出的三个研究问题，通过受控机制实验展开：
 
@@ -323,11 +323,11 @@ Validation split ratio & 0.1 \\
 \subsection{整体基准性能}
 % ============================================================
 
-基准评估了六个数据集、九种方法（五种 CR-GNN 变体加上四种外部基线），CR-GNN 模型使用 GCNConv 算子，各基线使用其原生算子，在统一协议下进行五外折评估。
+基准评估了六个数据集和五种 CR-GNN 架构（GCNConv），进行五外折评估。
 
 \input{../md/all_exp_tables.tex}
 
-三张表共同揭示了一个细致入微的格局。在 CR-GNN 家族内部，GraphResGNN 在 PROTEINS、ENZYMES 和 AIDS 上最强；NodeResGNN 在 PROTEINS 上领先。在外部基线中，GIN 在 MUTAG（0.8403）和 AIDS（0.9145）上尤为强劲，而 GraphSAGE 在 DD（0.7334）和 Mutagenicity（0.8084）上领先。具有竞争力的外部基线的存在强化了本文的中心论点：CR-GNN 家族并非被宣称普遍占优，而是提供了一个受控设计空间，在此空间内可以研究系统性的权衡。
+三张表共同揭示了 CR-GNN 家族内部的清晰层级。GraphResGNN 在 ENZYMES 和 AIDS 上最强；NodeResGNN 在 PROTEINS 上领先。没有单一架构能在所有数据集上占据主导地位，这与本文的核心定位一致：CR-GNN 家族提供了一个用于研究复用拓扑之间系统性权衡的受控设计空间。
 
 % ============================================================
 \subsection{生物学核心数据集结果}
@@ -335,9 +335,9 @@ Validation split ratio & 0.1 \\
 
 主生物基准结果报告于表~\ref{tab:all_results_1}。
 
-\textbf{PROTEINS.} 在 CR-GNN 家族内部，NodeResGNN 数值领先（0.7143 $\pm$ 0.0223），紧随其后的是 GraphResGNN（0.7071 $\pm$ 0.0402）。外部基线 GraphSAGE（0.6954）、GIN（0.6972）和 JKNet（0.6954）均聚集在 CR-GNN 模型附近。APPNP 表现明显更差（0.5966）。
+\textbf{PROTEINS.} NodeResGNN 数值领先（0.7143 $\pm$ 0.0223），紧随其后的是 GraphResGNN（0.7071 $\pm$ 0.0402）。PlainGNN（0.7026 $\pm$ 0.0331）具有竞争力，而 NodeCrossGNN（0.6945 $\pm$ 0.0488）和 GraphCrossGNN（0.7017 $\pm$ 0.0520）表现出较大的方差。
 
-\textbf{DD.} GraphSAGE 整体领先（0.7334 $\pm$ 0.0227），GraphResGNN 是 CR-GNN 家族中最强的变体（0.7275 $\pm$ 0.0144）。值得注意的是，两个交叉残差变体——GraphCrossGNN（0.7207）和 NodeCrossGNN（0.7164）——均优于 NodeResGNN（0.7088），支持了跨分支交换在大型稀疏蛋白质图上尤其有效的观察。
+\textbf{DD.} GraphResGNN 领先（0.7275 $\pm$ 0.0144），紧随其后的是 GraphCrossGNN（0.7207 $\pm$ 0.0322）和 NodeCrossGNN（0.7164 $\pm$ 0.0315）。值得注意的是，两个交叉残差变体均优于 NodeResGNN（0.7088 $\pm$ 0.0332），支持了跨分支交换在大型稀疏蛋白质图上尤其有效的观察。
 
 \textbf{ENZYMES.} 所有模型在绝对指标上均表现不佳，GraphResGNN 领先（0.3333 $\pm$ 0.1000）。CR-GNN 家族的相对排序（GraphRes $>$ GraphCross $>$ NodeCross $\approx$ NodeRes $\approx$ Plain）与其他数据集上的模式一致，尽管 6 类、600 图的设定创造了嘈杂的制度，限制了架构级结论的强度。
 
@@ -347,11 +347,11 @@ Validation split ratio & 0.1 \\
 
 补充鲁棒性结果报告于表~\ref{tab:all_results_2}。
 
-\textbf{MUTAG.} GIN 是整体最强的模型（0.8403 $\pm$ 0.0298），大幅领先所有其他方法。在 CR-GNN 家族内部，NodeResGNN（0.7451）和 NodeCrossGNN（0.7398）与 GraphSAGE（0.7504）具有竞争力。GraphResGNN 表现最差（0.7238），与激进的表示重塑不太适合小型分子图的观察一致。
+\textbf{MUTAG.} NodeResGNN 在 CR-GNN 家族内领先（0.7451 $\pm$ 0.0504），其后依次为 NodeCrossGNN（0.7398 $\pm$ 0.0523）和 GraphCrossGNN（0.7397 $\pm$ 0.0531）。GraphResGNN 表现最差（0.7238 $\pm$ 0.0778），与激进的表示重塑不太适合局部基序保存至关重要的小型分子图的观察一致。
 
-\textbf{AIDS.} GIN（0.9145 $\pm$ 0.0415）和 GraphResGNN（0.9090 $\pm$ 0.0194）几乎并列领先，GraphResGNN 的方差显著更低。GraphSAGE（0.8800）、NodeCrossGNN（0.8850）、JKNet（0.8775）和 GraphCrossGNN（0.8740）构成一个紧密的聚类。
+\textbf{AIDS.} GraphResGNN 领先（0.9090 $\pm$ 0.0194），方差显著低于其他变体。NodeCrossGNN（0.8850 $\pm$ 0.0380）和 GraphCrossGNN（0.8740 $\pm$ 0.0460）紧随其后，NodeResGNN（0.8615 $\pm$ 0.0314）和 PlainGNN（0.8295 $\pm$ 0.0456）排在末尾。
 
-\textbf{Mutagenicity.} GraphSAGE 领先（0.8084 $\pm$ 0.0180），紧随其后的是 GraphResGNN（0.8022 $\pm$ 0.0244）和 GraphCrossGNN（0.7992 $\pm$ 0.0232）。排名前四的模型仅相差 0.015，标准差重叠。
+\textbf{Mutagenicity.} GraphResGNN 领先（0.8022 $\pm$ 0.0244），其后紧跟着 GraphCrossGNN（0.7992 $\pm$ 0.0232）和 NodeCrossGNN（0.7939 $\pm$ 0.0196）。前三名之间的差距小于 0.01，标准差重叠。
 
 % ============================================================
 \subsection{深度扩展与表示相似性}

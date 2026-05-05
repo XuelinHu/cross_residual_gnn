@@ -44,7 +44,7 @@ _BASELINE_DISPLAY = {
     "APPNPBaseline": "APPNP",
 }
 _ALL_DISPLAY = {**MODEL_DISPLAY, **_BASELINE_DISPLAY}
-MODELS = ALL_MODELS
+MODELS = CR_MODELS  # CR-GNN family only
 
 TXT_OUT = MD_DIR / "all_results_summary.txt"
 TEX_OUT = MD_DIR / "all_exp_tables.tex"
