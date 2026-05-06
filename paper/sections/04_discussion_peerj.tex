@@ -1,8 +1,8 @@
 \section{Discussion}
 
-The results above raise several questions that a simple architecture ranking cannot answer. This section addresses them directly.
+This section returns to the three research questions posed in the Introduction and answers them in light of the evidence presented in Section~\ref{sec:results}.
 
-\subsection{Why does the architecture with the weakest representational continuity win most often?}
+\subsection{RQ1: Why does the architecture with the weakest representational continuity win most often?}
 
 The CKA--performance paradox---GraphResGNN achieves the lowest CKA at depth (0.942) yet the most wins (12/24), while NodeResGNN achieves the highest CKA (0.968) yet the fewest wins among reuse variants (3/24)---has a structural explanation. GraphResGNN chains three graph-conditioned blocks, each receiving the previous block's pooled graph embedding as conditioning input. This design deliberately reshapes representations at every stage using accumulating global context: it does not aim to preserve representations, but to progressively refine them. On datasets where global structure is discriminative (AIDS, PROTEINS), this strategy excels. On MUTAG, where local motifs dominate, it backfires (rank 5/5).
 
@@ -10,7 +10,7 @@ NodeResGNN preserves representations faithfully but at a cost: representations t
 
 \textbf{Answer:} Aggressive representational reshaping is productive when global context is discriminative, but creates brittleness when local motifs matter. Cross-residual architectures balance continuity and change, yielding the most consistent performance.
 
-\subsection{When should cross-residual be chosen over residual?}
+\subsection{RQ1 \& RQ2: When does each reuse topology dominate?}
 
 The benchmark identifies a clear regime where cross-residual dominates: large, sparse protein graphs. On DD (1,178 graphs, 89-dim features), NodeCrossGNN wins under three of four operators. In this setting, a single propagation branch tends to suppress rare but discriminative structural signals under repeated message passing; dual-branch node-level exchange provides complementary parallel pathways that preserve them. The same pattern is visible on other GATConv-based configurations (AIDS, Mutagenicity, ENZYMES), where NodeCrossGNN is consistently competitive.
 
@@ -18,7 +18,7 @@ By contrast, on smaller, denser graphs where global context is strongly discrimi
 
 \textbf{Answer:} Choose cross-residual (NodeCrossGNN) for large, sparse graphs, especially with attention-based operators. Choose graph-level residual (GraphResGNN) for smaller, denser graphs where global context dominates.
 
-\subsection{Does routing strategy matter beyond architecture choice?}
+\subsection{RQ3: Does routing strategy matter beyond architecture choice?}
 
 The ablation results (Section~\ref{sec:results}) show that it does, and in a target-dependent way. First, gate ablations reveal that cross-residual architectures are robust to gate configuration---learnable and fixed gates split evenly on cross-favored targets---consistent with their greater rank stability. Second, routing mode matters substantially: sparse routing (threshold 0.05) is optimal on three of four representative targets, and two of these involve cross-residual architectures. The mechanism-level synergy is that sparsity suppresses weak residual channels before they accumulate as noise across depth, while the cross-branch pathway preserves genuinely complementary signals through an independent route. Aggressive sparsity (0.10) damages the graph-level residual target, confirming the effect is threshold-dependent.
 

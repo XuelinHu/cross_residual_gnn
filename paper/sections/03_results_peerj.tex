@@ -10,7 +10,7 @@ All main results are reported as five-fold mean best test accuracy $\pm$ fold-le
 
 \input{../md/all_exp_tables.tex}
 
-The benchmark evaluates six datasets and five CR-GNN architectures under GCNConv with five outer folds. Table~\ref{tab:all_results_1} (biological core) and Table~\ref{tab:all_results_2} (supplementary robustness) together show that no single architecture dominates all datasets. GraphResGNN is the strongest on ENZYMES, AIDS, and Mutagenicity; NodeResGNN leads on PROTEINS and MUTAG. DD is the only dataset where cross-residual variants outperform both residual counterparts.
+The benchmark evaluates six datasets and five CR-GNN architectures under GCNConv with five outer folds. Table~\ref{tab:all_results_1} (biological core) and Table~\ref{tab:all_results_2} (supplementary robustness) together show that no single architecture dominates all datasets. GraphResGNN is the strongest on ENZYMES, AIDS, and Mutagenicity; NodeResGNN leads on PROTEINS and MUTAG. Under three of four operators, DD is the only dataset where cross-residual variants outperform both residual counterparts (Table~\ref{tab:winner_summary}).
 
 % ============================================================
 \subsection{When does each reuse topology help?}
@@ -18,7 +18,7 @@ The benchmark evaluates six datasets and five CR-GNN architectures under GCNConv
 
 The dataset-level results reveal two distinct regimes in which different reuse topologies excel.
 
-\textbf{Regime 1 --- graph-level context is discriminative.} On PROTEINS, AIDS, and Mutagenicity, GraphResGNN and GraphCrossGNN occupy the top two positions. These datasets share a common property: global graph-level structure carries strong discriminative signal. GraphResGNN's sequential block design, which reinjects pooled graph summaries at each stage, is well-suited to this regime. On AIDS, it achieves the highest accuracy (0.9090) with the lowest variance ($\pm$0.0194) of any architecture on any dataset.
+\textbf{Regime 1 --- graph-level context is discriminative.} On PROTEINS and Mutagenicity, GraphResGNN and GraphCrossGNN occupy the top two positions. These datasets share the property that global graph-level structure carries strong discriminative signal, and GraphResGNN's sequential block design, which reinjects pooled graph summaries at each stage, is well-suited to this regime.
 
 \textbf{Regime 2 --- local structural motifs are discriminative.} On MUTAG---small molecular graphs averaging 18 nodes---NodeResGNN and NodeCrossGNN are the strongest CR-GNN variants, while GraphResGNN ranks last. The same pattern appears on DD, the largest and sparsest protein graph in the core: both cross-residual variants outperform both residual variants. In these settings, aggressive graph-level representational reshaping appears to suppress the local structural signals that matter most.
 
@@ -66,7 +66,7 @@ To move beyond qualitative patterns, Table~\ref{tab:winner_summary} counts per-a
 \begin{table}[h]
 \centering
 \small
-\caption{Winner counts across 24 dataset--operator combinations (GCNConv).}
+\caption{Winner counts across 24 dataset--operator combinations (CR-GNN family).}
 \label{tab:winner_summary}
 \begin{tabular}{l c c c c c c c}
 \toprule
