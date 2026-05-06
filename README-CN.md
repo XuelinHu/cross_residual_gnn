@@ -2,304 +2,153 @@
 
 [English README](./README.md)
 
-本仓库是 CR-GNN（Cross-Residual Graph Neural Networks）图分类研究代码，核心目标是在统一训练协议下，对比普通堆叠、残差复用和交叉残差的信息传递方式。
+本仓库包含 CR-GNN 研究的代码、实验产物和论文源码。仓库现已收口到最终 `V3` 流程，当前 paper-facing 版本以 [`paper/`](./paper) 下的稿件为准。
 
-当前主训练入口是 [geomatric/graph_classify_v3.py](./geomatric/graph_classify_v3.py)。共享的数据集定义、日志工具和钉钉通知工具都已经放到 [geomatric/](./geomatric) 包下面。
+## 最终 V3 状态
 
-## 功能概览
+- 当前训练入口：[`geomatric/graph_classify_v3.py`](./geomatric/graph_classify_v3.py)
+- 最终流程入口：[`py/run_final_v3_pipeline.py`](./py/run_final_v3_pipeline.py)
+- 最终实验产物：`logs/V3`、`records/V3`、`runs/V3`
+- 项目索引：[`md/FINAL_PROJECT_INDEX.md`](./md/FINAL_PROJECT_INDEX.md)
+- 论文主文件：[`paper/main.tex`](./paper/main.tex)
 
-当前主线支持 5 个图分类结构：
+现在只应把 `V3` 视为当前有效版本。更早的补跑记录、阶段性整理笔记和过时归档目录不再属于主流程。
 
-- `PlainGNN`
-- `NodeResGNN`
-- `NodeCrossGNN`
-- `GraphResGNN`
-- `GraphCrossGNN`
-
-当前代码还包含：
-
-- 分层 5 折交叉验证
-- 训练集内部验证集切分
-- `ReduceLROnPlateau`
-- 梯度裁剪
-- TensorBoard 记录
-- JSON 结果快照导出
-- 批量实验、汇总、画图和论文产物生成脚本
-
-旧版 V2 相关内容已经归档到 [achivement_V2/](./achivement_V2)。
-
-## 当前补跑进度
-
-截至 `2026-04-15 10:33:31`，缺失实验补跑任务的最新状态为：
-
-- 总目标：`720`
-- 已完成：`677`
-- 剩余：`43`
-- baseline 覆盖：`120 / 120`
-- 非 `GCNConv` 算子覆盖：`557 / 600`
-
-实时状态文件：
-
-- [md/missing_experiment_completion.md](./md/missing_experiment_completion.md)
-- [records/missing_experiment_status.json](./records/missing_experiment_status.json)
-- [logs/missing_experiments_20260414_235657.log](./logs/missing_experiments_20260414_235657.log)
-
-## 仓库路径总览
+## 仓库结构
 
 ```text
 cross_residual_gnn/
-├── achivement_V2/               # 旧版 V2 代码与记录
-├── data/                        # 本地数据集目录，Git 忽略
-├── figures/                     # 导出的实验图片
-├── geomatric/                   # 当前有效 Python 包
-├── logs/                        # 训练 JSON 快照，Git 忽略
-│   └── missing_jobs/            # 补跑任务的单任务日志
-├── md/                          # Markdown / TeX 汇总文件
-├── paper/                       # 论文 LaTeX 与图片
-├── py/                          # 批处理与分析脚本
-├── records/                     # 文本记录，Git 忽略
-├── runs/                        # TensorBoard 日志，Git 忽略
-├── tmp/                         # 本地临时文件，Git 忽略
+├── data/                      # 本地数据集，不提交
+├── figures/                   # 导出的实验图片
+├── geomatric/                 # 当前有效 Python 包
+├── logs/                      # 运行日志与 V1/V2/V3 归档输出
+├── md/                        # 汇总、表格与论文分析说明
+├── paper/                     # 当前 LaTeX 论文与论文图片
+├── py/                        # 批处理、分析、汇总脚本
+├── records/                   # 文本汇总与 V1/V2/V3 归档记录
+├── runs/                      # TensorBoard 日志
 ├── README.md
 └── README-CN.md
 ```
 
-## 核心文件路径
+## 环境
 
-### 核心包路径
-
-- [geomatric/__init__.py](./geomatric/__init__.py)：包入口
-- [geomatric/graph_classify_v3.py](./geomatric/graph_classify_v3.py)：主训练 / 主评估入口
-- [geomatric/experiment_catalog.py](./geomatric/experiment_catalog.py)：数据集分组与元信息
-- [geomatric/logging_config.py](./geomatric/logging_config.py)：统一日志配置
-- [geomatric/dingtalk_util.py](./geomatric/dingtalk_util.py)：钉钉 Markdown / ActionCard 通知工具
-
-### 运行脚本路径
-
-- [py/run_paper_experiments.py](./py/run_paper_experiments.py)：全量论文实验批跑
-- [py/run_missing_experiments.py](./py/run_missing_experiments.py)：缺失 baseline / 算子实验的后台补跑脚本
-- [py/run_sensitivity_experiments.py](./py/run_sensitivity_experiments.py)：参数敏感性扫描
-- [py/run_enzymes_tuned_cross.py](./py/run_enzymes_tuned_cross.py)：ENZYMES 调优交叉模型实验
-- [py/summarize_paper_experiments.py](./py/summarize_paper_experiments.py)：读取最新日志并汇总
-- [py/generate_all_result_reports.py](./py/generate_all_result_reports.py)：生成总报告文本和 TeX
-- [py/generate_suite_analysis_figures.py](./py/generate_suite_analysis_figures.py)：生成全套对比图
-- [py/generate_dataset_statistics_report.py](./py/generate_dataset_statistics_report.py)：生成数据集统计
-- [py/generate_sensitivity_reports.py](./py/generate_sensitivity_reports.py)：生成敏感性分析报告
-- [py/generate_exp_figures.py](./py/generate_exp_figures.py)：根据记录文件生成图表
-- [py/generate_method_figure.py](./py/generate_method_figure.py)：方法图辅助脚本
-- [py/generate_topic_tables.py](./py/generate_topic_tables.py)：面向主题的 LaTeX 表格
-- [py/export_analysis_artifacts.py](./py/export_analysis_artifacts.py)：导出单次训练分析产物
-- [py/organize_references_from_corpus.py](./py/organize_references_from_corpus.py)：参考文献整理
-- [py/plot_style.py](./py/plot_style.py)：绘图样式工具
-
-### 结果快照与输出路径
-
-这里的“快照”主要指训练过程和实验汇总生成的结果文件：
-
-- `logs/LATEST/train_<dataset>_<model>_<operator>_fold<k>__<timestamp>.json`
-  当前最新日志目录：[logs/LATEST](./logs/LATEST)
-- `logs/LATEST/dataset_stats_<dataset>__<timestamp>.json`
-  数据集统计日志目录：[logs/LATEST](./logs/LATEST)
-- `records/LATEST/suite_<suite_name>_<dataset>__<timestamp>.txt`
-  当前最新记录目录：[records/LATEST](./records/LATEST)
-- `records/LATEST/missing_experiment_status.json`
-  当前最新补跑状态快照：[records/LATEST](./records/LATEST)
-- `runs/LATEST/<model>_<operator>_<dataset>_<dim>_fold<k>_<h_layer>_<timestamp>/events.out.tfevents.*`
-  TensorBoard 根路径：[runs/LATEST](./runs/LATEST)
-- `logs/LATEST/missing_jobs/<job_slug>.log`
-  单任务训练日志：[logs/LATEST/missing_jobs](./logs/LATEST/missing_jobs)
-- `records/experiment_versions.json`
-  归档 `V1` / `V2` / `V3` 与当前 `LATEST` 的统一版本索引：[records/experiment_versions.json](./records/experiment_versions.json)
-- `figures/analysis/*`
-  分析产物目录：[figures/analysis/](./figures/analysis)
-- `figures/exp/*`
-  实验图目录：[figures/exp/](./figures/exp)
-- `paper/figures/exp/*`
-  论文图目录：[paper/figures/exp/](./paper/figures/exp)
-
-### Markdown / TeX 汇总文件路径
-
-- [md/all_results_summary.txt](./md/all_results_summary.txt)
-- [md/all_exp_tables.tex](./md/all_exp_tables.tex)
-- [md/all_exp_tables_appendix.tex](./md/all_exp_tables_appendix.tex)
-- [md/all_ablation_analysis.md](./md/all_ablation_analysis.md)
-- [md/sensitivity_summary.md](./md/sensitivity_summary.md)
-- [md/parameter_sensitivity_analysis.md](./md/parameter_sensitivity_analysis.md)
-- [md/dataset_statistics_summary.md](./md/dataset_statistics_summary.md)
-- [md/dataset_statistics_summary.json](./md/dataset_statistics_summary.json)
-- [md/dataset_statistics_tables.tex](./md/dataset_statistics_tables.tex)
-- [md/topic_results_summary.txt](./md/topic_results_summary.txt)
-- [md/topic_exp_tables.tex](./md/topic_exp_tables.tex)
-- [md/cross_advantage_summary.md](./md/cross_advantage_summary.md)
-- [md/formal_experiment_protocol.md](./md/formal_experiment_protocol.md)
-- [md/final_implementation_todo.md](./md/final_implementation_todo.md)
-- [md/missing_experiment_completion.md](./md/missing_experiment_completion.md)
-- [md/paper_gap_checklist.md](./md/paper_gap_checklist.md)
-- [md/reference_logic_map.md](./md/reference_logic_map.md)
-- [md/frontiers_topic_alignment.md](./md/frontiers_topic_alignment.md)
-- [md/topic_aligned_dataset_shortlist.md](./md/topic_aligned_dataset_shortlist.md)
-- [md/SESSION_RECORD.md](./md/SESSION_RECORD.md)
-
-### 图像文件路径
-
-当前实验图：
-
-- [figures/exp/fig1_full_suite_results.png](./figures/exp/fig1_full_suite_results.png)
-- [figures/exp/fig1_full_suite_results.pdf](./figures/exp/fig1_full_suite_results.pdf)
-- [figures/exp/fig2_cross_advantage_heatmap.png](./figures/exp/fig2_cross_advantage_heatmap.png)
-- [figures/exp/fig2_cross_advantage_heatmap.pdf](./figures/exp/fig2_cross_advantage_heatmap.pdf)
-- [figures/exp/fig3_rank_winner_summary.png](./figures/exp/fig3_rank_winner_summary.png)
-- [figures/exp/fig3_rank_winner_summary.pdf](./figures/exp/fig3_rank_winner_summary.pdf)
-- [figures/exp/fig4_topic_focus_results.png](./figures/exp/fig4_topic_focus_results.png)
-- [figures/exp/fig4_topic_focus_results.pdf](./figures/exp/fig4_topic_focus_results.pdf)
-- [figures/exp/fig5_protein_package_summary.png](./figures/exp/fig5_protein_package_summary.png)
-- [figures/exp/fig5_protein_package_summary.pdf](./figures/exp/fig5_protein_package_summary.pdf)
-
-论文图片目录：
-
-- [paper/figures/](./paper/figures)
-- [paper/figures/exp/](./paper/figures/exp)
-- [paper/figures/cr_gnn_schematic.png](./paper/figures/cr_gnn_schematic.png)
-- [paper/figures/task_model_comparison.png](./paper/figures/task_model_comparison.png)
-
-## 数据集路径
-
-仓库本身不提交原始数据集，但本地数据路径已经固定：
-
-- [data/](./data)：本地数据根目录
-- `data/TUDataset/`：TU 数据集下载目录
-- `data/OGB/`：OGB 图属性预测数据集下载目录
-- [data/.gitkeep](./data/.gitkeep)：占位文件
-
-当前在 [geomatric/experiment_catalog.py](./geomatric/experiment_catalog.py) 中定义的数据集分组：
-
-- 主数据集：`PROTEINS`、`DD`、`ENZYMES`
-- 补充数据集：`MUTAG`、`AIDS`、`Mutagenicity`
-
-## 论文文件路径
-
-- [paper/main.tex](./paper/main.tex)
-- [paper/references.bib](./paper/references.bib)
-- [paper/compile.bat](./paper/compile.bat)
-- [paper/README.md](./paper/README.md)
-- [paper/paper_corpus_merged.json](./paper/paper_corpus_merged.json)
-- [paper/sections/01_introduction_peerj.tex](./paper/sections/01_introduction_peerj.tex)
-- [paper/sections/02_methods_peerj.tex](./paper/sections/02_methods_peerj.tex)
-- [paper/sections/03_results_peerj.tex](./paper/sections/03_results_peerj.tex)
-- [paper/sections/04_discussion_peerj.tex](./paper/sections/04_discussion_peerj.tex)
-- [paper/sections/05_conclusions_peerj.tex](./paper/sections/05_conclusions_peerj.tex)
-- [paper/sections/06_acknowledgments.tex](./paper/sections/06_acknowledgments.tex)
-- [paper/sections/07_appendix.tex](./paper/sections/07_appendix.tex)
-
-## 常用运行命令
-
-### 1. 单次训练
+按仓库约定，Python 命令默认使用 Conda 环境 `pyg`：
 
 ```bash
-python -m geomatric.graph_classify_v3 \
-  --mode single \
-  --ds PROTEINS \
-  --gname NodeCrossGNN \
-  --name GCNConv \
-  --ep 240 \
-  --patience 80 \
-  --lr 0.003 \
-  --weight_decay 5e-5 \
-  --drop 0.2 \
-  --dim 64 \
-  --h_layer 4 \
-  --batch_size 32 \
-  --grad_clip 2.0 \
-  --tensorboard
+conda activate pyg
 ```
 
-也可以直接运行脚本路径：
+推荐依赖：
+
+- Python `3.10+`
+- PyTorch
+- PyTorch Geometric
+- `tensorboard`
+- `matplotlib`、`seaborn`、`pandas`、`openpyxl`
+
+## 常用命令
+
+单次训练：
 
 ```bash
-python geomatric/graph_classify_v3.py --mode single --ds PROTEINS
+conda activate pyg
+python -m geomatric.graph_classify_v3 --mode single --ds PROTEINS
 ```
 
-### 2. 全量实验批跑
+最终 V3 流程：
 
 ```bash
+conda activate pyg
+python py/run_final_v3_pipeline.py
+python py/run_final_v3_pipeline.py --steps consolidate summarize reports figures
+```
+
+全量实验批跑：
+
+```bash
+conda activate pyg
 python py/run_paper_experiments.py --dataset_group all --max_workers 6 --tensorboard
 ```
 
-支持的数据集分组：
-
-- `main`
-- `topic`
-- `extended`
-- `all`
-
-### 3. 汇总最新实验日志
+汇总与导出报告：
 
 ```bash
+conda activate pyg
 python py/summarize_paper_experiments.py --dataset_group all
-```
-
-### 4. 补齐缺失 baseline / 算子实验
-
-```bash
-python py/run_missing_experiments.py --report_only
-python py/run_missing_experiments.py --max_parallel 8 --reserve_gb 4 --no_tensorboard
-```
-
-这次重跑会去掉 `TransformerConv` 算子，不再纳入补跑集合。
-
-当前补跑脚本面向 `24GB` GPU：
-
-- 预留约 `4GB` 显存
-- 用剩余显存尽量并发跑多个任务
-- 显存充足时自动放大 batch size
-- OOM 时自动缩小 batch 并重试
-
-### 5. 生成总报告和图
-
-```bash
 python py/generate_all_result_reports.py
 python py/generate_suite_analysis_figures.py
 ```
 
-### 6. 运行参数敏感性分析
+敏感性分析与数据统计：
 
 ```bash
+conda activate pyg
 python py/run_sensitivity_experiments.py --fold 0 --max_workers 6
 python py/generate_sensitivity_reports.py
-```
-
-### 7. 生成数据集统计
-
-```bash
 python py/generate_dataset_statistics_report.py
 ```
 
-### 8. 查看 TensorBoard
+## 关键文件
 
-```bash
-tensorboard --logdir runs --port 6006
-```
+代码与配置：
 
-## 当前论文层面的结论
+- [`geomatric/graph_classify_v3.py`](./geomatric/graph_classify_v3.py)
+- [`geomatric/experiment_catalog.py`](./geomatric/experiment_catalog.py)
+- [`geomatric/experiment_paths.py`](./geomatric/experiment_paths.py)
+- [`py/run_final_v3_pipeline.py`](./py/run_final_v3_pipeline.py)
 
-基于当前归档结果：
+实验汇总：
 
-- residual 系列在当前主题相关的 TU 数据集上更稳定
-- cross-residual 系列在部分补充数据集上仍然有选择性优势
+- [`md/EXPERIMENT_INDEX.md`](./md/EXPERIMENT_INDEX.md)
+- [`md/FINAL_PROJECT_INDEX.md`](./md/FINAL_PROJECT_INDEX.md)
+- [`md/V3_residual_summary.md`](./md/V3_residual_summary.md)
+- [`md/all_exp_tables_V3.tex`](./md/all_exp_tables_V3.tex)
+- [`md/all_results_summary_V3.txt`](./md/all_results_summary_V3.txt)
+- [`md/frontiers_topic_alignment.md`](./md/frontiers_topic_alignment.md)
 
-因此目前证据支持的是“交叉残差的收益具有数据集依赖性”，而不是“cross 一定优于 residual”。
+论文源码：
 
-## 当前全套实验获胜模型
+- [`paper/main.tex`](./paper/main.tex)
+- [`paper/sections/01_introduction_peerj.tex`](./paper/sections/01_introduction_peerj.tex)
+- [`paper/sections/02_methods_peerj.tex`](./paper/sections/02_methods_peerj.tex)
+- [`paper/sections/03_results_peerj.tex`](./paper/sections/03_results_peerj.tex)
+- [`paper/sections/04_discussion_peerj.tex`](./paper/sections/04_discussion_peerj.tex)
+- [`paper/sections/05_conclusions_peerj.tex`](./paper/sections/05_conclusions_peerj.tex)
 
-- `MUTAG`: `NodeCrossGNN`
-- `PROTEINS`: `GraphResGNN`
-- `DD`: `NodeResGNN`
-- `ENZYMES`: `GraphResGNN`
-- `AIDS`: `GraphResGNN`
-- `Mutagenicity`: `NodeCrossGNN`
+已经存在但尚未充分纳入正文的论文图：
+
+- [`paper/figures/exp/fig1_full_suite_results.pdf`](./paper/figures/exp/fig1_full_suite_results.pdf)
+- [`paper/figures/exp/fig2_cross_advantage_heatmap.pdf`](./paper/figures/exp/fig2_cross_advantage_heatmap.pdf)
+- [`paper/figures/exp/fig4_topic_focus_results.pdf`](./paper/figures/exp/fig4_topic_focus_results.pdf)
+- [`paper/figures/exp/fig5_protein_package_summary.pdf`](./paper/figures/exp/fig5_protein_package_summary.pdf)
+
+## 论文当前状态
+
+当前稿件更准确的定位是：
+
+- 一个 biomolecular graph classification 方法论文
+- 以 `PROTEINS`、`DD`、`ENZYMES` 作为 biological core
+- 以 `MUTAG`、`AIDS`、`Mutagenicity` 作为 supplementary robustness 数据集
+
+这份稿件还不是完全收口的最终版。当前源码仍需要：
+
+- 围绕 V3 主线进一步收束 scope
+- 让文字结论逐条对齐当前表格
+- 补齐 methods 中未闭合的数学定义
+- 把已有主结果图重新接回正文
+
+关于选题匹配和改稿判断，优先看 [`md/frontiers_topic_alignment.md`](./md/frontiers_topic_alignment.md)。
+
+## 数据集分组
+
+定义位于 [`geomatric/experiment_catalog.py`](./geomatric/experiment_catalog.py)：
+
+- biological core：`PROTEINS`、`DD`、`ENZYMES`
+- supplementary robustness：`MUTAG`、`AIDS`、`Mutagenicity`
 
 ## 备注
 
-- `logs/`、`runs/`、`records/`、`data/`、`tmp/` 这类运行期目录默认被 Git 忽略。
-- `py/` 下分析脚本统一依赖 [geomatric/experiment_catalog.py](./geomatric/experiment_catalog.py) 中的数据集定义。
-- 仓库不会提交下载后的原始数据集内容，README 只记录约定的数据目录路径。
+- 仓库不提交原始数据集。
+- 运行目录可能较大，并保留 V1/V2/V3 历史输出。
+- 修改论文结论时，应以 V3 表格和图为准，不要再参考早期 `LATEST` 风格说明。

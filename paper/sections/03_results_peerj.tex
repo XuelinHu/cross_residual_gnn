@@ -10,19 +10,46 @@ All results are reported as five-fold mean best test accuracy $\pm$ fold-level s
 
 \input{../md/all_exp_tables.tex}
 
-The benchmark evaluates six datasets and five CR-GNN architectures under GCNConv with five outer folds. Table~\ref{tab:all_results_1} (biological core) and Table~\ref{tab:all_results_2} (supplementary robustness) together show that no single architecture dominates all datasets. GraphResGNN is the strongest on ENZYMES, AIDS, and Mutagenicity; NodeResGNN leads on PROTEINS and MUTAG. Under three of four operators, DD is the only dataset where cross-residual variants outperform both residual counterparts (Table~\ref{tab:winner_summary}).
+The benchmark evaluates six datasets and five CR-GNN architectures under GCNConv with five outer folds. For the paper-facing argument, Table~\ref{tab:all_results_1} is the main result table: it contains the protein-oriented comparison centered on PROTEINS and DD, plus ENZYMES as a supporting biological stress test, whereas Table~\ref{tab:all_results_2} is retained as supplementary robustness evidence. Within the main pair, NodeResGNN is best on PROTEINS (0.7143) and GraphResGNN is best on DD (0.7275). The margins are often small: on PROTEINS, GraphResGNN trails NodeResGNN by only 0.0072, and on DD the three strongest models (GraphResGNN, GraphCrossGNN, NodeCrossGNN) all lie within 0.0111 accuracy points.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/exp/fig1_full_suite_results_V3.pdf}
+\caption{Full V3 benchmark across the active dataset package under the GCNConv comparison. Bars show five-fold mean best test accuracy with standard-deviation error bars.}
+\label{fig:full_suite_results}
+\end{figure}
+
+Figure~\ref{fig:full_suite_results} makes the same pattern visually explicit. Across the full suite, graph-level residual propagation is the strongest default choice, but the main biological claim should be read from the protein-oriented core rather than from the full six-dataset average impression.
 
 % ============================================================
-\subsection{When does each reuse topology help?}
+\subsection{Biological core and cross-residual advantage}
 % ============================================================
 
-The dataset-level results reveal two distinct regimes in which different reuse topologies excel.
+The biological core is the most important part of the paper-facing benchmark, but within that core the main biological comparison is carried by PROTEINS and DD. ENZYMES is retained as a supporting stress test, so we examine all three while keeping that hierarchy explicit.
 
-\textbf{Regime 1 --- graph-level context is discriminative.} On PROTEINS and Mutagenicity, GraphResGNN and GraphCrossGNN occupy the top two positions. These datasets share the property that global graph-level structure carries strong discriminative signal, and GraphResGNN's sequential block design, which reinjects pooled graph summaries at each stage, is well-suited to this regime.
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\linewidth]{figures/exp/fig4_topic_focus_results_V3.pdf}
+\caption{V3 results on the protein-oriented core. The main comparison is carried by PROTEINS and DD; ENZYMES is retained as a supporting stress test.}
+\label{fig:topic_focus_results}
+\end{figure}
 
-\textbf{Regime 2 --- local structural motifs are discriminative.} On MUTAG---small molecular graphs averaging 18 nodes---NodeResGNN and NodeCrossGNN are the strongest CR-GNN variants, while GraphResGNN ranks last. The same pattern appears on DD, the largest and sparsest protein graph in the core: both cross-residual variants outperform both residual variants. In these settings, aggressive graph-level representational reshaping appears to suppress the local structural signals that matter most.
+Figure~\ref{fig:topic_focus_results} shows that the core datasets do not support a single biological narrative. On PROTEINS, NodeResGNN is best and GraphResGNN is second. On DD, the ordering shifts: GraphResGNN is best in the GCNConv table, but the two cross-residual models remain close behind. These two datasets carry the main biological comparison, and together they support a split regime rather than a universal winner. On ENZYMES, GraphResGNN is again best, but all models perform poorly, with the best mean accuracy only 0.3333 on a 6-class task. ENZYMES therefore serves as a supporting difficulty stress test rather than as a primary separator between reuse topologies.
 
-\textbf{ENZYMES} stands apart: all architectures perform poorly (best accuracy 0.3333, only $\sim$16 pp above the 6-class random baseline), reflecting the difficulty of learning from 600 graphs with 3-dimensional features across 6 classes.
+% ============================================================
+\subsection{Supplementary robustness reference}
+% ============================================================
+
+The supplementary robustness datasets are summarized in Appendix~\ref{sec:appendix}. Their ordering remains mixed---NodeResGNN is best on MUTAG, whereas GraphResGNN is best on AIDS and Mutagenicity---which is useful as a robustness check, but these datasets do not define the central biological claim.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.82\linewidth]{figures/exp/fig2_cross_advantage_heatmap_V3.pdf}
+\caption{V3 cross-residual advantage heatmap. Positive cells indicate that the best cross-residual variant outperforms the indicated comparator on that dataset.}
+\label{fig:cross_advantage_heatmap}
+\end{figure}
+
+Figure~\ref{fig:cross_advantage_heatmap} clarifies what can and cannot be claimed for cross-residual exchange across the full suite. The best cross-residual variant outperforms PlainGNN on five of six datasets, with the largest gains on ENZYMES (+0.057), AIDS (+0.028), and Mutagenicity (+0.022). However, the best cross-residual variant surpasses the best residual variant only on MUTAG (+0.005) and Mutagenicity (+0.001), while essentially tying on DD (-0.001). Cross-residual exchange is therefore a useful option, but not a universal replacement for the strongest residual baseline, including within the protein-oriented core.
 
 % ============================================================
 \subsection{The mechanism: representational continuity vs.\ performance}
@@ -30,21 +57,14 @@ The dataset-level results reveal two distinct regimes in which different reuse t
 
 Why does GraphResGNN---which deliberately alters representations between blocks---outperform architectures that preserve them more faithfully? To answer this, we track hidden-state similarity (CKA and cosine) and per-layer gradient norms from $L=1$ to $L=8$ on PROTEINS under GCNConv.
 
-\begin{figure}[H]
+\begin{figure}[t]
 \centering
-\includegraphics[width=0.98\linewidth]{figures/exp/fig_supp_layer_cka_comparison_PROTEINS_GCNConv.pdf}
-\caption{CKA similarity between adjacent depth stages across $L=1$--$8$. Each subplot shows one model.}
+\includegraphics[width=0.92\linewidth]{figures/exp/fig_supp_layer_cka_comparison_PROTEINS_GCNConv.pdf}
+\caption{CKA similarity between adjacent depth stages across $L=1$--$8$ on PROTEINS under GCNConv.}
 \label{fig:layer_cka_comparison}
 \end{figure}
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.98\linewidth]{figures/exp/fig_supp_layer_cosine_comparison_PROTEINS_GCNConv.pdf}
-\caption{Cosine similarity between adjacent depth stages across $L=1$--$8$.}
-\label{fig:layer_cosine_comparison}
-\end{figure}
-
-Figures~\ref{fig:layer_cka_comparison} and~\ref{fig:layer_cosine_comparison} reveal a counter-intuitive pattern. At $L=8$, the CKA ordering is NodeResGNN (0.968) $>$ GraphCrossGNN (0.952) $>$ PlainGNN (0.951) $>$ NodeCrossGNN (0.946) $>$ GraphResGNN (0.942). The architecture that preserves representations most faithfully (NodeResGNN) wins only 3 of 24 combinations; the architecture that reshapes them most aggressively (GraphResGNN) wins 12 of 24. We term this the \textbf{CKA--performance paradox}: stronger layer-wise representational continuity does not predict stronger final accuracy.
+Figure~\ref{fig:layer_cka_comparison} reveals a counter-intuitive pattern. At $L=8$, the CKA ordering is NodeResGNN (0.968) $>$ GraphCrossGNN (0.952) $>$ PlainGNN (0.951) $>$ NodeCrossGNN (0.946) $>$ GraphResGNN (0.942). The architecture that preserves representations most faithfully (NodeResGNN) wins only 3 of 24 combinations; the architecture that reshapes them most aggressively (GraphResGNN) wins 12 of 24. We term this the \textbf{CKA--performance paradox}: stronger layer-wise representational continuity does not predict stronger final accuracy. The cosine trends follow the same ordering and are omitted from the main text for brevity.
 
 This paradox has a structural explanation. GraphResGNN's three graph-conditioned blocks each receive the previous block's pooled graph embedding as a conditioning signal. This deliberate, structured reshaping---reinjecting accumulating global context at each stage---produces more discriminative final representations precisely \emph{because} representations change substantially between blocks. Conversely, NodeResGNN's faithful preservation of representations across depth may limit its capacity to adapt to task-specific structure.
 
@@ -99,7 +119,7 @@ PlainGNN & 4.3 & 0.036 & \textbf{0.75} \\
 \end{tabular}
 \end{table}
 
-The trade-off is now quantitative. GraphResGNN wins most often (12/24) but with the weakest rank stability (std 1.46)---it can win big or lose badly. GraphCrossGNN wins only once yet is the most stable performer (std 0.75), never falling below fourth. NodeCrossGNN occupies the middle: second-most wins (6/24), intermediate stability (std 1.00), and dominance on DD specifically.
+The trade-off is now quantitative. Across the 24 dataset--operator combinations, GraphResGNN wins most often (12/24) but with relatively weak rank stability (std 1.46)---it can win clearly or fall to the bottom, as on MUTAG. GraphCrossGNN wins only once, but ties PlainGNN for the smallest rank standard deviation (0.75) while remaining much closer to the top of the ranking. NodeCrossGNN occupies the middle: second-most wins (6/24), intermediate stability (std 1.00), and a clear concentration of wins on DD at the operator level.
 
 % ============================================================
 \subsection{Ablation evidence}
@@ -117,14 +137,13 @@ Gate ablations test whether adaptive control of residual injection explains the 
 
 \input{../md/peerj_residual_tables.tex}
 
-Four representative targets compare learnable dense, top-k, and sparse routing modes. Sparse routing (threshold 0.05) is optimal on three of four targets; learnable dense routing remains best only on the strongest graph-level residual target. Two of the three sparse-favoring targets involve cross-residual architectures, suggesting that sparse filtering and cross-branch exchange are complementary.
+Four representative targets compare learnable dense, top-k, and sparse routing modes. Sparse routing (threshold 0.05) is optimal on three of four targets; learnable dense routing remains best only on the strongest graph-level residual target. Two of the three sparse-favoring targets involve cross-residual architectures, suggesting that sparse filtering and cross-branch exchange are complementary rather than universally dominant.
 
 \subsubsection{Statistical tests}
 
 \input{../md/statistical_tests_main.tex}
-\input{../md/statistical_tests_supp.tex}
 
-The paired-test matrices (Tables~\ref{tab:statistical_tests_main}--\ref{tab:statistical_tests_supp}) confirm that most architecture-level gaps are modest relative to fold-level variation.
+The paired-test matrix for the main biological evidence (Table~\ref{tab:statistical_tests_main}) confirms that most architecture-level gaps are modest relative to fold-level variation. The corresponding supplementary-dataset tests are reported in Appendix~\ref{sec:appendix}.
 
 \subsubsection{Parameter sweep}
 
@@ -135,4 +154,3 @@ Additional top-k ratios and sparsity levels refine rather than change the patter
 % ============================================================
 
 Auxiliary sensitivity checks over depth, dropout, and learning rate on PROTEINS, DD, and ENZYMES do not materially change the conclusions above.
-

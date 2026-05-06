@@ -17,7 +17,7 @@
 
 \graphicspath{{figures/}{../figures/}}
 
-\title{Cross-Residual Graph Neural Networks for Biomolecular Graph Classification: An Empirical Study of Residual Routing}
+\title{Cross-Residual Graph Neural Networks for Protein-Oriented Graph Classification}
 
 \author[1]{Xuelin Hu}
 \author[2]{Xiaoqin Fu}
@@ -28,13 +28,13 @@
 \corrauthor[2]{Xiaoqin Fu}{fuxiaoqin@ltzy.edu.cn}
 
 \begin{abstract}
-\textbf{Background.} While skip connections and hierarchical pooling have been widely used to preserve multi-depth information in graph neural networks, no prior work directly isolates whether cross-branch hidden-state exchange or cross-block graph-summary reinjection is preferable to ordinary same-path residual reuse for biomolecular graph classification. This is the gap addressed here.
+\textbf{Background.} Existing graph neural networks often use skip connections to stabilize deep message passing, but they rarely isolate whether cross-branch exchange or graph-summary reinjection is preferable to ordinary same-path residual reuse in protein-oriented graph classification.
 
-\textbf{Methods.} We propose Cross-Residual Graph Neural Networks (CR-GNN), a controlled comparison framework encompassing five information-flow topologies---plain stacking, node-level residual reuse, node-level cross exchange, graph-level residual propagation, and graph-level cross-summary exchange---evaluated under shared backbones and stratified five-fold validation. Targeted ablations on gate control, residual routing, and parameter sweeps, together with depth-scaling analyses of hidden-state similarity and gradient norms across hidden layers, isolate the mechanisms behind the observed performance patterns.
+\textbf{Methods.} We propose Cross-Residual Graph Neural Networks (CR-GNN), a controlled comparison framework spanning five information-flow topologies: plain stacking, node-level residual reuse, node-level cross exchange, graph-level residual propagation, and graph-level cross-summary exchange. All variants are evaluated under shared backbones and stratified five-fold validation. The main evidence comes from the protein-oriented pair PROTEINS and DD; ENZYMES is treated as a supporting stress test, and MUTAG, AIDS, and Mutagenicity as supplementary robustness datasets. Targeted ablations and depth-scaling analyses are used to interpret the benchmark patterns.
 
-\textbf{Results.} Within the CR-GNN family, graph-level residual propagation achieves the highest peak accuracy most frequently, while node-level cross-residual exchange dominates on large sparse protein graphs under attention-based operators. Cross-residual architectures exhibit the strongest cross-dataset rank consistency and, when combined with sparse routing, are optimal on the majority of representative routing targets. A depth-scaling analysis further reveals a counter-intuitive pattern: the architecture with the weakest representational continuity at depth achieves the most frequent wins. This inversion---weaker layer-wise continuity predicting stronger final accuracy---is the central mechanism finding of this study.
+\textbf{Results.} No single reuse topology dominates. In the main protein-oriented comparison, NodeResGNN is best on PROTEINS and GraphResGNN is best on DD. ENZYMES points in the same direction as GraphResGNN, but its low absolute accuracy makes it better interpreted as a stress test than as primary biological evidence. Cross-residual variants are not universal winners, but they remain competitive on DD and pair well with sparse routing in targeted ablations. In the 24 dataset--operator winner count, GraphResGNN records the most wins (12/24). A depth-scaling analysis on PROTEINS further shows a CKA--performance paradox: GraphResGNN has the lowest deepest-layer CKA yet the most wins, whereas NodeResGNN has the highest CKA but far fewer wins.
 
-\textbf{Conclusions.} The study reveals that stronger layer-wise representational continuity does not necessarily predict better graph classification---a counter-intuitive finding we term the CKA--performance paradox. Cross-residual architectures, which exchange information across parallel branches, emerge as the most consistently reliable performers across diverse datasets, and their combination with sparse routing constitutes the optimal configuration on the majority of evaluated targets. Finally, dual-branch node-level exchange proves especially effective on large, sparse protein graphs, pointing to a concrete application scenario where this design is the natural choice.
+\textbf{Conclusions.} Residual design is dataset-dependent in protein-oriented graph classification. Graph-level residual propagation is the strongest default choice in this benchmark, but it is not uniformly best; node-level residual reuse remains strongest on selected datasets, and cross-residual exchange is a selective alternative rather than a universal replacement. Stronger layer-wise continuity also does not necessarily predict better final accuracy.
 \end{abstract}
 
 \begin{document}
@@ -49,6 +49,7 @@
 \input{sections/04_discussion_peerj.tex}
 \input{sections/05_conclusions_peerj.tex}
 \input{sections/06_acknowledgments.tex}
+\input{sections/07_appendix.tex}
 
 \bibliographystyle{plainnat}
 \bibliography{references}

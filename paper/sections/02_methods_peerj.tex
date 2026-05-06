@@ -51,29 +51,58 @@ Let $\mathcal{G}=(\mathcal{V},\mathcal{E})$ be a graph with node feature matrix 
 \]
 and reuses the same operator type throughout a model instance. For a hidden width $d$, every branch starts with an input projection
 \begin{equation}
-\mathbf{H}^{(0)} = \mathrm{ReLU}\!\left(\Phi_{\mathrm{in}}(\mathbf{X}, \mathbf{A})\right),
+\mathbf{H}^{(0)} = \psi\!\left(\Phi_{\mathrm{in}}(\mathbf{X}, \mathbf{A})\right),
 \end{equation}
 followed by $L$ hidden layers and a readout
 \begin{equation}
 \mathbf{g} = \mathrm{Pool}\!\left(\mathbf{H}^{(L)}\right).
 \end{equation}
+Here $\Phi_{\mathrm{in}}:\mathbb{R}^{n\times d_{\mathrm{in}}}\rightarrow\mathbb{R}^{n\times d}$ denotes the branch-specific input operator, $\mathrm{Pool}(\cdot)$ is global mean pooling over nodes, and
+\begin{equation}
+\psi(\mathbf{Z}) = \mathrm{Dropout}\!\left(\mathrm{ReLU}(\mathbf{Z})\right).
+\end{equation}
+Residual signals are modulated by a scalar gate $\alpha\in(0,1]$, learned by sigmoid parameterization in the default setting and fixed only in gate ablations. The residual-routing operator is written as
+\begin{equation}
+\mathcal{R}(\mathbf{U}) =
+\begin{cases}
+\mathbf{U}, & \text{learnable dense routing}, \\
+\mathbf{U}\odot \mathbf{M}_{k}, & \text{top-k routing}, \\
+\mathrm{softshrink}_{\lambda}(\mathbf{U}), & \text{sparse routing},
+\end{cases}
+\end{equation}
+where $\mathbf{M}_{k}$ keeps the largest-magnitude channels along the feature dimension and $\lambda$ is the sparse-routing threshold.
 
 \subsubsection{Single-branch and node-level residual variants}
 
 \textbf{PlainGNN.} The plain baseline stacks $L$ copies of the same operator without residual reuse:
 \begin{equation}
-\mathbf{H}^{(\ell+1)} = \psi\!\left(\mathrm{ReLU}\!\left(\Phi_{\ell}\!\left(\mathbf{H}^{(\ell)}, \mathbf{A}\right)\right)\right).
+\mathbf{H}^{(\ell+1)} = \psi\!\left(\Phi_{\ell}\!\left(\mathbf{H}^{(\ell)}, \mathbf{A}\right)\right), \qquad \ell=0,\dots,L-1.
 \end{equation}
 
-\textbf{NodeResGNN.} The first residual variant stores the previous hidden state within the same branch:
+\textbf{NodeResGNN.} The first residual variant stores the previous hidden state within the same branch. To match the implementation, the first residual input is zero:
 \begin{equation}
-\mathbf{H}^{(\ell+1)} = \psi\!\left(\mathrm{ReLU}\!\left(\Phi_{\ell}\!\left(\mathbf{H}^{(\ell)} + \mathbf{H}^{(\ell-1)}, \mathbf{A}\right)\right)\right).
+\mathbf{P}^{(0)}=\mathbf{0}, \qquad \mathbf{P}^{(\ell+1)}=\mathbf{H}^{(\ell)}.
+\end{equation}
+The update is
+\begin{equation}
+\mathbf{H}^{(\ell+1)} = \psi\!\left(\Phi_{\ell}\!\left(\mathbf{H}^{(\ell)} + \alpha\,\mathcal{R}\!\left(\mathbf{P}^{(\ell)}\right), \mathbf{A}\right)\right), \qquad \ell=0,\dots,L-1.
 \end{equation}
 
 \textbf{NodeCrossGNN.} The node-level cross-residual model maintains two parallel branches with separate input projections:
+\begin{equation}
+\mathbf{H}_{1}^{(0)}=\psi\!\left(\Phi_{\mathrm{in}}^{(1)}(\mathbf{X},\mathbf{A})\right), \qquad
+\mathbf{H}_{2}^{(0)}=\psi\!\left(\Phi_{\mathrm{in}}^{(2)}(\mathbf{X},\mathbf{A})\right),
+\end{equation}
+with zero-initialized exchanged states
+\begin{equation}
+\mathbf{P}_{1}^{(0)}=\mathbf{0}, \qquad \mathbf{P}_{2}^{(0)}=\mathbf{0}, \qquad
+\mathbf{P}_{b}^{(\ell+1)}=\mathbf{H}_{b}^{(\ell)}.
+\end{equation}
+Each branch receives the previous state of the other branch:
 \begin{align}
-\mathbf{H}^{(\ell+1)}_{1} &= \psi\!\left(\mathrm{ReLU}\!\left(\Phi^{(1)}_{\ell}\!\left(\mathbf{H}^{(\ell)}_{1} + \widetilde{\mathbf{H}}^{(\ell)}_{2}, \mathbf{A}\right)\right)\right), \\
-\mathbf{H}^{(\ell+1)}_{2} &= \psi\!\left(\mathrm{ReLU}\!\left(\Phi^{(2)}_{\ell}\!\left(\mathbf{H}^{(\ell)}_{2} + \widetilde{\mathbf{H}}^{(\ell)}_{1}, \mathbf{A}\right)\right)\right).
+\mathbf{H}^{(\ell+1)}_{1} &= \psi\!\left(\Phi^{(1)}_{\ell}\!\left(\mathbf{H}^{(\ell)}_{1} + \alpha\,\mathcal{R}\!\left(\mathbf{P}^{(\ell)}_{2}\right), \mathbf{A}\right)\right), \\
+\mathbf{H}^{(\ell+1)}_{2} &= \psi\!\left(\Phi^{(2)}_{\ell}\!\left(\mathbf{H}^{(\ell)}_{2} + \alpha\,\mathcal{R}\!\left(\mathbf{P}^{(\ell)}_{1}\right), \mathbf{A}\right)\right),
+\qquad \ell=0,\dots,L-1.
 \end{align}
 The final node representation is the branch sum
 \begin{equation}
@@ -89,19 +118,41 @@ The final node representation is the branch sum
 
 \subsubsection{Graph-level residual propagation}
 
-\textbf{GraphResGNN.} This variant chains three graph-conditioned blocks:
-\begin{equation}
-\mathbf{g}^{(t+1)} = B_{t+1}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(t)}\right), \quad t \in \{1,2\}.
-\end{equation}
-
-\textbf{GraphCrossGNN.} Four blocks are organized as two sequential pairs. Within each stage, the two block outputs are swapped and reused as the next stage's graph-level input:
+\textbf{GraphResGNN.} This variant chains three graph-conditioned blocks. Let $\mathcal{B}(\mathbf{X},\mathbf{A},\mathbf{g})$ denote one graph-conditioned block. Inside the block, a graph-level state $\mathbf{g}\in\mathbb{R}^{B\times d}$ is broadcast back to nodes by batch indexing and added before each hidden message-passing layer:
 \begin{align}
-(\mathbf{g}^{(t)}_{1}, \mathbf{g}^{(t)}_{2}) &= \left(B_{2t-1}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(t-1)}_{1}\right),\ B_{2t}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(t-1)}_{2}\right)\right), \\
-(\mathbf{g}^{(t+1)}_{1}, \mathbf{g}^{(t+1)}_{2}) &= \left(\mathbf{g}^{(t)}_{2},\ \mathbf{g}^{(t)}_{1}\right).
+\mathbf{Z}^{(0)} &= \psi\!\left(\Phi_{\mathrm{in}}(\mathbf{X},\mathbf{A})\right), \\
+\mathbf{Z}^{(\ell+1)} &=
+\psi\!\left(
+\Phi_{\ell}\!\left(
+\mathbf{Z}^{(\ell)} + \alpha\,\mathcal{R}\!\left(\mathbf{g}[\mathrm{batch}]\right), \mathbf{A}
+\right)
+\right), \qquad \ell=0,\dots,L-1, \\
+\mathcal{B}(\mathbf{X},\mathbf{A},\mathbf{g}) &=
+\mathrm{Pool}\!\left(\mathbf{Z}^{(L)}\right) + \alpha\,\mathcal{R}(\mathbf{g}).
+\end{align}
+If no previous graph state is available, the block uses $\mathbf{g}=\mathbf{0}$. GraphResGNN then applies the recurrence
+\begin{equation}
+\mathbf{g}^{(0)}=\mathbf{0}, \qquad
+\mathbf{g}^{(t)} = \mathcal{B}_{t}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(t-1)}\right), \qquad t=1,2,3,
+\end{equation}
+and uses $\mathbf{g}^{(3)}$ for classification.
+
+\textbf{GraphCrossGNN.} Four blocks are organized as two sequential pairs. In this model, each block uses graph-level exchange only at the pooled embedding stage, not inside node updates. Let $\mathcal{C}(\mathbf{X},\mathbf{A},\mathbf{g})$ denote such a block:
+\begin{align}
+\mathbf{Z}^{(0)} &= \psi\!\left(\Phi_{\mathrm{in}}(\mathbf{X},\mathbf{A})\right), \\
+\mathbf{Z}^{(\ell+1)} &= \psi\!\left(\Phi_{\ell}\!\left(\mathbf{Z}^{(\ell)},\mathbf{A}\right)\right), \qquad \ell=0,\dots,L-1, \\
+\mathcal{C}(\mathbf{X},\mathbf{A},\mathbf{g}) &= \mathrm{Pool}\!\left(\mathbf{Z}^{(L)}\right) + \alpha\,\mathcal{R}(\mathbf{g}).
+\end{align}
+With two branch states initialized as $\mathbf{g}^{(0)}_{1}=\mathbf{g}^{(0)}_{2}=\mathbf{0}$, the stage-wise recurrence is
+\begin{align}
+\widehat{\mathbf{g}}^{(t)}_{1} &= \mathcal{C}_{2t-1}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(t-1)}_{1}\right), \\
+\widehat{\mathbf{g}}^{(t)}_{2} &= \mathcal{C}_{2t}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(t-1)}_{2}\right), \qquad t=1,2, \\
+\mathbf{g}^{(t)}_{1} &= \widehat{\mathbf{g}}^{(t)}_{2}, \qquad
+\mathbf{g}^{(t)}_{2} = \widehat{\mathbf{g}}^{(t)}_{1}.
 \end{align}
 The final graph embedding is
 \begin{equation}
-\mathbf{g}_{\mathrm{final}} = \mathbf{g}^{(T)}_{1} + \mathbf{g}^{(T)}_{2}.
+\mathbf{g}_{\mathrm{final}} = \mathbf{g}^{(2)}_{1} + \mathbf{g}^{(2)}_{2}.
 \end{equation}
 
 \begin{figure}[!htbp]
