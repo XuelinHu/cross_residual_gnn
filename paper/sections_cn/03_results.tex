@@ -1,0 +1,142 @@
+\section{结果}
+\label{sec:results}
+\label{sec:experiments}
+
+除特别说明外，所有结果均报告为五折 mean best test accuracy $\pm$ 折级标准差；单折敏感性分析仅作探索性参考。
+
+\subsection{整体 benchmark 表现}
+
+\input{md_cn/all_exp_tables.tex}
+
+在 GCNConv 设定下，该 benchmark 对六个数据集和五种 CR-GNN 架构进行了五个外层折评估。对于本文的 paper-facing 论证，表~\ref{tab:all_results_1} 是主结果表：它承载以 PROTEINS 和 DD 为核心、并将 ENZYMES 作为支持性生物压力测试的蛋白质导向比较；表~\ref{tab:all_results_2} 则被保留为补充鲁棒性证据。在主比较对中，NodeResGNN 在 PROTEINS 上最佳（0.7143），GraphResGNN 在 DD 上最佳（0.7275）。两者差距通常不大：在 PROTEINS 上，GraphResGNN 仅落后 NodeResGNN 0.0072；在 DD 上，最强的三个模型 GraphResGNN、GraphCrossGNN 和 NodeCrossGNN 均位于 0.0111 准确率点以内。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/exp/fig1_full_suite_results_V3.pdf}
+\caption{在 GCNConv 比较下，当前有效数据集包上的 V3 全套 benchmark 结果。柱形表示五折 mean best test accuracy，误差条为标准差。}
+\label{fig:full_suite_results}
+\end{figure}
+
+图~\ref{fig:full_suite_results} 将这一模式以可视化方式进一步明确。放眼全套数据，图级残差传播是更强的默认选择；但本文的主要 biological claim 应从蛋白质导向核心读取，而不能由六个数据集的整体平均印象直接替代。
+
+\subsection{Biological core 与交叉残差优势}
+
+biological core 是本文面向投稿主线的最关键部分，而在这个核心内部，真正承载主要生物比较的是 PROTEINS 和 DD。ENZYMES 被保留为支持性压力测试，因此我们同时考察三者，但始终保留这种层级关系。
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\linewidth]{figures/exp/fig4_topic_focus_results_V3.pdf}
+\caption{蛋白质导向核心上的 V3 结果。主要比较由 PROTEINS 和 DD 承载，ENZYMES 作为支持性的压力测试保留。}
+\label{fig:topic_focus_results}
+\end{figure}
+
+图~\ref{fig:topic_focus_results} 表明，这组核心数据并不支持单一的 biological narrative。在 PROTEINS 上，NodeResGNN 最优，GraphResGNN 次之；在 DD 上，排序发生转移：GCNConv 主表中 GraphResGNN 最优，但两个交叉残差模型紧随其后。这两个数据集共同构成主要 biological comparison，它们支持的是“分裂型优势区间”而非“单一普适赢家”。在 ENZYMES 上，GraphResGNN 再次最优，但所有模型表现都较差，最佳平均准确率也只有 0.3333，且该任务是六分类。因此 ENZYMES 更适合被解释为支持性的难度压力测试，而非主要证据。
+
+\subsection{补充鲁棒性参考}
+
+补充鲁棒性数据集的结果见 Appendix~\ref{sec:appendix}。其内部排序依然混合，例如 NodeResGNN 在 MUTAG 上最优，而 GraphResGNN 在 AIDS 和 Mutagenicity 上最优。这对验证结论的鲁棒性有帮助，但这些数据集不定义本文的中心 biological claim。
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.82\linewidth]{figures/exp/fig2_cross_advantage_heatmap_V3.pdf}
+\caption{V3 交叉残差优势热力图。正值单元表示该数据集上最优交叉残差变体优于对应比较基线。}
+\label{fig:cross_advantage_heatmap}
+\end{figure}
+
+图~\ref{fig:cross_advantage_heatmap} 说明了对于交叉残差交换，哪些说法可以成立，哪些不能。最优交叉残差变体在六个数据集中有五个优于 PlainGNN，最大增益出现在 ENZYMES（+0.057）、AIDS（+0.028）和 Mutagenicity（+0.022）。然而，最优交叉残差变体只在 MUTAG（+0.005）和 Mutagenicity（+0.001）上超过最优残差变体，在 DD 上则基本持平（-0.001）。因此，交叉残差交换是一种有价值的选项，但并不是对最强残差基线的普适替代，包括在蛋白质导向核心内部也是如此。
+
+\subsection{机制：表示连续性与性能的张力}
+
+为什么 GraphResGNN 明确地在块间重塑表示，却反而优于那些更忠实保留表示的架构？为回答这一问题，我们在 PROTEINS 的 GCNConv 设定下，从 $L=1$ 到 $L=8$ 跟踪隐藏状态相似度（CKA 与 cosine）和逐层梯度范数。
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\linewidth]{figures/exp/fig_supp_layer_cka_comparison_PROTEINS_GCNConv.pdf}
+\caption{在 PROTEINS 的 GCNConv 设定下，$L=1$--$8$ 不同深度阶段之间的 CKA 相似度。}
+\label{fig:layer_cka_comparison}
+\end{figure}
+
+图~\ref{fig:layer_cka_comparison} 揭示了一个反直觉模式。在 $L=8$ 时，CKA 排序为 NodeResGNN（0.968）$>$ GraphCrossGNN（0.952）$>$ PlainGNN（0.951）$>$ NodeCrossGNN（0.946）$>$ GraphResGNN（0.942）。最忠实保留表示的架构 NodeResGNN 只在 24 个组合中获胜 3 次；而最积极重塑表示的 GraphResGNN 则在 24 个组合中获胜 12 次。我们将这一现象称为 \textbf{CKA--性能悖论}：更强的层间表示连续性并不能预测更好的最终准确率。cosine 结果呈现相同排序，为简洁起见不在正文中展开。
+
+这一悖论有其结构性解释。GraphResGNN 的三个图条件块在每个阶段都接收上一块的池化图嵌入作为条件信号。正是这种有意识的、结构化的重塑，即在每个阶段重新注入逐步累积的全局上下文，使得最终表示更具判别性。相反，NodeResGNN 对表示的忠实保留，可能限制了模型对任务特定结构的适应能力。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{figures/exp/fig_supp_layer_gradient_comparison_PROTEINS_GCNConv.pdf}
+\caption{最深层梯度的 $L_2$ 范数随 $L=1$--$8$ 的变化（PROTEINS, GCNConv）。}
+\label{fig:layer_gradient_comparison}
+\end{figure}
+
+图~\ref{fig:layer_gradient_comparison} 进一步表明，PlainGNN 的最深层梯度范数随深度下降最快；而残差家族整体保持了更稳定的梯度。NodeResGNN 与 NodeCrossGNN 的梯度稳定性相近，这说明跨分支交换并未引入明显的梯度干扰。
+
+\subsection{量化这些权衡}
+
+为避免只停留在定性描述，表~\ref{tab:winner_summary} 统计了全部 24 个数据集--算子组合中各架构的获胜次数，表~\ref{tab:consistency} 则衡量跨数据集的排序稳定性。
+
+\begin{table}[h]
+\centering
+\small
+\caption{24 个数据集--算子组合上的获胜次数统计（CR-GNN 家族）。}
+\label{tab:winner_summary}
+\begin{tabular}{l c c c c c c c}
+\toprule
+模型 & PROTEINS & DD & ENZYMES & MUTAG & AIDS & Mutagenicity & 总计 \\
+\midrule
+GraphResGNN & 3 & 1 & 3 & 0 & 3 & 2 & \textbf{12} \\
+NodeCrossGNN & 0 & \textbf{3} & 1 & 0 & 1 & 1 & \textbf{6} \\
+NodeResGNN & 1 & 0 & 0 & 1 & 0 & 1 & 3 \\
+PlainGNN & 0 & 0 & 0 & 2 & 0 & 0 & 2 \\
+GraphCrossGNN & 0 & 0 & 0 & 1 & 0 & 0 & 1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\small
+\caption{六个数据集上的平均排名与排序稳定性（GCNConv）。}
+\label{tab:consistency}
+\begin{tabular}{l c c c}
+\toprule
+模型 & 平均排名 & 距最优差距 & 排名标准差 \\
+\midrule
+GraphResGNN & 1.8 & 0.005 & 1.46 \\
+GraphCrossGNN & 2.7 & 0.018 & \textbf{0.75} \\
+NodeCrossGNN & 3.0 & 0.022 & 1.00 \\
+NodeResGNN & 3.2 & 0.024 & 1.57 \\
+PlainGNN & 4.3 & 0.036 & \textbf{0.75} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+这些权衡现在可以被定量表述。GraphResGNN 在 24 个数据集--算子组合中获胜最多（12/24），但排序稳定性较弱（std 1.46），它既可能明显领先，也可能像在 MUTAG 上那样跌至末位。GraphCrossGNN 只获胜 1 次，但它与 PlainGNN 并列拥有最低的排序标准差（0.75），同时整体排名更靠前。NodeCrossGNN 则处于中间地带：获胜数第二多（6/24），稳定性中等（std 1.00），并在 DD 的算子级比较中表现出明显集中优势。
+
+\subsection{消融证据}
+
+\subsubsection{Gate ablation}
+
+\input{md_cn/peerj_gate_tables.tex}
+\input{md_cn/peerj_gate_fold_table.tex}
+\input{md_cn/peerj_cross_gate_full_table.tex}
+
+gate ablation 用于检验前述结构差异是否主要由残差注入的自适应控制所解释。在最强的图级残差目标（\texttt{AIDS + GraphResGNN + GINConv}）上，可学习门控表现最佳，但固定系数 0.5 也很接近。在六个偏向交叉残差的目标中，可学习门控和固定门控各获胜三次，说明交叉残差架构对 gate 配置较为稳健，这与其更稳定的整体排名特征是一致的。
+
+\subsubsection{残差路由}
+
+\input{md_cn/peerj_residual_tables.tex}
+
+在四个代表性目标上，我们比较了可学习稠密、top-k 与稀疏三种路由。稀疏路由（阈值 0.05）在四个目标中赢下三个；只有在最强的图级残差目标上，可学习稠密路由仍然最优。这三个偏向稀疏的目标中有两个涉及交叉残差架构，说明稀疏过滤与跨分支交换更像是互补关系，而非普适压制其他策略的单一解。
+
+\subsubsection{统计检验}
+
+\input{md_cn/statistical_tests_main.tex}
+
+针对主 biological evidence 的配对检验矩阵（表~\ref{tab:statistical_tests_main}）表明，多数架构间差距相对于折级波动而言并不大。对应的补充数据集检验结果见 Appendix~\ref{sec:appendix}。
+
+\subsubsection{参数扫描}
+
+对额外 top-k 比例和稀疏阈值的扫描只是细化了上述模式，而没有改变其方向。最优 top-k 比例随目标而变化，而过强稀疏（0.10）会损害图级残差目标，这说明稀疏收益依赖阈值设置，而不是无条件成立。
+
+\subsection{探索性敏感性分析}
+
+在 PROTEINS、DD 和 ENZYMES 上围绕深度、dropout 和学习率所做的辅助敏感性检验，并未实质改变上述主要结论。

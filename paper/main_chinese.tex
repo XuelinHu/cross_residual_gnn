@@ -19,7 +19,7 @@
 
 \graphicspath{{figures/}{../figures/}}
 
-\title{\heiti 交叉残差图神经网络用于生物分子图分类：\\残差路由的实证研究}
+\title{\heiti 面向蛋白质图分类的交叉残差图神经网络}
 
 \author{胡学林\thanks{柳州铁道职业技术学院 铁路通信与信号工程学院，广西柳州 545000}}
 \author{付小琴\thanks{柳州铁道职业技术学院 铁路机车与车辆学院，广西柳州 545000}}
@@ -30,234 +30,30 @@
 \maketitle
 
 \begin{abstract}
-\textbf{研究背景。} 虽然跳跃连接和层次化池化已被广泛用于保存图神经网络中的多深度信息，但现有工作均未直接分离出跨分支隐藏状态交换或跨块图摘要重新注入是否优于普通同路径残差复用。这正是本文所填补的研究缺口。
+\textbf{研究背景。} 现有图神经网络通常使用跳跃连接来稳定深层消息传递，但在面向蛋白质的图分类中，它们很少直接隔离如下问题：跨分支交换或图摘要重新注入，是否优于普通的同路径残差复用。
 
-\textbf{研究方法。} 本文提出交叉残差图神经网络（CR-GNN）作为一个受控比较框架，涵盖五种信息流拓扑——普通堆叠、节点级残差复用、节点级交叉交换、图级残差传播和图级交叉摘要交换——在共享主干网络和分层五折验证下进行评估。通过门控机制、残差路由和参数扫描等针对性消融实验，结合跨隐藏层的状态相似性和梯度范数深度扩展分析，分离出所观察到的性能模式背后的机制。
+\textbf{研究方法。} 本文提出交叉残差图神经网络（CR-GNN），作为一个受控比较框架，覆盖五种信息流拓扑：普通堆叠、节点级残差复用、节点级交叉交换、图级残差传播和图级交叉摘要交换。所有变体均在共享主干和分层五折验证下评估。主要证据来自 PROTEINS 和 DD 这一蛋白质导向主对比；ENZYMES 被视为支持性压力测试，MUTAG、AIDS 和 Mutagenicity 则作为补充鲁棒性数据集。针对性消融和深度扩展分析用于解释 benchmark 中出现的模式。
 
-\textbf{研究结果。} 在 CR-GNN 家族中，图级残差传播最频繁地取得最高峰值准确率，而节点级交叉残差交换在大型稀疏蛋白质图与注意力算子的组合上形成统治。交叉残差架构展现出最强的跨数据集排名一致性，且与稀疏路由结合时构成最频繁的最优配置。深度扩展分析进一步揭示了一个反直觉的模式：深层表示连续性最弱的架构却取得了最多的优胜次数，挑战了更强的层级稳定性必然预测更好性能的假设。
+\textbf{研究结果。} 没有任何单一复用拓扑能够全面占优。在主要蛋白质导向比较中，NodeResGNN 在 PROTEINS 上最佳，GraphResGNN 在 DD 上最佳。ENZYMES 也指向 GraphResGNN 更强，但由于其绝对准确率较低，更适合作为压力测试而非主要 biological evidence。交叉残差变体不是普适赢家，但在 DD 上保持竞争力，并在针对性消融中与稀疏路由表现出较好配合。在 24 个数据集--算子组合中，GraphResGNN 获胜最多（12/24）。基于 PROTEINS 的深度扩展分析进一步揭示了一个 CKA--性能悖论：GraphResGNN 具有最低的深层 CKA，却取得最多胜场；NodeResGNN 拥有最高 CKA，却获胜较少。
 
-\textbf{研究结论。} 本研究发现，更强的层级表示连续性并不必然预测更好的图分类效果——这一反直觉的发现我们称之为 CKA--性能悖论。交叉残差架构通过跨并行分支交换信息，成为跨不同数据集最一致可靠的性能表现者，其与稀疏路由的组合在大多数评估目标上构成最优配置。最后，双分支节点级交换在大型稀疏蛋白质图上尤为有效，为这一设计指明了一个合适的应用场景。
+\textbf{研究结论。} 在面向蛋白质的图分类中，残差设计具有明显的数据集依赖性。图级残差传播是当前 benchmark 中最强的默认选择，但并非在所有场景都最佳；节点级残差复用在部分数据集上仍然最强，而交叉残差交换更适合被理解为一种选择性替代方案，而非普适替换。更强的层间连续性同样不必然意味着更好的最终准确率。
 \end{abstract}
-
-\newpage
 
 \tableofcontents
 \newpage
 
-% ============================================================
-\section{引言}
-% ============================================================
+\input{sections_cn/01_introduction.tex}
+\input{sections_cn/02_methods.tex}
+\input{sections_cn/03_results.tex}
+\input{sections_cn/04_discussion.tex}
+\input{sections_cn/05_conclusions.tex}
+\input{sections_cn/06_acknowledgments.tex}
+\input{sections_cn/07_appendix.tex}
 
-图神经网络（GNN）现已成为从分子图和蛋白质图中学习的标准方法，因为它们能够将局部邻域结构与高阶关系上下文联合编码 \cite{kipf2016semi,gilmer2017neural,hamilton2017inductive,wu2020comprehensive,zhou2020graph}。在生物分子图分类中，这种组合之所以重要，是因为预测证据可能同时依赖于局部生化基序和更广泛的图级组织。因此，PROTEINS、DD、ENZYMES、MUTAG、AIDS 和 Mutagenicity 等基准测试套件仍作为方法导向图分类研究的受控测试平台发挥作用，而非下游生物学发现的直接代理。
+\bibliographystyle{plainnat}
+\bibliography{references}
 
-主要的方法论困难在于：在这些设定下，更深层的消息传递并非自动有益。重复传播会通过过度平滑和相关的深度效应 \cite{li2018deeper,oono2020simple,chen2023revisiting} 抑制具备信息量的中间状态，而过度挤压效应 \cite{alon2020bottleneck,topping2021understanding} 则导致来自远距离节点的信息被压缩为无信息量的瓶颈。残差连接、归一化和正则化缓解了部分退化 \cite{he2016deep,bresson2017residual,zhao2020pair,cai2021graphnorm,rong2019dropedge,chenSimpleDeepGraph2020}，但大多数残差设计仍沿同一分支复用信息。因此，它们改善了优化过程，却未直接检验替代的信息流拓扑是否能保存更有用的历史信号。
-
-相关图学习工作已探索过跳跃连接、稠密聚合、APPNP式传播、Jumping Knowledge读出和层次化池化 \cite{xu2018representation,klicpera2018combining,gao2019graph,ying2018hierarchical}。这些方法保存了来自多个深度或跨越池化层次的信息，但它们并未直接分离出跨分支交换隐藏状态或跨块边界重新注入池化图摘要是否优于普通同路径残差复用。此前尚无研究在受控协议下直接比较这些复用拓扑——这正是本文所做的工作。
-
-本文研究交叉残差图神经网络（CR-GNN），这是一个受控模型家族，在共享的图分类主干下对比了普通堆叠、节点级残差复用、节点级交叉残差交换、图级残差传播和图级交叉摘要交换。研究围绕三个具体研究问题展开：
-
-\begin{enumerate}
-    \item \textbf{交叉残差交互何时有帮助？} 在何种数据集特性和任务条件下，跨并行分支交换隐藏状态能够比普通同路径复用更好地改善图分类？
-    \item \textbf{普通残差复用何时依然保持更强的默认选择？} 在哪些生物分子基准测试中，更简单的单分支残差设计持续优于交叉残差替代方案？这些数据集的结构特性如何解释这一模式？
-    \item \textbf{残差路由设计如何改变答案？} 超越"是否存在额外复用路径"的二元问题，不同的过滤策略——可学习稠密路由、Top-k选择和稀疏抑制——如何影响残差与交叉残差架构的相对性能？
-\end{enumerate}
-
-围绕这三个问题组织研究对本文的方法论范围至关重要。目标不是宣称某一条额外通路总能产生更好的GNN，而是揭示残差路由\textit{何时}以及\textit{如何}发挥作用——即在主干网络、数据划分和训练协议受控的条件下，哪种复用拓扑能够可靠地保存具有判别力的历史结构信号。
-
-本文作为一项生物分子图分类方法学研究展开。主要证据来自以 PROTEINS、DD 和 ENZYMES 为核心的蛋白质导向基准测试，辅以补充的分子鲁棒性数据集。该设计使论文贴近具有生物学意义的图设定，同时保持可复现和受控的基准范围。
-
-\subsection{主要贡献}
-
-本文的主要贡献如下：
-
-\begin{itemize}
-    \item \textbf{揭示复用拓扑设计权衡的受控比较框架。} 在相同主干网络、数据划分和训练协议下比较了五种信息流设计——普通堆叠、节点级残差复用、节点级交叉残差交换、图级残差传播和图级交叉摘要交换。通过保持其他所有因素不变，该框架隔离了复用拓扑对性能、一致性和表示动态的影响。
-
-    \item \textbf{发现峰值准确率、跨数据集一致性和表示连续性之间的系统性权衡。} 没有任何单一拓扑能在所有三个维度上占优。图级残差传播取得了最高的峰值准确率，但排名波动最大；交叉残差架构是最一致的性能表现者；而最强的表示连续性并不能预测最佳分类准确率。这种三向张力为评估 GNN 架构提供了一个超越单一数字排行榜比较的新视角。
-
-    \item \textbf{揭示 CKA--性能悖论的深度扩展机制分析。} 跨深度的逐层 CKA、余弦相似性和梯度范数追踪表明，表示连续性最弱的架构取得了最频繁的获胜——挑战了"更强的逐层稳定性预测更好性能"的假设。
-
-    \item \textbf{路由策略是一个有意义的次要设计轴的实证证据。} 稀疏路由与交叉残差架构的组合在代表性目标上构成了最频繁的最优配置，且路由效应具有目标依赖性。
-\end{itemize}
-
-
-% ============================================================
-\section{材料与方法}
-\label{sec:methods}
-% ============================================================
-
-本节定义共同的图分类设定、CR-GNN架构家族、基准测试集以及共享的实验协议。指导原则是隔离信息复用的\textit{位置}，同时保持其余流程尽可能一致。该设计选择对本文的方法论论证至关重要：如果主干算子、池化和评估协议保持固定，那么性能差异更可能归因于复用拓扑本身，而非无关的实现变化。
-
-\subsection{问题定义与符号}
-
-令 $\mathcal{G} = (\mathcal{V}, \mathcal{E})$ 表示无向或有向图，其中 $\mathcal{V} = \{v_1, v_2, \ldots, v_n\}$ 是包含 $n$ 个节点的节点集，$\mathcal{E} \subseteq \mathcal{V} \times \mathcal{V}$ 是边集。每个节点 $v_i \in \mathcal{V}$ 关联一个特征向量 $\mathbf{x}_i \in \mathbb{R}^{d_{\text{in}}}$，整张图的节点特征收集于 $\mathbf{X} \in \mathbb{R}^{n \times d_{\text{in}}}$ 中。图结构以邻接矩阵 $\mathbf{A}$ 表示。
-
-给定训练数据集 $\mathcal{D} = \{(\mathcal{G}_i, y_i)\}_{i=1}^{N}$，目标是学习一个映射函数 $f_\theta: \mathcal{G} \rightarrow \hat{y}$，用于预测未见图的标签。本研究在同一图分类流程下比较五种架构：
-\begin{itemize}
-    \item \textbf{PlainGNN}：无显式状态复用的顺序消息传递
-    \item \textbf{NodeResGNN}：单分支节点级残差复用
-    \item \textbf{NodeCrossGNN}：双分支节点级交叉交换
-    \item \textbf{GraphResGNN}：跨顺序块的图级残差传播
-    \item \textbf{GraphCrossGNN}：跨配对块的图级交叉摘要交换
-\end{itemize}
-
-该比较旨在隔离信息复用的\textit{位置}：在单分支内部、跨并行分支之间，或通过跨块传递的池化图摘要。这隔离出架构家族背后一个具体的研究问题。同分支残差复用主要检验重新注入历史状态是否能稳定更深层的传播，而交叉残差设计则检验跨并行流交换信息是否能保存普通堆叠下可能丢失的互补结构。
-
-
-\subsection{共享消息传递与图级学习}
-
-令 $\Phi$ 表示一个消息传递算子。对于选定的主干网络，节点表示通过 $L$ 层更新如下：
-\begin{equation}
-\mathbf{h}_i^{(\ell+1)} = \sigma\left(\mathbf{W}^{(\ell)} \cdot \text{AGGREGATE}_{\Phi}\left(\left\{\mathbf{h}_j^{(\ell)} : j \in \mathcal{N}(i)\right\}, \mathbf{h}_i^{(\ell)}\right) + \mathbf{b}^{(\ell)}\right).
-\end{equation}
-在 $L$ 层之后，读出函数 $R$ 将节点级表示聚合为图嵌入：
-\begin{equation}
-\mathbf{h}_{\mathcal{G}} = R\left(\left\{\mathbf{h}_i^{(L)} : i = 1, \ldots, n\right\}\right).
-\end{equation}
-分类器产生：
-\begin{equation}
-\hat{\mathbf{y}} = \text{softmax}\left(\mathbf{W}_{\text{clf}} \mathbf{h}_{\mathcal{G}} + \mathbf{b}_{\text{clf}}\right),
-\end{equation}
-模型通过最小化交叉熵损失进行端到端训练：
-\begin{equation}
-\mathcal{L}(\theta) = -\frac{1}{N} \sum_{i=1}^{N} \sum_{c=1}^{C} y_{i,c} \log(\hat{y}_{i,c}).
-\end{equation}
-
-\subsection{CR-GNN架构家族}
-\label{sec:model}
-
-CR-GNN 被定义为一个紧凑的图分类架构家族。所有变体共享相同的输入投影、堆叠消息传递层、图级池化和线性分类器；它们仅在中间节点状态和图级摘要如何在深度和分支之间复用的方式上有所不同。该设计特意避免引入单独的编码器、任务特定特征工程或架构特定的读出头部，因为此类添加将使判断任何观察到的增益来自残差拓扑还是来自额外模型容量变得更加困难。
-
-令 $\mathcal{G}=(\mathcal{V},\mathcal{E})$ 为一个图，其节点特征矩阵为 $\mathbf{X}\in\mathbb{R}^{n\times d_{\mathrm{in}}}$，邻接结构为 $\mathbf{A}$。模型可被实例化为四种标准消息传递算子之一：
-\[
-\Phi \in \{\mathrm{GCNConv},\ \mathrm{GATConv},\ \mathrm{SAGEConv},\ \mathrm{GINConv}\},
-\]
-并在一个模型实例内统一使用同一算子类型。对于隐藏宽度 $d$，每个分支以输入投影开始：
-\begin{equation}
-\mathbf{H}^{(0)} = \mathrm{ReLU}\!\left(\Phi_{\mathrm{in}}(\mathbf{X}, \mathbf{A})\right),
-\end{equation}
-随后是 $L$ 个隐藏层和读出：
-\begin{equation}
-\mathbf{g} = \mathrm{Pool}\!\left(\mathbf{H}^{(L)}\right).
-\end{equation}
-
-\subsubsection{单分支和节点级残差变体}
-
-\textbf{PlainGNN.} 普通基线堆叠 $L$ 层相同算子，不含残差复用：
-\begin{equation}
-\mathbf{H}^{(\ell+1)} = \psi\!\left(\mathrm{ReLU}\!\left(\Phi_{\ell}\!\left(\mathbf{H}^{(\ell)}, \mathbf{A}\right)\right)\right).
-\end{equation}
-
-\textbf{NodeResGNN.} 第一个残差变体在同一分支内保存前一隐藏状态：
-\begin{equation}
-\mathbf{H}^{(\ell+1)} = \psi\!\left(\mathrm{ReLU}\!\left(\Phi_{\ell}\!\left(\mathbf{H}^{(\ell)} + \mathbf{H}^{(\ell-1)}, \mathbf{A}\right)\right)\right).
-\end{equation}
-
-\textbf{NodeCrossGNN.} 节点级交叉残差模型维护两个具有独立输入投影的并行分支：
-\begin{align}
-\mathbf{H}^{(\ell+1)}_{1} &= \psi\!\left(\mathrm{ReLU}\!\left(\Phi^{(1)}_{\ell}\!\left(\mathbf{H}^{(\ell)}_{1} + \widetilde{\mathbf{H}}^{(\ell)}_{2}, \mathbf{A}\right)\right)\right), \\
-\mathbf{H}^{(\ell+1)}_{2} &= \psi\!\left(\mathrm{ReLU}\!\left(\Phi^{(2)}_{\ell}\!\left(\mathbf{H}^{(\ell)}_{2} + \widetilde{\mathbf{H}}^{(\ell)}_{1}, \mathbf{A}\right)\right)\right).
-\end{align}
-最终节点表示为两分支之和：
-\begin{equation}
-\mathbf{H}^{(L)} = \mathbf{H}^{(L)}_{1} + \mathbf{H}^{(L)}_{2}.
-\end{equation}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.98\linewidth]{figures/cr_gnn_node_architecture.pdf}
-\caption{节点级CR-GNN架构家族。左：PlainGNN——无状态复用的顺序消息传递层。中：NodeResGNN——单分支残差复用，每层接收前一隐藏状态作为额外输入。右：NodeCrossGNN——双分支交叉残差交换，每个分支复用自身和对侧的先前隐藏状态；两分支求和后进行全局均值池化和分类。}
-\label{fig:node_architecture}
-\end{figure}
-
-\subsubsection{图级残差传播}
-
-\textbf{GraphResGNN.} 该变体链接三个图条件块：
-\begin{equation}
-\mathbf{g}^{(t+1)} = B_{t+1}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(t)}\right), \quad t \in \{1,2\}.
-\end{equation}
-
-\textbf{GraphCrossGNN.} 四个块被组织为两个顺序对。在每个阶段内，两个块的输出被交换并作为下一阶段的图级输入复用：
-\begin{align}
-(\mathbf{g}^{(t)}_{1}, \mathbf{g}^{(t)}_{2}) &= \left(B_{2t-1}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(t-1)}_{1}\right),\ B_{2t}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(t-1)}_{2}\right)\right), \\
-(\mathbf{g}^{(t+1)}_{1}, \mathbf{g}^{(t+1)}_{2}) &= \left(\mathbf{g}^{(t)}_{2},\ \mathbf{g}^{(t)}_{1}\right).
-\end{align}
-最终图嵌入为：
-\begin{equation}
-\mathbf{g}_{\mathrm{final}} = \mathbf{g}^{(T)}_{1} + \mathbf{g}^{(T)}_{2}.
-\end{equation}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.98\linewidth]{figures/cr_gnn_graph_architecture.pdf}
-\caption{图级CR-GNN架构家族。左：GraphResGNN——顺序图条件块，共享残差状态通过残差路由器跨块传播。右：GraphCrossGNN——双分支交叉摘要交换，两条并行块序列（分支A和分支B）在配对阶段之间交换图级摘要。残差路由器支持四种路由模式：固定、可学习、Top-k和稀疏。}
-\label{fig:graph_architecture}
-\end{figure}
-
-\subsection{残差路由机制}
-
-除架构家族本身外，本研究还评估了残差信息\textit{如何}被注入。这第二层分析是必要的，因为仅靠架构比较无法回答明显的残差优势究竟来自额外路径的存在，还是来自该路径被过滤的方式。针对性消融实验中使用了三种路由模式：
-\begin{itemize}
-    \item \textbf{可学习路由}：稠密残差注入，由自适应门控调制。
-    \item \textbf{Top-k路由}：仅保留最强残差通道后再注入。
-    \item \textbf{稀疏路由}：抑制弱残差系数，留下经过滤的残差路径。
-\end{itemize}
-这些路由模式不被用于重新定义核心架构家族，而是作为实验设计中选定残差和交叉残差目标之上的一个机制层。因此，路由研究是解释性而非装饰性的：它检验同一架构在残差信息以稠密、选择性或稀疏方式向前传递时是否表现不同。
-
-\subsection{数据集}
-\label{sec:datasets}
-
-为在具有生物学意义的设定下检验所提出的架构，基准测试被组织为两个层次。
-
-主生物基准测试包含 PROTEINS、DD 和 ENZYMES \cite{fey2019fast,morris2020tudataset}。补充鲁棒性测试集包含 MUTAG、AIDS 和 Mutagenicity。该组织方式使主生物学声明聚焦于蛋白质导向数据集，同时仍在额外分子图上检验结构鲁棒性。
-
-\paragraph{PROTEINS}
-PROTEINS 包含蛋白质的图表示，其中节点表示二级结构元素，边编码它们之间的邻域关系。任务为二值图分类。该数据集包含 1,113 张图，2 个类别，每节点 3 维输入特征。
-
-\paragraph{DD}
-DD 是一个蛋白质结构数据集，其中每张图对应一个蛋白质，节点表示氨基酸或结构相关单元，通过邻近性导出的边连接。任务为二值分类。DD 包含 1,178 张图，2 个类别，89 维输入特征。
-
-\paragraph{ENZYMES}
-ENZYMES 是一个 6 类酶分类基准，包含 600 张图和 3 维输入特征。它在保持酶导向生物学解释的同时，仍可与研究中其他图分类基准直接比较。
-
-\input{../md/dataset_statistics_tables.tex}
-
-所有数据集通过统一基准接口使用 \cite{fey2019fast,morris2020tudataset}。我们保持预处理尽可能轻量，不引入任务特定的特征工程、图增强或边重设计。
-
-所有报告结果遵循相同的分层两阶段评估设计：
-\begin{itemize}
-    \item \textbf{外评估}：在图级别的分层五折交叉验证
-    \item \textbf{内验证}：从训练折中抽取的分层验证子集，验证比例为 0.1
-\end{itemize}
-
-主要评估指标为保留测试折上的图分类准确率。对于折 $k$ 和测试集 $\mathcal{T}_k$：
-\begin{equation}
-\mathrm{Acc}_k = \frac{1}{|\mathcal{T}_k|}\sum_{(\mathcal{G}_i,y_i)\in\mathcal{T}_k}\mathbf{1}\!\left[\hat{y}_i = y_i\right].
-\end{equation}
-跨五个折，我们报告平均准确率：
-\begin{equation}
-\overline{\mathrm{Acc}} = \frac{1}{5}\sum_{k=1}^{5}\mathrm{Acc}_k
-\end{equation}
-和对应的标准差：
-\begin{equation}
-\sigma_{\mathrm{Acc}} = \sqrt{\frac{1}{5}\sum_{k=1}^{5}\left(\mathrm{Acc}_k-\overline{\mathrm{Acc}}\right)^2 }.
-\end{equation}
-
-\subsection{比较方法与主干算子}
-
-基准评估五种架构，在四种消息传递算子（GCNConv、GATConv、SAGEConv、GINConv）下进行。
-
-每种方法在四种消息传递算子下评估：
-\begin{itemize}
-    \item \textbf{GCNConv}
-    \item \textbf{GATConv}
-    \item \textbf{GINConv}
-    \item \textbf{SAGEConv}
-\end{itemize}
-
-\subsection{训练配置与实现细节}
-
-所有模型均在 PyTorch Geometric \cite{fey2019fast} 中实现，并在统一协议下训练。关键超参数汇总于表~\ref{tab:hyperparams}。训练采用早停机制：当验证损失连续 60 轮未改善时终止训练，并保留验证损失最低的检查点用于测试评估。不应用批归一化或层归一化；唯一正则化为 dropout 和权重衰减。所有训练-验证-测试划分由全局随机种子 1024 固定，确保每个模型在每折内看到相同的数据划分。不应用任务特定特征工程、图增强或边重设计；直接使用 TUDataset 的原始节点特征和邻接结构。
+\end{document}
 
 \begin{table}[h]
 \centering

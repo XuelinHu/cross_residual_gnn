@@ -2,17 +2,27 @@
 
 [中文说明 / Chinese README](./README-CN.md)
 
-Research code, experiment assets, and manuscript sources for the CR-GNN study. The repository has been consolidated around the final `V3` pipeline and the current paper-facing manuscript in [`paper/`](./paper).
+Research code, experiment assets, and manuscript sources for the CR-GNN study. The repository is now organized around the final `V3` pipeline and a submission-facing manuscript package in [`paper/`](./paper).
+
+## Submission Entry
+
+- English manuscript: [`paper/main.tex`](./paper/main.tex)
+- Chinese manuscript: [`paper/main_chinese.tex`](./paper/main_chinese.tex)
+- English PDF: [`paper/main.pdf`](./paper/main.pdf)
+- Chinese PDF: [`paper/main_chinese.pdf`](./paper/main_chinese.pdf)
+- submission manifest: [`paper/SUBMISSION_MANIFEST.md`](./paper/SUBMISSION_MANIFEST.md)
+
+If you only care about the paper package, start from `paper/`. If you need to reproduce the final tables and figures, start from the `V3` code and report pipeline below.
 
 ## Final V3 State
 
 - active training entry: [`geomatric/graph_classify_v3.py`](./geomatric/graph_classify_v3.py)
 - final workflow entry: [`py/run_final_v3_pipeline.py`](./py/run_final_v3_pipeline.py)
-- final experiment assets: `logs/V3`, `records/V3`, `runs/V3`
+- final active summaries: [`md/all_exp_tables.tex`](./md/all_exp_tables.tex), [`md/statistical_tests_main.tex`](./md/statistical_tests_main.tex), [`md/statistical_tests_supp.tex`](./md/statistical_tests_supp.tex)
+- final active figures: `figures/exp/*_V3.pdf` and `paper/figures/exp/*_V3.pdf`
 - project index: [`md/FINAL_PROJECT_INDEX.md`](./md/FINAL_PROJECT_INDEX.md)
-- manuscript entry: [`paper/main.tex`](./paper/main.tex)
 
-The `V3` package is the only version that should be treated as current. Earlier rerun notes and obsolete archive folders are not part of the active workflow anymore.
+Only `V3` should be treated as current. `V1` and `V2` directories are retained as historical archives for reproducibility, not as active editing targets.
 
 ## Repository Layout
 
@@ -21,12 +31,12 @@ cross_residual_gnn/
 ├── data/                      # Local datasets, not committed
 ├── figures/                   # Exported experiment figures
 ├── geomatric/                 # Active Python package
-├── logs/                      # Runtime logs and archived V1/V2/V3 outputs
-├── md/                        # Generated summaries, tables, and paper notes
+├── logs/                      # Historical runtime logs (archive / reproducibility)
+├── md/                        # Final tables plus working notes and legacy summaries
 ├── paper/                     # Current LaTeX manuscript and paper figures
-├── py/                        # Batch runners and analysis/report scripts
-├── records/                   # Text summaries and archived V1/V2/V3 records
-├── runs/                      # TensorBoard runs
+├── py/                        # Batch runners and analysis / export scripts
+├── records/                   # Final analysis JSON and version records
+├── runs/                      # TensorBoard archives (historical)
 ├── README.md
 └── README-CN.md
 ```
@@ -71,7 +81,7 @@ conda activate pyg
 python py/run_paper_experiments.py --dataset_group all --max_workers 6 --tensorboard
 ```
 
-Summarize and export report artifacts:
+Summarize and export final report artifacts:
 
 ```bash
 conda activate pyg
@@ -106,39 +116,35 @@ Experiment summaries:
 - [`md/all_exp_tables_V3.tex`](./md/all_exp_tables_V3.tex)
 - [`md/all_results_summary_V3.txt`](./md/all_results_summary_V3.txt)
 - [`md/frontiers_topic_alignment.md`](./md/frontiers_topic_alignment.md)
+- [`records/experiment_versions.json`](./records/experiment_versions.json)
 
 Paper source:
 
 - [`paper/main.tex`](./paper/main.tex)
+- [`paper/main_chinese.tex`](./paper/main_chinese.tex)
 - [`paper/sections/01_introduction_peerj.tex`](./paper/sections/01_introduction_peerj.tex)
 - [`paper/sections/02_methods_peerj.tex`](./paper/sections/02_methods_peerj.tex)
 - [`paper/sections/03_results_peerj.tex`](./paper/sections/03_results_peerj.tex)
 - [`paper/sections/04_discussion_peerj.tex`](./paper/sections/04_discussion_peerj.tex)
 - [`paper/sections/05_conclusions_peerj.tex`](./paper/sections/05_conclusions_peerj.tex)
+- [`paper/sections_cn/`](./paper/sections_cn)
 
-Paper figures already available:
+Active paper figures:
 
-- [`paper/figures/exp/fig1_full_suite_results.pdf`](./paper/figures/exp/fig1_full_suite_results.pdf)
-- [`paper/figures/exp/fig2_cross_advantage_heatmap.pdf`](./paper/figures/exp/fig2_cross_advantage_heatmap.pdf)
-- [`paper/figures/exp/fig4_topic_focus_results.pdf`](./paper/figures/exp/fig4_topic_focus_results.pdf)
-- [`paper/figures/exp/fig5_protein_package_summary.pdf`](./paper/figures/exp/fig5_protein_package_summary.pdf)
+- [`paper/figures/exp/fig1_full_suite_results_V3.pdf`](./paper/figures/exp/fig1_full_suite_results_V3.pdf)
+- [`paper/figures/exp/fig2_cross_advantage_heatmap_V3.pdf`](./paper/figures/exp/fig2_cross_advantage_heatmap_V3.pdf)
+- [`paper/figures/exp/fig4_topic_focus_results_V3.pdf`](./paper/figures/exp/fig4_topic_focus_results_V3.pdf)
+- [`paper/figures/exp/fig5_protein_package_summary_V3.pdf`](./paper/figures/exp/fig5_protein_package_summary_V3.pdf)
 
 ## Paper Status
 
-The current manuscript is positioned as:
+The current manuscript has been tightened to a protein-oriented benchmark paper:
 
-- a biomolecular graph-classification methods paper
-- with `PROTEINS`, `DD`, and `ENZYMES` as the biological core
-- and `MUTAG`, `AIDS`, `Mutagenicity` as supplementary robustness datasets
+- main biological evidence: `PROTEINS` and `DD`
+- supporting biological stress test: `ENZYMES`
+- supplementary robustness datasets: `MUTAG`, `AIDS`, `Mutagenicity`
 
-This is not yet a cleanly finished paper-facing draft. The current source still needs:
-
-- tighter scope alignment around the V3 narrative
-- direct alignment between claims and the current tables
-- fuller mathematical definitions in the methods section
-- reintroduction of the existing main result figures into the body text
-
-For the working assessment and venue-fit notes, start from [`md/frontiers_topic_alignment.md`](./md/frontiers_topic_alignment.md).
+Both English and Chinese PDFs compile successfully. Remaining manuscript warnings are formatting-level only, mainly float placement, a few wide tables, and PDF version warnings for two architecture figures.
 
 ## Dataset Grouping
 
@@ -147,8 +153,14 @@ Defined in [`geomatric/experiment_catalog.py`](./geomatric/experiment_catalog.py
 - biological core: `PROTEINS`, `DD`, `ENZYMES`
 - supplementary robustness: `MUTAG`, `AIDS`, `Mutagenicity`
 
-## Notes
+## Archive Policy
 
 - Raw datasets are not committed.
-- Runtime directories can be large and may contain archived V1/V2/V3 outputs.
-- If you are updating paper claims, treat the V3 tables and figures as the source of truth, not older `LATEST`-style notes.
+- `logs/V1`, `logs/V2`, `runs/V1`, and `runs/V2` are archive-only.
+- `logs/V3` and `runs/V3` are reproducibility records, not paper source.
+- Working notes in `md/` can include legacy or exploratory files; use the active non-suffixed `V3`-aligned tables and the `paper/` manifest as source of truth.
+
+## Notes
+
+- If you update paper claims, use the current `V3` tables and figures, not older `LATEST`-style notes.
+- If you prepare a clean handoff, point collaborators directly to [`paper/SUBMISSION_MANIFEST.md`](./paper/SUBMISSION_MANIFEST.md).

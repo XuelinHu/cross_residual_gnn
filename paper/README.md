@@ -1,43 +1,75 @@
 # Paper README
 
-This directory contains the current `V3` manuscript source for the CR-GNN study.
+This directory contains the submission-facing manuscript package for the CR-GNN study.
 
-## Primary Files
+## Main Deliverables
 
-- main entry: [`main.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/main.tex)
+- English source: [`main.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/main.tex)
+- Chinese source: [`main_chinese.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/main_chinese.tex)
+- English PDF: [`main.pdf`](/ds1/workspace/ai/cross_residual_gnn/paper/main.pdf)
+- Chinese PDF: [`main_chinese.pdf`](/ds1/workspace/ai/cross_residual_gnn/paper/main_chinese.pdf)
+- submission manifest: [`SUBMISSION_MANIFEST.md`](/ds1/workspace/ai/cross_residual_gnn/paper/SUBMISSION_MANIFEST.md)
 - bibliography: [`references.bib`](/ds1/workspace/ai/cross_residual_gnn/paper/references.bib)
-- sections:
-  - [`sections/01_introduction_peerj.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections/01_introduction_peerj.tex)
-  - [`sections/02_methods_peerj.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections/02_methods_peerj.tex)
-  - [`sections/03_results_peerj.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections/03_results_peerj.tex)
-  - [`sections/04_discussion_peerj.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections/04_discussion_peerj.tex)
-  - [`sections/05_conclusions_peerj.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections/05_conclusions_peerj.tex)
-  - [`sections/06_acknowledgments.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections/06_acknowledgments.tex)
 
-## Current Positioning
+## Source Layout
 
-The manuscript is currently framed as a biomolecular graph-classification methods paper:
+English sections:
 
-- biological core: `PROTEINS`, `DD`, `ENZYMES`
+- [`sections/01_introduction_peerj.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections/01_introduction_peerj.tex)
+- [`sections/02_methods_peerj.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections/02_methods_peerj.tex)
+- [`sections/03_results_peerj.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections/03_results_peerj.tex)
+- [`sections/04_discussion_peerj.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections/04_discussion_peerj.tex)
+- [`sections/05_conclusions_peerj.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections/05_conclusions_peerj.tex)
+- [`sections/06_acknowledgments.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections/06_acknowledgments.tex)
+- [`sections/07_appendix.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections/07_appendix.tex)
+
+Chinese sections:
+
+- [`sections_cn/01_introduction.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections_cn/01_introduction.tex)
+- [`sections_cn/02_methods.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections_cn/02_methods.tex)
+- [`sections_cn/03_results.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections_cn/03_results.tex)
+- [`sections_cn/04_discussion.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections_cn/04_discussion.tex)
+- [`sections_cn/05_conclusions.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections_cn/05_conclusions.tex)
+- [`sections_cn/06_acknowledgments.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections_cn/06_acknowledgments.tex)
+- [`sections_cn/07_appendix.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/sections_cn/07_appendix.tex)
+
+## Current Manuscript Positioning
+
+The paper is now framed as a protein-oriented graph-classification benchmark study:
+
+- main biological evidence: `PROTEINS` and `DD`
+- supporting biological stress test: `ENZYMES`
 - supplementary robustness datasets: `MUTAG`, `AIDS`, `Mutagenicity`
-- main method comparison: plain, residual, and cross-residual reuse topologies
+- main comparison axis: plain, residual, and cross-residual reuse topologies
 
-## Important Supporting Assets
+## Supporting Assets
 
-Main tables and summaries are injected from the repository root:
+Active English table inputs from repository root:
 
 - [`../md/all_exp_tables.tex`](/ds1/workspace/ai/cross_residual_gnn/md/all_exp_tables.tex)
+- [`../md/all_exp_tables_appendix.tex`](/ds1/workspace/ai/cross_residual_gnn/md/all_exp_tables_appendix.tex)
 - [`../md/statistical_tests_main.tex`](/ds1/workspace/ai/cross_residual_gnn/md/statistical_tests_main.tex)
 - [`../md/statistical_tests_supp.tex`](/ds1/workspace/ai/cross_residual_gnn/md/statistical_tests_supp.tex)
 - [`../md/peerj_gate_tables.tex`](/ds1/workspace/ai/cross_residual_gnn/md/peerj_gate_tables.tex)
 - [`../md/peerj_residual_tables.tex`](/ds1/workspace/ai/cross_residual_gnn/md/peerj_residual_tables.tex)
 
-Main figure assets already available:
+Chinese table inputs:
 
-- [`figures/exp/fig1_full_suite_results.pdf`](/ds1/workspace/ai/cross_residual_gnn/paper/figures/exp/fig1_full_suite_results.pdf)
-- [`figures/exp/fig2_cross_advantage_heatmap.pdf`](/ds1/workspace/ai/cross_residual_gnn/paper/figures/exp/fig2_cross_advantage_heatmap.pdf)
-- [`figures/exp/fig4_topic_focus_results.pdf`](/ds1/workspace/ai/cross_residual_gnn/paper/figures/exp/fig4_topic_focus_results.pdf)
-- [`figures/exp/fig5_protein_package_summary.pdf`](/ds1/workspace/ai/cross_residual_gnn/paper/figures/exp/fig5_protein_package_summary.pdf)
+- [`md_cn/all_exp_tables.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/md_cn/all_exp_tables.tex)
+- [`md_cn/all_exp_tables_appendix.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/md_cn/all_exp_tables_appendix.tex)
+- [`md_cn/statistical_tests_main.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/md_cn/statistical_tests_main.tex)
+- [`md_cn/statistical_tests_supp.tex`](/ds1/workspace/ai/cross_residual_gnn/paper/md_cn/statistical_tests_supp.tex)
+
+Active figure assets:
+
+- [`figures/exp/fig1_full_suite_results_V3.pdf`](/ds1/workspace/ai/cross_residual_gnn/paper/figures/exp/fig1_full_suite_results_V3.pdf)
+- [`figures/exp/fig2_cross_advantage_heatmap_V3.pdf`](/ds1/workspace/ai/cross_residual_gnn/paper/figures/exp/fig2_cross_advantage_heatmap_V3.pdf)
+- [`figures/exp/fig4_topic_focus_results_V3.pdf`](/ds1/workspace/ai/cross_residual_gnn/paper/figures/exp/fig4_topic_focus_results_V3.pdf)
+- [`figures/exp/fig5_protein_package_summary_V3.pdf`](/ds1/workspace/ai/cross_residual_gnn/paper/figures/exp/fig5_protein_package_summary_V3.pdf)
+- [`figures/cr_gnn_node_architecture.pdf`](/ds1/workspace/ai/cross_residual_gnn/paper/figures/cr_gnn_node_architecture.pdf)
+- [`figures/cr_gnn_graph_architecture.pdf`](/ds1/workspace/ai/cross_residual_gnn/paper/figures/cr_gnn_graph_architecture.pdf)
+
+Legacy and exploratory figures are intentionally retained in `paper/figures/exp/` for traceability, but the `_V3` versions are the active paper-facing ones.
 
 ## Compilation
 
@@ -45,20 +77,9 @@ From this directory:
 
 ```bash
 latexmk -pdf main.tex
+latexmk -xelatex main_chinese.tex
 ```
 
-or:
+## Status
 
-```bash
-pdflatex main.tex
-bibtex main
-pdflatex main.tex
-pdflatex main.tex
-```
-
-## Current Editing Priorities
-
-1. Align abstract, results, discussion, and conclusion claims with the current V3 tables.
-2. Reinsert the existing main result figures into the body text so the benchmark story has visible evidence.
-3. Close notation gaps in the methods section, especially for `psi`, `Phi_in`, `Pool`, `B_t`, `T`, and the graph-level cross-residual recurrence.
-4. Keep the main storyline centered on the biological core and demote supplementary datasets when making paper-facing claims.
+Both PDFs compile successfully. Remaining warnings are non-blocking and mainly concern float placement, wide tables, and PDF version warnings for two architecture figures.

@@ -1,0 +1,260 @@
+\section{材料与方法}
+\label{sec:methods}
+
+本节定义统一的图分类设定、CR-GNN 架构家族、benchmark 套件以及共享实验协议。核心原则是在尽量保持其余流程一致的前提下，隔离“信息在何处被复用”。这一设计对论文的方法论论证至关重要：如果主干算子、池化方式和评估协议都被固定，那么性能差异就更可能来源于复用拓扑本身，而不是无关的实现差异。
+
+\subsection{问题定义与符号}
+
+设 $\mathcal{G} = (\mathcal{V}, \mathcal{E})$ 为无向或有向图，其中 $\mathcal{V} = \{v_1, v_2, \ldots, v_n\}$ 是包含 $n$ 个节点的集合，$\mathcal{E} \subseteq \mathcal{V} \times \mathcal{V}$ 是边集。每个节点 $v_i \in \mathcal{V}$ 关联一个特征向量 $\mathbf{x}_i \in \mathbb{R}^{d_{\text{in}}}$，整图的节点特征记为 $\mathbf{X} \in \mathbb{R}^{n \times d_{\text{in}}}$，图结构由邻接矩阵 $\mathbf{A}$ 表示。
+
+给定训练数据集 $\mathcal{D} = \{(\mathcal{G}_i, y_i)\}_{i=1}^{N}$，目标是学习映射 $f_\theta: \mathcal{G} \rightarrow \hat{y}$，用于预测未见图的标签。本文在同一图分类流程下比较五种架构：
+\begin{itemize}
+    \item \textbf{PlainGNN}：无显式状态复用的顺序消息传递
+    \item \textbf{NodeResGNN}：单分支节点级残差复用
+    \item \textbf{NodeCrossGNN}：双分支节点级交叉交换
+    \item \textbf{GraphResGNN}：跨顺序块的图级残差传播
+    \item \textbf{GraphCrossGNN}：跨成对块的图级交叉摘要交换
+\end{itemize}
+
+这组比较旨在隔离“信息在哪里被复用”：是在单分支内部、在并行分支之间，还是通过块间传递的池化图摘要。对应地，同分支残差复用主要检验重新注入历史状态能否稳定更深层传播，而交叉残差设计则检验跨并行流交换信息能否保留普通堆叠中可能丢失的互补结构。
+
+\subsection{共享消息传递与图级学习}
+
+设 $\Phi$ 表示一个消息传递算子。对于给定主干，节点表示经过 $L$ 层更新为
+\begin{equation}
+\mathbf{h}_i^{(\ell+1)} = \sigma\left(\mathbf{W}^{(\ell)} \cdot \text{AGGREGATE}_{\Phi}\left(\left\{\mathbf{h}_j^{(\ell)} : j \in \mathcal{N}(i)\right\}, \mathbf{h}_i^{(\ell)}\right) + \mathbf{b}^{(\ell)}\right).
+\end{equation}
+经过 $L$ 层后，读出函数 $R$ 将节点级表示聚合为图嵌入
+\begin{equation}
+\mathbf{h}_{\mathcal{G}} = R\left(\left\{\mathbf{h}_i^{(L)} : i = 1, \ldots, n\right\}\right).
+\end{equation}
+分类器输出为
+\begin{equation}
+\hat{\mathbf{y}} = \text{softmax}\left(\mathbf{W}_{\text{clf}} \mathbf{h}_{\mathcal{G}} + \mathbf{b}_{\text{clf}}\right),
+\end{equation}
+模型通过最小化交叉熵进行端到端训练：
+\begin{equation}
+\mathcal{L}(\theta) = -\frac{1}{N} \sum_{i=1}^{N} \sum_{c=1}^{C} y_{i,c} \log(\hat{y}_{i,c}).
+\end{equation}
+
+\subsection{CR-GNN 架构家族}
+\label{sec:model}
+
+CR-GNN 被定义为一个紧凑的图分类架构家族。所有变体共享相同的输入投影、堆叠消息传递层、图级池化和线性分类器；它们只在中间节点状态与图级摘要如何跨深度和跨分支复用上有所不同。这里特意不引入独立编码器、任务特定特征工程或架构特定读出头，因为这些额外组件会使人难以判断性能增益究竟来自残差拓扑还是额外模型容量。
+
+设 $\mathcal{G}=(\mathcal{V},\mathcal{E})$ 为一个图，其节点特征矩阵为 $\mathbf{X}\in\mathbb{R}^{n\times d_{\mathrm{in}}}$，邻接结构为 $\mathbf{A}$。模型可实例化为四种标准消息传递算子之一：
+\[
+\Phi \in \{\mathrm{GCNConv},\ \mathrm{GATConv},\ \mathrm{SAGEConv},\ \mathrm{GINConv}\},
+\]
+并在单个模型实例内始终复用同一种算子。设隐藏宽度为 $d$，每个分支都从输入投影开始：
+\begin{equation}
+\mathbf{H}^{(0)} = \psi\!\left(\Phi_{\mathrm{in}}(\mathbf{X}, \mathbf{A})\right),
+\end{equation}
+随后经过 $L$ 个隐藏层和一个读出：
+\begin{equation}
+\mathbf{g} = \mathrm{Pool}\!\left(\mathbf{H}^{(L)}\right).
+\end{equation}
+其中，$\Phi_{\mathrm{in}}:\mathbb{R}^{n\times d_{\mathrm{in}}}\rightarrow\mathbb{R}^{n\times d}$ 表示分支特定的输入算子，$\mathrm{Pool}(\cdot)$ 表示对节点执行全局均值池化，而
+\begin{equation}
+\psi(\mathbf{Z}) = \mathrm{Dropout}\!\left(\mathrm{ReLU}(\mathbf{Z})\right).
+\end{equation}
+残差信号由标量门控系数 $\alpha\in(0,1]$ 调制，默认通过 sigmoid 参数化学习得到，仅在 gate ablation 中固定。残差路由算子记为
+\begin{equation}
+\mathcal{R}(\mathbf{U}) =
+\begin{cases}
+\mathbf{U}, & \text{可学习稠密路由}, \\
+\mathbf{U}\odot \mathbf{M}_{k}, & \text{top-k 路由}, \\
+\mathrm{softshrink}_{\lambda}(\mathbf{U}), & \text{稀疏路由},
+\end{cases}
+\end{equation}
+其中 $\mathbf{M}_{k}$ 沿特征维保留绝对值最大的通道，$\lambda$ 为稀疏路由阈值。
+
+\subsubsection{单分支与节点级残差变体}
+
+\textbf{PlainGNN.} 普通基线不做残差复用，而是直接堆叠 $L$ 层相同算子：
+\begin{equation}
+\mathbf{H}^{(\ell+1)} = \psi\!\left(\Phi_{\ell}\!\left(\mathbf{H}^{(\ell)}, \mathbf{A}\right)\right), \qquad \ell=0,\dots,L-1.
+\end{equation}
+
+\textbf{NodeResGNN.} 第一种残差变体在同一分支内保存前一层隐藏状态。为与实现一致，第一步残差输入初始化为零：
+\begin{equation}
+\mathbf{P}^{(0)}=\mathbf{0}, \qquad \mathbf{P}^{(\ell+1)}=\mathbf{H}^{(\ell)}.
+\end{equation}
+其更新写为
+\begin{equation}
+\mathbf{H}^{(\ell+1)} = \psi\!\left(\Phi_{\ell}\!\left(\mathbf{H}^{(\ell)} + \alpha\,\mathcal{R}\!\left(\mathbf{P}^{(\ell)}\right), \mathbf{A}\right)\right), \qquad \ell=0,\dots,L-1.
+\end{equation}
+
+\textbf{NodeCrossGNN.} 节点级交叉残差模型维护两个具有独立输入投影的并行分支：
+\begin{equation}
+\mathbf{H}_{1}^{(0)}=\psi\!\left(\Phi_{\mathrm{in}}^{(1)}(\mathbf{X},\mathbf{A})\right), \qquad
+\mathbf{H}_{2}^{(0)}=\psi\!\left(\Phi_{\mathrm{in}}^{(2)}(\mathbf{X},\mathbf{A})\right),
+\end{equation}
+交换状态初始化为
+\begin{equation}
+\mathbf{P}_{1}^{(0)}=\mathbf{0}, \qquad \mathbf{P}_{2}^{(0)}=\mathbf{0}, \qquad
+\mathbf{P}_{b}^{(\ell+1)}=\mathbf{H}_{b}^{(\ell)}.
+\end{equation}
+每个分支接收另一分支的前一时刻状态：
+\begin{align}
+\mathbf{H}^{(\ell+1)}_{1} &= \psi\!\left(\Phi^{(1)}_{\ell}\!\left(\mathbf{H}^{(\ell)}_{1} + \alpha\,\mathcal{R}\!\left(\mathbf{P}^{(\ell)}_{2}\right), \mathbf{A}\right)\right), \\
+\mathbf{H}^{(\ell+1)}_{2} &= \psi\!\left(\Phi^{(2)}_{\ell}\!\left(\mathbf{H}^{(\ell)}_{2} + \alpha\,\mathcal{R}\!\left(\mathbf{P}^{(\ell)}_{1}\right), \mathbf{A}\right)\right),
+\qquad \ell=0,\dots,L-1.
+\end{align}
+最终节点表示为两分支求和：
+\begin{equation}
+\mathbf{H}^{(L)} = \mathbf{H}^{(L)}_{1} + \mathbf{H}^{(L)}_{2}.
+\end{equation}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/cr_gnn_node_architecture.pdf}
+\caption{节点级 CR-GNN 架构家族。左：PlainGNN，无状态复用的顺序消息传递。中：NodeResGNN，单分支残差复用，每层接收前一隐藏状态作为附加输入。右：NodeCrossGNN，双分支交叉残差交换，每个分支接收对侧分支的先前隐藏状态；两分支在全局均值池化与分类前求和。}
+\label{fig:node_architecture}
+\end{figure}
+
+\subsubsection{图级残差传播}
+
+\textbf{GraphResGNN.} 该变体串联三个图条件块。设 $\mathcal{B}(\mathbf{X},\mathbf{A},\mathbf{g})$ 表示一个图条件块。块内部将图级状态 $\mathbf{g}\in\mathbb{R}^{B\times d}$ 通过 batch 索引广播回节点，并在每个隐藏消息传递层前进行相加：
+\begin{align}
+\mathbf{Z}^{(0)} &= \psi\!\left(\Phi_{\mathrm{in}}(\mathbf{X},\mathbf{A})\right), \\
+\mathbf{Z}^{(\ell+1)} &=
+\psi\!\left(
+\Phi_{\ell}\!\left(
+\mathbf{Z}^{(\ell)} + \alpha\,\mathcal{R}\!\left(\mathbf{g}[\mathrm{batch}]\right), \mathbf{A}
+\right)
+\right), \qquad \ell=0,\dots,L-1, \\
+\mathcal{B}(\mathbf{X},\mathbf{A},\mathbf{g}) &=
+\mathrm{Pool}\!\left(\mathbf{Z}^{(L)}\right) + \alpha\,\mathcal{R}(\mathbf{g}).
+\end{align}
+若不存在上一阶段的图状态，则取 $\mathbf{g}=\mathbf{0}$。于是 GraphResGNN 的递推为
+\begin{equation}
+\mathbf{g}^{(0)}=\mathbf{0}, \qquad
+\mathbf{g}^{(t)} = \mathcal{B}_{t}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(t-1)}\right), \qquad t=1,2,3,
+\end{equation}
+并使用 $\mathbf{g}^{(3)}$ 进行分类。
+
+\textbf{GraphCrossGNN.} 四个块被组织为两个顺序阶段。在该模型中，图级交换仅发生在池化后的图嵌入阶段，而不直接进入节点更新。设 $\mathcal{C}(\mathbf{X},\mathbf{A},\mathbf{g})$ 表示一个此类块：
+\begin{align}
+\mathbf{Z}^{(0)} &= \psi\!\left(\Phi_{\mathrm{in}}(\mathbf{X},\mathbf{A})\right), \\
+\mathbf{Z}^{(\ell+1)} &= \psi\!\left(\Phi_{\ell}\!\left(\mathbf{Z}^{(\ell)},\mathbf{A}\right)\right), \qquad \ell=0,\dots,L-1, \\
+\mathcal{C}(\mathbf{X},\mathbf{A},\mathbf{g}) &= \mathrm{Pool}\!\left(\mathbf{Z}^{(L)}\right) + \alpha\,\mathcal{R}(\mathbf{g}).
+\end{align}
+设两个分支状态初始化为 $\mathbf{g}^{(0)}_{1}=\mathbf{g}^{(0)}_{2}=\mathbf{0}$，则分阶段递推为
+\begin{align}
+\widehat{\mathbf{g}}^{(t)}_{1} &= \mathcal{C}_{2t-1}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(t-1)}_{1}\right), \\
+\widehat{\mathbf{g}}^{(t)}_{2} &= \mathcal{C}_{2t}\!\left(\mathbf{X}, \mathbf{A}, \mathbf{g}^{(t-1)}_{2}\right), \qquad t=1,2, \\
+\mathbf{g}^{(t)}_{1} &= \widehat{\mathbf{g}}^{(t)}_{2}, \qquad
+\mathbf{g}^{(t)}_{2} = \widehat{\mathbf{g}}^{(t)}_{1}.
+\end{align}
+最终图嵌入为
+\begin{equation}
+\mathbf{g}_{\mathrm{final}} = \mathbf{g}^{(2)}_{1} + \mathbf{g}^{(2)}_{2}.
+\end{equation}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/cr_gnn_graph_architecture.pdf}
+\caption{图级 CR-GNN 架构家族。左：GraphResGNN，顺序图条件块之间通过残差路由器传播共享残差状态。右：GraphCrossGNN，双分支交叉摘要交换，两条并行块序列在成对阶段之间交换图级摘要。残差路由器支持固定、可学习、top-k 和稀疏四种模式。}
+\label{fig:graph_architecture}
+\end{figure}
+
+\subsection{残差路由机制}
+
+除架构家族本身外，本文还评估残差信息“如何”被注入。因为仅靠架构比较，无法回答表面上的残差优势究竟来自额外路径的存在，还是来自这一路径被过滤的方式。针对性消融中使用三种路由模式：
+\begin{itemize}
+    \item \textbf{可学习路由}：由自适应门控调制的稠密残差注入。
+    \item \textbf{Top-k 路由}：仅保留最强残差通道后再注入。
+    \item \textbf{稀疏路由}：抑制弱残差系数，仅保留经过筛选的残差路径。
+\end{itemize}
+这些路由模式并不用于重新定义核心架构家族，而是在实验设计中叠加于部分残差与交叉残差目标之上的机制层。因此，路由研究是解释性的而非装饰性的：它检验同一架构在残差信息被稠密、选择性或稀疏地向前传递时，是否会出现不同表现。
+
+\subsection{数据集}
+\label{sec:datasets}
+
+为在具有生物意义的设定下检验所提架构，本文将 benchmark 组织为两个层级。
+
+主 biological benchmark 由 PROTEINS、DD 和 ENZYMES 构成 \cite{fey2019fast,morris2020tudataset}。补充鲁棒性套件由 MUTAG、AIDS 和 Mutagenicity 构成。这种组织方式使主要 biological claim 聚焦于蛋白质导向数据集，同时仍能在额外分子图上检验结构鲁棒性。
+
+\paragraph{PROTEINS}
+PROTEINS 包含蛋白质的图表示，其中节点表示二级结构元素，边编码它们之间的邻域关系。任务为二分类图分类。该数据集含 1,113 张图，2 个类别，每个节点 3 维输入特征。
+
+\paragraph{DD}
+DD 是一个蛋白质结构数据集，每张图对应一个蛋白质，节点表示氨基酸或与结构相关的单元，边由邻近关系导出。任务为二分类。DD 含 1,178 张图，2 个类别，89 维输入特征。
+
+\paragraph{ENZYMES}
+ENZYMES 是一个 6 类酶分类 benchmark，包含 600 张图和 3 维输入特征。它保留了酶导向的生物解释，同时仍可与本文中的其他图分类 benchmark 直接比较。
+
+\input{md_cn/dataset_statistics_tables.tex}
+
+所有数据集均通过统一 benchmark 接口访问 \cite{fey2019fast,morris2020tudataset}。我们尽量保持轻量预处理，不引入任务特定特征工程、图增强或边重设计。
+
+所有结果均遵循相同的分层两阶段评估设计：
+\begin{itemize}
+    \item \textbf{外层评估}：图级别的分层五折交叉验证
+    \item \textbf{内层验证}：从训练折中抽取验证比例为 0.1 的分层验证子集
+\end{itemize}
+
+主要评估指标是保留测试折上的图分类准确率。对于测试集为 $\mathcal{T}_k$ 的第 $k$ 折，准确率定义为
+\begin{equation}
+\mathrm{Acc}_k = \frac{1}{|\mathcal{T}_k|}\sum_{(\mathcal{G}_i,y_i)\in\mathcal{T}_k}\mathbf{1}\!\left[\hat{y}_i = y_i\right].
+\end{equation}
+跨五折，我们报告平均准确率
+\begin{equation}
+\overline{\mathrm{Acc}} = \frac{1}{5}\sum_{k=1}^{5}\mathrm{Acc}_k
+\end{equation}
+及其标准差
+\begin{equation}
+\sigma_{\mathrm{Acc}} = \sqrt{\frac{1}{5}\sum_{k=1}^{5}\left(\mathrm{Acc}_k-\overline{\mathrm{Acc}}\right)^2 }.
+\end{equation}
+
+该 benchmark 在四种消息传递算子（GCNConv、GATConv、SAGEConv、GINConv）下评估五种架构。
+
+\subsection{训练配置与实现细节}
+
+所有模型均在 PyTorch Geometric \cite{fey2019fast} 中实现，并遵循统一训练协议。关键超参数总结于表~\ref{tab:hyperparams}。训练采用早停：若验证损失连续 60 个 epoch 未改善则终止，并保留验证损失最低的 checkpoint 用于测试评估。不使用 batch normalization 或 layer normalization，唯一正则化来自 dropout 和 weight decay。所有训练、验证和测试划分均由全局随机种子 1024 固定，确保每个模型在每一折内看到完全相同的数据划分。不使用任务特定特征工程、图增强或边重设计，直接采用 TUDataset 的原始节点特征和邻接结构。
+
+\begin{table}[h]
+\centering
+\small
+\caption{所有实验共享的关键训练超参数。}
+\label{tab:hyperparams}
+\begin{tabular}{l c}
+\toprule
+参数 & 数值 \\
+\midrule
+框架 & PyTorch Geometric \\
+隐藏维度 ($d$) & 64 \\
+消息传递层数 ($L$) & 4 \\
+Dropout 比例 & 0.5 \\
+优化器 & Adam \\
+初始学习率 & $5\times10^{-3}$ \\
+权重衰减 & $1\times10^{-4}$ \\
+学习率调度 & ReduceLROnPlateau（factor 0.5, patience 15） \\
+最小学习率 & $1\times10^{-5}$ \\
+Batch size & 256 \\
+最大训练轮数 & 200 \\
+早停耐心值 & 60 epochs \\
+梯度裁剪范数 ($L_2$) & 2.0 \\
+池化方式 & 全局均值池化 \\
+损失函数 & 交叉熵 \\
+随机种子 & 1024 \\
+验证集比例 & 0.1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+残差与交叉残差变体使用的可学习门控，对一个初始值为 0.8 的标量参数施加 sigmoid 激活，从而在训练中自适应缩放每次残差注入。对于 top-k 路由，仅保留残差通道中绝对值最大的那一部分。对于稀疏路由，使用阈值为 $\lambda$ 的 softshrink 算子抑制幅值低于 $\lambda$ 的残差系数，仅保留筛选后的残差路径。
+
+\subsection{实验设计}
+
+本实证研究将确认性五折证据与探索性分析区分开来。统一协议下，benchmark 覆盖六个数据集、五种架构、四种消息传递算子和五个外层折。整体 benchmark 被分为 biological core（PROTEINS、DD、ENZYMES）与 supplementary robustness suite（MUTAG、AIDS、Mutagenicity）。
+
+为回答引言中的研究问题，研究被组织为四个实验层次：
+
+\begin{enumerate}
+    \item \textbf{完整 benchmark。} 在六个数据集和四种算子上，对五种架构进行分层五折比较，以建立整体性能层级，并找出各拓扑最擅长的数据集--算子组合。
+    \item \textbf{深度扩展分析。} 在 PROTEINS 的 GCNConv 设定下，跟踪隐藏状态相似度（CKA 与 cosine）以及逐层梯度范数，以分析 benchmark 模式背后的表示动态。
+    \item \textbf{针对性消融。} 通过 gate ablation、routing ablation 以及参数扫描，检验观察到的差异是否由残差注入机制而非单纯架构标签驱动。
+    \item \textbf{统计检验。} 对主要 biological evidence 执行配对 $t$ 检验，以判断观察到的性能差异相对于折间波动是否具有说服力；补充数据集的统计检验放入 appendix。
+\end{enumerate}
